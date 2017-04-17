@@ -3,6 +3,7 @@ datatype uri = EXPLICIT of string | IMPLICIT
 datatype pin = UNPINNED | PINNED of string
 datatype state = ABSENT | CORRECT | SUPERSEDED | WRONG
 datatype result = OK | ERROR of string
+datatype output = SUCCEED of string | FAIL of string
                                         
 type provider = {
     name : string,
@@ -32,48 +33,65 @@ type config = {
 structure FileBits :> sig
     val libpath : context -> libname -> string
     val subpath : context -> libname -> string -> string
-    val command_output : context -> libname -> string -> string
+    val command_output : context -> libname -> string -> output
+    val command : context -> libname -> string -> result
+    val my_dir : unit -> string
 end = struct
 
-fun subpath { rootpath, extdir } libname remainder =
-    let val { isAbs, vol, arcs } = OS.Path.fromString rootpath
-    in OS.Path.toString {
-            isAbs = isAbs,
-            vol = vol,
-            arcs = arcs @ [ extdir, libname ] @
-                   String.tokens (fn c => c = #"/") remainder
-        }
-    end
-
-fun libpath context libname =
-    subpath context libname ""
-
-fun file_contents filename =
-    let val stream = TextIO.openIn filename
-        fun read_all str acc =
-            case TextIO.inputLine str of
-                SOME line => read_all str (line :: acc)
-              | NONE => rev acc
-        val contents = read_all stream []
-        val _ = TextIO.closeIn stream
-    in
-        String.concatWith "\\n" contents
-    end
-            
-fun command_output context libname command =
-    let open OS
-        val dir = libpath context libname
-        val tmpFile = FileSys.tmpName ()
-    in
-        let val _ = FileSys.chDir dir
-            val status = Process.system (command ^ ">" ^ tmpFile)
-            val contents = file_contents tmpFile
-        in
-            FileSys.remove tmpFile;
-            contents
+    fun subpath { rootpath, extdir } libname remainder =
+        let val { isAbs, vol, arcs } = OS.Path.fromString rootpath
+        in OS.Path.toString {
+                isAbs = isAbs,
+                vol = vol,
+                arcs = arcs @ [ extdir, libname ] @
+                       String.tokens (fn c => c = #"/") remainder
+            }
         end
-        handle ex => (FileSys.remove tmpFile; raise ex) (*!!!*)
-    end
+
+    fun libpath context libname =
+        subpath context libname ""
+
+    fun file_contents filename =
+        let val stream = TextIO.openIn filename
+            fun read_all str acc =
+                case TextIO.inputLine str of
+                    SOME line => read_all str (line :: acc)
+                  | NONE => rev acc
+            val contents = read_all stream []
+            val _ = TextIO.closeIn stream
+        in
+            String.concatWith "\\n" contents
+        end
+            
+    fun command_output context libname command =
+        let open OS
+            val dir = libpath context libname
+            val tmpFile = FileSys.tmpName ()
+        in
+            let val _ = FileSys.chDir dir
+                val status = Process.system (command ^ ">" ^ tmpFile)
+                val contents = file_contents tmpFile
+            in
+                FileSys.remove tmpFile;
+                if Process.isSuccess status
+                then SUCCEED contents
+                else FAIL ("Command failed: \"" ^ command ^
+                           "\" (in dir \"" ^ dir ^ "\")")
+            end
+            handle ex => (FileSys.remove tmpFile; raise ex) (*!!!*)
+        end
+
+    fun command context libname command =
+        case command_output context libname command of
+            SUCCEED _ => OK
+          | FAIL err => ERROR err
+
+    fun my_dir () =
+        let open OS
+            val { dir, file } = Path.splitDirFile (CommandLine.name ())
+        in
+            FileSys.realPath (Path.concat (FileSys.getDir (), dir))
+        end
 end
                   
 signature VCS_CONTROL = sig
@@ -91,7 +109,9 @@ structure HgControl :> VCS_CONTROL = struct
         handle _ => false
 
     fun current_id context libname =
-        FileBits.command_output context libname "hg id"
+        case FileBits.command_output context libname "hg id" of
+            SUCCEED out => out
+          | FAIL err => raise Fail err
 
     fun is_newest context (libname, provider) = false
 
@@ -108,12 +128,14 @@ end
                                          
 functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
 
-fun check context ({ name, pin, ... } : libspec) =
-    if not (V.exists context name)
-    then ABSENT
-    else CORRECT (*!!!*)
-
-fun update context libspec = ERROR "not implemented"
+    fun check context ({ name, pin, ... } : libspec) =
+        if not (V.exists context name)
+        then ABSENT
+        else CORRECT (*!!!*)
+             
+    fun update context ({ name, provider, pin = UNPINNED, ... } : libspec) =
+        V.update context (name, provider)
+      | update context (spec : libspec) = ERROR "not implemented"
              
 end
 
@@ -121,8 +143,11 @@ structure HgLibControl = LibControlFn(HgControl)
                                               
 fun main () =
     let open HgLibControl
+        val rootpath = FileBits.my_dir ();
+        val _ = print ("path is " ^ rootpath ^ "\n")
     in
-        case check { rootpath = ".", extdir = "ext" }
+        (*
+        case check { rootpath = rootpath, extdir = "ext" }
                { name = "sml-log", vcs = HG,
                  provider = { name = "bitbucket", uri = IMPLICIT, user = "cannam" },
                  pin = UNPINNED } of
@@ -130,7 +155,15 @@ fun main () =
           | CORRECT => print "correct\n"
           | SUPERSEDED => print "superseded\n"
           | WRONG => print "wrong\n"
+        *)
+        case update { rootpath = rootpath, extdir = "ext" }
+                    { name = "sml-log", vcs = HG,
+                      provider = { name = "bitbucket", uri = IMPLICIT, user = "cannam" },
+                      pin = UNPINNED } of
+            OK => print "done\n"
+          | ERROR text => print ("error: " ^ text ^ "\n")
     end
+    handle Fail err => print ("failed with error: " ^ err ^ "\n");
         
 (*
 structure GitControl :> VCS_CONTROL = struct
