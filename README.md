@@ -19,7 +19,7 @@ managers:
 
  1. It only knows how to get things from version control
  repositories. There is no support for installing pre-packaged or
- pre-compiled dependencies. If it's not in a repository, or cloning
+ pre-compiled dependencies. If it's not in a repository, or if cloning
  the repository would be too expensive, then Vext won't help.
 
  2. It can only bring code in to a subdirectory of the local directory
@@ -91,5 +91,6 @@ Run "vext update" to update all the configured libraries.
 Pinned libraries will be updated if they are in Absent or Wrong state.
 
 Unpinned libraries will always be updated, which should have an effect
-when they are in Absent or Out-of-date state.
+only when they are in Absent or Out-of-date state.
+
 
