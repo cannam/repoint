@@ -2,6 +2,8 @@
 Vext
 ====
 
+*NOTE* This is just an experiment.
+
 A simple manager for third-party source code dependencies.
 
 Vext is a program that manages a directory of external source code
