@@ -132,7 +132,9 @@ end
                   
 signature VCS_CONTROL = sig
     val exists : context -> libname -> bool
-    val current_state : context -> libname -> { id: string, modified: bool, branch: string, tags: string list }
+    val current_state : context -> libname ->
+                        { id: string, modified: bool,
+                          branch: string, tags: string list }
     val is_newest : context -> libname * provider -> bool
     val checkout : context -> libname * provider -> result
     val update : context -> libname * provider -> result
