@@ -14,7 +14,7 @@ type provider = {
 type libname = string
 
 type libspec = {
-    name : libname,
+    libname : libname,
     vcs : vcs,
     provider : provider,
     pin : pin
@@ -229,37 +229,37 @@ end
                                          
 functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
 
-    fun check context ({ name, provider, pin, ... } : libspec) =
-        if not (V.exists context name)
+    fun check context ({ libname, provider, pin, ... } : libspec) =
+        if not (V.exists context libname)
         then ABSENT
         else
             case pin of
-                UNPINNED => if not (V.is_newest context (name, provider))
+                UNPINNED => if not (V.is_newest context (libname, provider))
                             then SUPERSEDED
                             else CORRECT
               | PINNED target => 
-                case V.current_state context name of
+                case V.current_state context libname of
                     { id, ... } => if target <> id
                                    then WRONG
-(*!!!???                                   else if not (V.is_newest context (name, provider))
+(*!!!???                                   else if not (V.is_newest context (libname, provider))
                                    then SUPERSEDED *)
                                    else CORRECT
 
-    fun update context (spec as { name, provider, pin, ... } : libspec) =
+    fun update context (spec as { libname, provider, pin, ... } : libspec) =
         let fun update' () =
             case pin of
-                UNPINNED => if not (V.is_newest context (name, provider))
-                            then V.update context (name, provider)
+                UNPINNED => if not (V.is_newest context (libname, provider))
+                            then V.update context (libname, provider)
                             else OK
               | PINNED target =>
-                case V.current_state context name of
+                case V.current_state context libname of
                     { id, ... } => if target <> id
-                                   then V.update_to context (name, provider,
-                                                             target)
+                                   then V.update_to context
+                                                    (libname, provider, target)
                                    else OK
         in
-            if not (V.exists context name)
-            then case V.checkout context (name, provider) of
+            if not (V.exists context libname)
+            then case V.checkout context (libname, provider) of
                      OK => update' ()
                    | ERROR e => ERROR e
             else update' ()
@@ -281,7 +281,7 @@ fun main () =
     in
 
 (*        case check { rootpath = rootpath, extdir = "ext" }
-               { name = "sml-fft", vcs = HG,
+               { libname = "sml-fft", vcs = HG,
                  provider = { service = "bitbucket", url = IMPLICIT, user = "cannam" },
                  pin = PINNED "393e07cc4a53" } of
             ABSENT => print "absent\n"
@@ -290,7 +290,7 @@ fun main () =
           | WRONG => print "wrong\n"
 *)
         case update { rootpath = rootpath, extdir = "ext" }
-                    { name = "sml-fft",
+                    { libname = "sml-fft",
                       vcs = HG,
                       provider = {
                           service = "bitbucket",
