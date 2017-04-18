@@ -1,5 +1,5 @@
 datatype vcs = HG | GIT
-datatype uri = EXPLICIT of string | IMPLICIT
+datatype url = EXPLICIT of string | IMPLICIT
 datatype pin = UNPINNED | PINNED of string
 datatype libstate = ABSENT | CORRECT | SUPERSEDED | WRONG
 datatype result = OK | ERROR of string
@@ -8,7 +8,7 @@ datatype output = SUCCEED of string | FAIL of string
 type provider = {
     service : string,
     user : string,
-    uri : uri
+    url : url
 }
 
 type libname = string
@@ -31,13 +31,24 @@ type config = {
 }
 
 structure FileBits :> sig
+    val extpath : context -> string
     val libpath : context -> libname -> string
     val subpath : context -> libname -> string -> string
     val command_output : context -> libname -> string -> output
     val command : context -> libname -> string -> result
     val my_dir : unit -> string
+    val mkpath : string -> result
 end = struct
 
+    fun extpath { rootpath, extdir } =
+        let val { isAbs, vol, arcs } = OS.Path.fromString rootpath
+        in OS.Path.toString {
+                isAbs = isAbs,
+                vol = vol,
+                arcs = arcs @ [ extdir ]
+            }
+        end
+    
     fun subpath { rootpath, extdir } libname remainder =
         let val { isAbs, vol, arcs } = OS.Path.fromString rootpath
         in OS.Path.toString {
@@ -48,7 +59,9 @@ end = struct
             }
         end
 
-    fun libpath context libname =
+    fun libpath context "" =
+        extpath context
+      | libpath context libname =
         subpath context libname ""
 
     fun trim str =
@@ -100,12 +113,28 @@ end = struct
                  then dir
                  else Path.concat (FileSys.getDir (), dir))
         end
+
+    fun mkpath path =
+        if OS.FileSys.isDir path handle _ => false
+        then OK
+        else case OS.Path.fromString path of
+                 { arcs = nil, ... } => OK
+               | { isAbs = false, ... } => ERROR "mkpath requires absolute path"
+               | { isAbs, vol, arcs } => 
+                 case mkpath (OS.Path.toString {      (* parent *)
+                                   isAbs = isAbs,
+                                   vol = vol,
+                                   arcs = rev (tl (rev arcs)) }) of
+                     ERROR e => ERROR e
+                   | OK => ((OS.FileSys.mkDir path; OK)
+                            handle OS.SysErr (e, _) => ERROR e)
 end
                   
 signature VCS_CONTROL = sig
     val exists : context -> libname -> bool
     val current_state : context -> libname -> { id: string, modified: bool, branch: string, tags: string list }
     val is_newest : context -> libname * provider -> bool
+    val checkout : context -> libname * provider -> result
     val update : context -> libname * provider -> result
     val update_to : context -> libname * provider * string -> result
 end
@@ -117,10 +146,10 @@ structure HgControl :> VCS_CONTROL = struct
         handle _ => false
 
     fun remote_for (libname, provider : provider) =
-        case (#uri provider) of
-            EXPLICIT uri => uri
+        case (#url provider) of
+            EXPLICIT url => url
           | IMPLICIT =>
-            (*!!! todo: check user, libname, tags etc for characters invalid in filenames and/or uris; reject or encode *)
+            (*!!! todo: check user, libname, tags etc for characters invalid in filenames and/or urls; reject or encode *)
             case (#service provider) of
                 "bitbucket" => ("https://bitbucket.org/" ^ (#user provider) ^
                                 "/" ^ libname)
@@ -157,11 +186,20 @@ structure HgControl :> VCS_CONTROL = struct
         end
 
     fun is_newest context (libname, provider) = false
+
+    fun checkout context (libname, provider) =
+        let val command = FileBits.command context ""
+            val url = remote_for (libname, provider)
+        in
+            case FileBits.mkpath (FileBits.extpath context) of
+               OK => command ("hg clone \"" ^ url ^ "\" \"" ^ libname ^ "\"")
+             | ERROR e => ERROR e
+        end
                                                     
     fun update context (libname, provider) =
         let val command = FileBits.command context libname
-            val uri = remote_for (libname, provider)
-            val pull_result = command ("hg pull \"" ^ uri ^ "\"")
+            val url = remote_for (libname, provider)
+            val pull_result = command ("hg pull \"" ^ url ^ "\"")
         in
             case command "hg update" of
                 OK => pull_result
@@ -172,12 +210,12 @@ structure HgControl :> VCS_CONTROL = struct
         update context (libname, provider)
       | update_to context (libname, provider, id) = 
         let val command = FileBits.command context libname
-            val uri = remote_for (libname, provider)
+            val url = remote_for (libname, provider)
         in
             if command ("hg update -r" ^ id) = OK
             then OK
             else
-                case command ("hg pull \"" ^ uri ^ "\"") of
+                case command ("hg pull \"" ^ url ^ "\"") of
                     OK => command ("hg update -r" ^ id)
                   | ERROR e => ERROR e
         end
@@ -206,17 +244,26 @@ functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
 (*!!!???                                   else if not (V.is_newest context (name, provider))
                                    then SUPERSEDED *)
                                    else CORRECT
-             
-    fun update context ({ name, provider, pin = UNPINNED, ... } : libspec) =
-        if not (V.is_newest context (name, provider))
-        then V.update context (name, provider)
-        else OK
-      | update context ({ name, provider, pin = PINNED target, ... } : libspec) =
-        case V.current_state context name of
-            { id, ... } => if target <> id
-                           then V.update_to context (name, provider, target)
-                           else OK
-             
+
+    fun update context (spec as { name, provider, pin, ... } : libspec) =
+        let fun update' () =
+            case pin of
+                UNPINNED => if not (V.is_newest context (name, provider))
+                            then V.update context (name, provider)
+                            else OK
+              | PINNED target =>
+                case V.current_state context name of
+                    { id, ... } => if target <> id
+                                   then V.update_to context (name, provider,
+                                                             target)
+                                   else OK
+        in
+            if not (V.exists context name)
+            then case V.checkout context (name, provider) of
+                     OK => update' ()
+                   | ERROR e => ERROR e
+            else update' ()
+        end
 end
 
 structure HgLibControl = LibControlFn(HgControl)
@@ -235,7 +282,7 @@ fun main () =
 
 (*        case check { rootpath = rootpath, extdir = "ext" }
                { name = "sml-fft", vcs = HG,
-                 provider = { service = "bitbucket", uri = IMPLICIT, user = "cannam" },
+                 provider = { service = "bitbucket", url = IMPLICIT, user = "cannam" },
                  pin = PINNED "393e07cc4a53" } of
             ABSENT => print "absent\n"
           | CORRECT => print "correct\n"
@@ -243,9 +290,15 @@ fun main () =
           | WRONG => print "wrong\n"
 *)
         case update { rootpath = rootpath, extdir = "ext" }
-                    { name = "sml-fft", vcs = HG,
-                      provider = { service = "bitbucket", uri = IMPLICIT, user = "cannam" },
-                      pin = PINNED "393e07cc4a53" } of
+                    { name = "sml-fft",
+                      vcs = HG,
+                      provider = {
+                          service = "bitbucket",
+                          url = IMPLICIT,
+                          user = "cannam"
+                      },
+                      pin = PINNED "393e07cc4a53"
+                    } of
             OK => print "done\n"
           | ERROR text => print ("error: " ^ text ^ "\n")
 
