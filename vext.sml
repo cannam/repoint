@@ -95,7 +95,10 @@ end = struct
         let open OS
             val { dir, file } = Path.splitDirFile (CommandLine.name ())
         in
-            FileSys.realPath (Path.concat (FileSys.getDir (), dir))
+            FileSys.realPath
+                (if Path.isAbsolute dir
+                 then dir
+                 else Path.concat (FileSys.getDir (), dir))
         end
 end
                   
@@ -113,7 +116,7 @@ structure HgControl :> VCS_CONTROL = struct
         OS.FileSys.isDir (FileBits.subpath context libname ".hg")
         handle _ => false
 
-    fun remote_for (libname, provider) =
+    fun remote_for (libname, provider : provider) =
         case (#uri provider) of
             EXPLICIT uri => uri
           | IMPLICIT =>
@@ -220,11 +223,17 @@ structure HgLibControl = LibControlFn(HgControl)
                                               
 fun main () =
     let open HgLibControl
+        (*!!! options: require that this program is in the root dir,
+        and so use the location of this program as the root dir
+        location; or require that the program is only ever run from
+        the root dir; or use some mechanism to scan upwards in the dir
+        hierarchy until we find a plausible root (e.g. a .vex file is
+        present [and we are not within an ext dir?] *)
         val rootpath = FileBits.my_dir ();
         val _ = print ("path is " ^ rootpath ^ "\n")
     in
 
-        case check { rootpath = rootpath, extdir = "ext" }
+(*        case check { rootpath = rootpath, extdir = "ext" }
                { name = "sml-fft", vcs = HG,
                  provider = { service = "bitbucket", uri = IMPLICIT, user = "cannam" },
                  pin = PINNED "393e07cc4a53" } of
@@ -232,19 +241,18 @@ fun main () =
           | CORRECT => print "correct\n"
           | SUPERSEDED => print "superseded\n"
           | WRONG => print "wrong\n"
-(*
+*)
         case update { rootpath = rootpath, extdir = "ext" }
                     { name = "sml-fft", vcs = HG,
                       provider = { service = "bitbucket", uri = IMPLICIT, user = "cannam" },
                       pin = PINNED "393e07cc4a53" } of
             OK => print "done\n"
           | ERROR text => print ("error: " ^ text ^ "\n")
-*)
-    end
-    handle Fail err => print ("failed with error: " ^ err ^ "\n");
-        
-(*
-structure GitControl :> VCS_CONTROL = struct
 
-end
-*)
+    end
+    handle Fail err => print ("failed with error: " ^ err ^ "\n")
+         | e => print ("failed with exception: " ^ (exnMessage e) ^ "\n")
+
+val _ = main ()
+
+             

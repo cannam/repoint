@@ -1,3 +1,5 @@
 
 vext:	vext.sml
-	../sml-buildscripts/polybuild $<
+	mlton $<
+
+#	../sml-buildscripts/polybuild $<
