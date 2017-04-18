@@ -1,7 +1,7 @@
 datatype vcs = HG | GIT
 datatype uri = EXPLICIT of string | IMPLICIT
 datatype pin = UNPINNED | PINNED of string
-datatype state = ABSENT | CORRECT | SUPERSEDED | WRONG
+datatype libstate = ABSENT | CORRECT | SUPERSEDED | WRONG
 datatype result = OK | ERROR of string
 datatype output = SUCCEED of string | FAIL of string
                                         
@@ -101,7 +101,7 @@ end
                   
 signature VCS_CONTROL = sig
     val exists : context -> libname -> bool
-    val current_id : context -> libname -> string
+    val current_state : context -> libname -> { id: string, modified: bool, branch: string, tags: string list }
     val is_newest : context -> libname * provider -> bool
     val update : context -> libname * provider -> result
     val update_to : context -> libname * provider * string -> result
@@ -123,48 +123,96 @@ structure HgControl :> VCS_CONTROL = struct
                                 "/" ^ libname)
               | other => raise Fail ("Unsupported implicit hg provider \"" ^
                                      other ^ "\"")
-    
-    fun current_id context libname = (*!!! can be more than one, e.g. "abcdef tip" *)
-        case FileBits.command_output context libname "hg id" of
-            SUCCEED out => (print ("current id = \"" ^ out ^ "\"\n"); out)
-          | FAIL err => raise Fail err
+
+    fun current_state context libname =
+        let fun is_branch text = text <> "" andalso #"(" = hd (explode text)
+            and extract_branch b =
+                if is_branch b     (* need to remove enclosing parens *)
+                then (implode o rev o tl o rev o tl o explode) b
+                else ""
+            and is_modified id = id <> "" andalso #"+" = hd (rev (explode id))
+            and extract_id id =
+                if is_modified id  (* need to remove trailing "+" *)
+                then (implode o rev o tl o rev o explode) id
+                else id
+            and split_tags tags = String.tokens (fn c => c = #"/") tags
+            and state_for (id, branch, tags) = { id = extract_id id,
+                                                 modified = is_modified id,
+                                                 branch = extract_branch branch,
+                                                 tags = split_tags tags }
+        in        
+            case FileBits.command_output context libname "hg id" of
+                FAIL err => raise Fail err
+              | SUCCEED out =>
+                case String.tokens (fn x => x = #" ") out of
+                    [id, branch, tags] => state_for (id, branch, tags)
+                  | [id, other] => if is_branch other
+                                   then state_for (id, other, "")
+                                   else state_for (id, "", other)
+                  | [id] => state_for (id, "", "")
+                  | _ => raise Fail ("Unexpected output from hg id: " ^ out)
+        end
 
     fun is_newest context (libname, provider) = false
-
-    fun update_to context (libname, provider, id) =
-        let val uri = remote_for (libname, provider)
-            val rev_arg = case id of "" => "" | x => "-r" ^ x
-        in
-            case FileBits.command context libname ("hg pull \"" ^ uri ^ "\"") of
-                ERROR e => ERROR e
-              | OK => FileBits.command context libname ("hg update " ^ rev_arg)
-        end
                                                     
     fun update context (libname, provider) =
-        update_to context (libname, provider, "")
+        let val command = FileBits.command context libname
+            val uri = remote_for (libname, provider)
+            val pull_result = command ("hg pull \"" ^ uri ^ "\"")
+        in
+            case command "hg update" of
+                OK => pull_result
+              | ERROR e => ERROR e
+        end
+
+    fun update_to context (libname, provider, "") =
+        update context (libname, provider)
+      | update_to context (libname, provider, id) = 
+        let val command = FileBits.command context libname
+            val uri = remote_for (libname, provider)
+        in
+            if command ("hg update -r" ^ id) = OK
+            then OK
+            else
+                case command ("hg pull \"" ^ uri ^ "\"") of
+                    OK => command ("hg update -r" ^ id)
+                  | ERROR e => ERROR e
+        end
                   
 end
 
 signature LIB_CONTROL = sig
-    val check : context -> libspec -> state
+    val check : context -> libspec -> libstate
     val update : context -> libspec -> result
 end
                                          
 functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
 
-    fun check context ({ name, pin, ... } : libspec) =
+    fun check context ({ name, provider, pin, ... } : libspec) =
         if not (V.exists context name)
         then ABSENT
-        else CORRECT (*!!!*)
+        else
+            case pin of
+                UNPINNED => if not (V.is_newest context (name, provider))
+                            then SUPERSEDED
+                            else CORRECT
+              | PINNED target => 
+                case V.current_state context name of
+                    { id, ... } => if target <> id
+                                   then WRONG
+(*!!!???                                   else if not (V.is_newest context (name, provider))
+                                   then SUPERSEDED *)
+                                   else CORRECT
              
     fun update context ({ name, provider, pin = UNPINNED, ... } : libspec) =
         if not (V.is_newest context (name, provider))
         then V.update context (name, provider)
         else OK
-      | update context ({ name, provider, pin = PINNED id, ... } : libspec) =
-        if V.current_id context name <> id
-        then V.update_to context (name, provider, id)
-        else OK
+      | update context ({ name, provider, pin = PINNED target, ... } : libspec) =
+        case V.current_state context name of
+            { id, ... } => if target <> id
+                           then V.update_to context (name, provider, target)
+                           else OK
              
 end
 
@@ -175,22 +223,23 @@ fun main () =
         val rootpath = FileBits.my_dir ();
         val _ = print ("path is " ^ rootpath ^ "\n")
     in
-        (*
+
         case check { rootpath = rootpath, extdir = "ext" }
                { name = "sml-fft", vcs = HG,
-                 provider = { name = "bitbucket", uri = IMPLICIT, user = "cannam" },
-                 pin = UNPINNED } of
+                 provider = { service = "bitbucket", uri = IMPLICIT, user = "cannam" },
+                 pin = PINNED "393e07cc4a53" } of
             ABSENT => print "absent\n"
           | CORRECT => print "correct\n"
           | SUPERSEDED => print "superseded\n"
           | WRONG => print "wrong\n"
-        *)
+(*
         case update { rootpath = rootpath, extdir = "ext" }
                     { name = "sml-fft", vcs = HG,
                       provider = { service = "bitbucket", uri = IMPLICIT, user = "cannam" },
                       pin = PINNED "393e07cc4a53" } of
             OK => print "done\n"
           | ERROR text => print ("error: " ^ text ^ "\n")
+*)
     end
     handle Fail err => print ("failed with error: " ^ err ^ "\n");
         

@@ -94,3 +94,10 @@ Unpinned libraries will always be updated, which should have an effect
 only when they are in Absent or Out-of-date state.
 
 
+to add:
+
+ + locally modified status
+ + archive command
+ + note about not handling libraries having their own dependencies
+ + ability to commit and/or push?
+
