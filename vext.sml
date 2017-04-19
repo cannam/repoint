@@ -34,8 +34,8 @@ structure FileBits :> sig
     val extpath : context -> string
     val libpath : context -> libname -> string
     val subpath : context -> libname -> string -> string
-    val command_output : context -> libname -> string -> output
-    val command : context -> libname -> string -> result
+    val command_output : context -> libname -> string list -> output
+    val command : context -> libname -> string list -> result
     val my_dir : unit -> string
     val mkpath : string -> result
 end = struct
@@ -78,31 +78,67 @@ end = struct
         in
             String.concatWith "\\n" contents
         end
+
+    fun expand_commandline cmdlist =
+        (* We are quite strict about what we accept here, except for
+           the first element in cmdlist which is assumed to be a known
+           command location rather than arbitrary user input. NB only
+           ASCII accepted at this point. *)
+        let open Char
+            fun quote arg =
+                if List.all isAlphaNum (explode arg)
+                then arg
+                else "\"" ^ arg ^ "\""
+            fun check arg =
+                let val valid = explode " /#:;?,._-"
+                in
+                    app (fn c =>
+                            if isAlphaNum c orelse
+                               List.find (fn x => x = c) valid <> NONE
+                            then ()
+                            else raise Fail ("Invalid character '" ^
+                                             (Char.toString c) ^
+                                             "' in command list"))
+                        (explode arg);
+                    arg
+                end
+        in
+            String.concatWith " "
+                              (map quote (hd cmdlist :: map check (tl cmdlist)))
+        end
             
-    fun command_output context libname command =
+    fun run_command context libname cmdlist redirect =
         let open OS
             val dir = libpath context libname
-            val tmpFile = FileSys.tmpName ()
+            val _ = FileSys.chDir dir
+            val cmd = expand_commandline cmdlist
+            val _ = print ("Running command: " ^ cmd ^
+                           " (in dir \"" ^ dir ^ "\")...\n")
+            val status = case redirect of
+                             NONE => Process.system cmd
+                           | SOME file => Process.system (cmd ^ ">" ^ file)
         in
-            let val _ = FileSys.chDir dir
-                val _ = print ("Running command: " ^ command ^
-                               " (in dir \"" ^ dir ^ "\")...\n")
-                val status = Process.system (command ^ ">" ^ tmpFile)
-                val contents = file_contents tmpFile
-            in
-                FileSys.remove tmpFile;
-                if Process.isSuccess status
-                then SUCCEED contents
-                else FAIL ("Command failed: \"" ^ command ^
-                           "\" (in dir \"" ^ dir ^ "\")")
-            end
-            handle ex => (FileSys.remove tmpFile; raise ex) (*!!!*)
+            if Process.isSuccess status
+            then OK
+            else ERROR ("Command failed: \"" ^ cmd ^
+                        "\" (in dir \"" ^ dir ^ "\")")
         end
+        handle ex => ERROR (exnMessage ex)
 
-    fun command context libname command =
-        case command_output context libname command of
-            SUCCEED _ => OK
-          | FAIL err => ERROR err
+    fun command context libname cmdlist =
+        run_command context libname cmdlist NONE
+            
+    fun command_output context libname cmdlist =
+        let open OS
+            val tmpFile = FileSys.tmpName ()
+            val result = run_command context libname cmdlist (SOME tmpFile)
+            val contents = file_contents tmpFile
+        in
+            FileSys.remove tmpFile handle _ => ();
+            case result of
+                OK => SUCCEED contents
+              | ERROR e => FAIL e
+        end
 
     fun my_dir () =
         let open OS
@@ -151,7 +187,6 @@ structure HgControl :> VCS_CONTROL = struct
         case (#url provider) of
             EXPLICIT url => url
           | IMPLICIT =>
-            (*!!! todo: check user, libname, tags etc for characters invalid in filenames and/or urls; reject or encode *)
             case (#service provider) of
                 "bitbucket" => ("https://bitbucket.org/" ^ (#user provider) ^
                                 "/" ^ libname)
@@ -175,7 +210,7 @@ structure HgControl :> VCS_CONTROL = struct
                                                  branch = extract_branch branch,
                                                  tags = split_tags tags }
         in        
-            case FileBits.command_output context libname "hg id" of
+            case FileBits.command_output context libname ["hg", "id"] of
                 FAIL err => raise Fail err
               | SUCCEED out =>
                 case String.tokens (fn x => x = #" ") out of
@@ -194,16 +229,16 @@ structure HgControl :> VCS_CONTROL = struct
             val url = remote_for (libname, provider)
         in
             case FileBits.mkpath (FileBits.extpath context) of
-               OK => command ("hg clone \"" ^ url ^ "\" \"" ^ libname ^ "\"")
+               OK => command ["hg", "clone", url, libname]
              | ERROR e => ERROR e
         end
                                                     
     fun update context (libname, provider) =
         let val command = FileBits.command context libname
             val url = remote_for (libname, provider)
-            val pull_result = command ("hg pull \"" ^ url ^ "\"")
+            val pull_result = command ["hg", "pull", url]
         in
-            case command "hg update" of
+            case command ["hg", "update"] of
                 OK => pull_result
               | ERROR e => ERROR e
         end
@@ -214,11 +249,11 @@ structure HgControl :> VCS_CONTROL = struct
         let val command = FileBits.command context libname
             val url = remote_for (libname, provider)
         in
-            if command ("hg update -r" ^ id) = OK
+            if command ["hg", "update", "-r" ^ id] = OK
             then OK
             else
-                case command ("hg pull \"" ^ url ^ "\"") of
-                    OK => command ("hg update -r" ^ id)
+                case command ["hg", "pull", url] of
+                    OK => command ["hg", "update", "-r" ^ id]
                   | ERROR e => ERROR e
         end
                   
