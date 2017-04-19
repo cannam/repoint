@@ -310,10 +310,26 @@ structure GitControl :> VCS_CONTROL = struct
 
     fun is_newest context (libname, provider) = false (*!!! *)
 
-    fun update context (libname, provider) = raise Fail "update not implemented"
+    (*!!! + branch support - we do need this if we're to perform
+            "update" correctly as it has to update to some branch *)
+            
+    fun update context (libname, provider) =
+        update_to context (libname, provider, "master")
 
-    fun update_to context (libname, provider, id) = raise Fail "update_to not implemented"
-                                                     
+    and update_to context (libname, provider, "") = 
+        update context (libname, provider)
+      | update_to context (libname, provider, id) = 
+        let val command = FileBits.command context libname
+            val url = remote_for (libname, provider)
+        in
+            if command ["git", "checkout", id] = OK
+            then OK
+            else
+                case command ["git", "pull", url] of
+                    OK => command ["git", "update", id]
+                  | ERROR e => ERROR e
+        end
+
 end
 
 signature LIB_CONTROL = sig
@@ -409,7 +425,10 @@ fun main () =
                           url = IMPLICIT,
                           user = "cannam"
                       },
+                      pin = UNPINNED
+                                (*
                       pin = PINNED "967d7d0b72e3db90"
+*)
                     } of
             OK => print "done\n"
           | ERROR text => print ("error: " ^ text ^ "\n")
