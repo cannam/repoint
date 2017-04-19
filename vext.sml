@@ -183,13 +183,12 @@ structure HgControl :> VCS_CONTROL = struct
         OS.FileSys.isDir (FileBits.subpath context libname ".hg")
         handle _ => false
 
-    fun remote_for (libname, provider : provider) =
-        case (#url provider) of
-            EXPLICIT url => url
+    fun remote_for (libname, { user, service, url }) =
+        case url of
+            EXPLICIT u => u
           | IMPLICIT =>
-            case (#service provider) of
-                "bitbucket" => ("https://bitbucket.org/" ^ (#user provider) ^
-                                "/" ^ libname)
+            case service of
+                "bitbucket" => "https://bitbucket.org/" ^ user ^ "/" ^ libname
               | other => raise Fail ("Unsupported implicit hg provider \"" ^
                                      other ^ "\"")
 
@@ -257,6 +256,32 @@ structure HgControl :> VCS_CONTROL = struct
                   | ERROR e => ERROR e
         end
                   
+end
+
+structure GitControl :> VCS_CONTROL = struct
+                            
+    fun exists context libname =
+        OS.FileSys.isDir (FileBits.subpath context libname ".git")
+        handle _ => false
+
+    fun remote_for (libname, { user, service, url }) =
+        case url of
+            EXPLICIT u => u
+          | IMPLICIT =>
+            case service of
+                "github" => "https://github.com/" ^ user ^ "/" ^ libname
+              | "bitbucket" => "https://bitbucket.org/" ^ user ^ "/" ^ libname
+              | other => raise Fail ("Unsupported implicit git provider \"" ^
+                                     other ^ "\"")
+
+    fun checkout context (libname, provider) =
+        let val command = FileBits.command context ""
+            val url = remote_for (libname, provider)
+        in
+            case FileBits.mkpath (FileBits.extpath context) of
+               OK => command ["git", "clone", url, libname]
+             | ERROR e => ERROR e
+        end
 end
 
 signature LIB_CONTROL = sig
