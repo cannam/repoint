@@ -86,7 +86,9 @@ end = struct
            ASCII accepted at this point. *)
         let open Char
             fun quote arg =
-                if List.all isAlphaNum (explode arg)
+                if List.all
+                       (fn c => isAlphaNum c orelse c = #"-" orelse c = #"_")
+                       (explode arg)
                 then arg
                 else "\"" ^ arg ^ "\""
             fun check arg =
@@ -112,16 +114,14 @@ end = struct
             val dir = libpath context libname
             val _ = FileSys.chDir dir
             val cmd = expand_commandline cmdlist
-            val _ = print ("Running command: " ^ cmd ^
-                           " (in dir \"" ^ dir ^ "\")...\n")
+            val _ = print ("Running: " ^ cmd ^ " (in dir " ^ dir ^ ")...\n")
             val status = case redirect of
                              NONE => Process.system cmd
                            | SOME file => Process.system (cmd ^ ">" ^ file)
         in
             if Process.isSuccess status
             then OK
-            else ERROR ("Command failed: \"" ^ cmd ^
-                        "\" (in dir \"" ^ dir ^ "\")")
+            else ERROR ("Command failed: " ^ cmd ^ " (in dir " ^ dir ^ ")")
         end
         handle ex => ERROR (exnMessage ex)
 
@@ -165,12 +165,10 @@ end = struct
                    | OK => ((OS.FileSys.mkDir path; OK)
                             handle OS.SysErr (e, _) => ERROR e)
 end
-                  
+
 signature VCS_CONTROL = sig
     val exists : context -> libname -> bool
-    val current_state : context -> libname ->
-                        { id: string, modified: bool,
-                          branch: string, tags: string list }
+    val is_at : context -> libname -> string -> bool
     val is_newest : context -> libname * provider -> bool
     val checkout : context -> libname * provider -> result
     val update : context -> libname * provider -> result
@@ -179,6 +177,9 @@ end
 
 structure HgControl :> VCS_CONTROL = struct
                             
+    type vcsstate = { id: string, modified: bool,
+                      branch: string, tags: string list }
+                  
     fun exists context libname =
         OS.FileSys.isDir (FileBits.subpath context libname ".hg")
         handle _ => false
@@ -192,7 +193,7 @@ structure HgControl :> VCS_CONTROL = struct
               | other => raise Fail ("Unsupported implicit hg provider \"" ^
                                      other ^ "\"")
 
-    fun current_state context libname =
+    fun current_state context libname : vcsstate =
         let fun is_branch text = text <> "" andalso #"(" = hd (explode text)
             and extract_branch b =
                 if is_branch b     (* need to remove enclosing parens *)
@@ -221,7 +222,15 @@ structure HgControl :> VCS_CONTROL = struct
                   | _ => raise Fail ("Unexpected output from hg id: " ^ out)
         end
 
-    fun is_newest context (libname, provider) = false
+    (*!!! + branch support? *)
+            
+    fun is_at context libname id_or_tag =
+        case current_state context libname of
+            { id, tags, ... } => 
+            String.isPrefix id_or_tag id orelse
+            List.exists (fn t => t = id_or_tag) tags
+            
+    fun is_newest context (libname, provider) = false (*!!!*)
 
     fun checkout context (libname, provider) =
         let val command = FileBits.command context ""
@@ -282,6 +291,29 @@ structure GitControl :> VCS_CONTROL = struct
                OK => command ["git", "clone", url, libname]
              | ERROR e => ERROR e
         end
+
+    (* NB git rev-parse HEAD shows revision id of current checkout;
+    git rev-list -1 <tag> shows revision id of revision with that tag *)
+
+    fun is_at context libname id_or_tag =
+        case FileBits.command_output context libname
+                                     ["git", "rev-parse", "HEAD"] of
+            FAIL err => raise Fail err
+          | SUCCEED id =>
+            String.isPrefix id_or_tag id orelse
+            case FileBits.command_output context libname
+                                         ["git", "rev-list", "-1", id_or_tag] of
+                FAIL err => raise Fail err
+              | SUCCEED tid =>
+                tid = id andalso
+                tid <> id_or_tag (* otherwise id_or_tag was an id, not a tag *)
+
+    fun is_newest context (libname, provider) = false (*!!! *)
+
+    fun update context (libname, provider) = raise Fail "update not implemented"
+
+    fun update_to context (libname, provider, id) = raise Fail "update_to not implemented"
+                                                     
 end
 
 signature LIB_CONTROL = sig
@@ -292,33 +324,35 @@ end
 functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
 
     fun check context ({ libname, provider, pin, ... } : libspec) =
-        if not (V.exists context libname)
-        then ABSENT
-        else
+        let fun check' () =
             case pin of
-                UNPINNED => if not (V.is_newest context (libname, provider))
-                            then SUPERSEDED
-                            else CORRECT
-              | PINNED target => 
-                case V.current_state context libname of
-                    { id, ... } => if target <> id
-                                   then WRONG
-(*!!!???                                   else if not (V.is_newest context (libname, provider))
-                                   then SUPERSEDED *)
-                                   else CORRECT
+                UNPINNED =>
+                if not (V.is_newest context (libname, provider))
+                then SUPERSEDED
+                else CORRECT
+
+              | PINNED target =>
+                if V.is_at context libname target
+                then CORRECT
+                else WRONG
+        in
+            if not (V.exists context libname)
+            then ABSENT
+            else check' ()
+        end
 
     fun update context (spec as { libname, provider, pin, ... } : libspec) =
         let fun update' () =
             case pin of
-                UNPINNED => if not (V.is_newest context (libname, provider))
-                            then V.update context (libname, provider)
-                            else OK
+                UNPINNED =>
+                if not (V.is_newest context (libname, provider))
+                then V.update context (libname, provider)
+                else OK
+
               | PINNED target =>
-                case V.current_state context libname of
-                    { id, ... } => if target <> id
-                                   then V.update_to context
-                                                    (libname, provider, target)
-                                   else OK
+                if V.is_at context libname target
+                then OK
+                else V.update_to context (libname, provider, target)
         in
             if not (V.exists context libname)
             then case V.checkout context (libname, provider) of
@@ -329,9 +363,10 @@ functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
 end
 
 structure HgLibControl = LibControlFn(HgControl)
+structure GitLibControl = LibControlFn(GitControl)
                                               
 fun main () =
-    let open HgLibControl
+    let open GitLibControl
         (*!!! options: require that this program is in the root dir,
         and so use the location of this program as the root dir
         location; or require that the program is only ever run from
@@ -350,7 +385,8 @@ fun main () =
           | CORRECT => print "correct\n"
           | SUPERSEDED => print "superseded\n"
           | WRONG => print "wrong\n"
-*)
+ *)
+        (*
         case update { rootpath = rootpath, extdir = "ext" }
                     { libname = "sml-fft",
                       vcs = HG,
@@ -360,6 +396,20 @@ fun main () =
                           user = "cannam"
                       },
                       pin = PINNED "393e07cc4a53"
+                    } of
+            OK => print "done\n"
+          | ERROR text => print ("error: " ^ text ^ "\n")
+        *)
+
+        case update { rootpath = rootpath, extdir = "ext" }
+                    { libname = "sml-fft",
+                      vcs = GIT,
+                      provider = {
+                          service = "github",
+                          url = IMPLICIT,
+                          user = "cannam"
+                      },
+                      pin = PINNED "967d7d0b72e3db90"
                     } of
             OK => print "done\n"
           | ERROR text => print ("error: " ^ text ^ "\n")
