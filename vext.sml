@@ -7,7 +7,7 @@ datatype output = SUCCEED of string | FAIL of string
                                         
 type provider = {
     service : string,
-    user : string,
+    owner : string,
     url : url
 }
 
@@ -80,10 +80,10 @@ end = struct
         end
 
     fun expand_commandline cmdlist =
-        (* We are quite strict about what we accept here, except for
-           the first element in cmdlist which is assumed to be a known
-           command location rather than arbitrary user input. NB only
-           ASCII accepted at this point. *)
+        (* We are quite [too] strict about what we accept here, except
+           for the first element in cmdlist which is assumed to be a
+           known command location rather than arbitrary user input. NB
+           only ASCII accepted at this point. *)
         let open Char
             fun quote arg =
                 if List.all
@@ -106,7 +106,8 @@ end = struct
                 end
         in
             String.concatWith " "
-                              (map quote (hd cmdlist :: map check (tl cmdlist)))
+                              (map quote
+                                   (hd cmdlist :: map check (tl cmdlist)))
         end
             
     fun run_command context libname cmdlist redirect =
@@ -184,12 +185,12 @@ structure HgControl :> VCS_CONTROL = struct
         OS.FileSys.isDir (FileBits.subpath context libname ".hg")
         handle _ => false
 
-    fun remote_for (libname, { user, service, url }) =
+    fun remote_for (libname, { owner, service, url }) =
         case url of
             EXPLICIT u => u
           | IMPLICIT =>
             case service of
-                "bitbucket" => "https://bitbucket.org/" ^ user ^ "/" ^ libname
+                "bitbucket" => "https://bitbucket.org/" ^ owner ^ "/" ^ libname
               | other => raise Fail ("Unsupported implicit hg provider \"" ^
                                      other ^ "\"")
 
@@ -257,9 +258,9 @@ structure HgControl :> VCS_CONTROL = struct
         let val command = FileBits.command context libname
             val url = remote_for (libname, provider)
         in
-            if command ["hg", "update", "-r" ^ id] = OK
-            then OK
-            else
+            case command ["hg", "update", "-r" ^ id] of
+                OK => OK
+              | ERROR _ => 
                 case command ["hg", "pull", url] of
                     OK => command ["hg", "update", "-r" ^ id]
                   | ERROR e => ERROR e
@@ -273,13 +274,13 @@ structure GitControl :> VCS_CONTROL = struct
         OS.FileSys.isDir (FileBits.subpath context libname ".git")
         handle _ => false
 
-    fun remote_for (libname, { user, service, url }) =
+    fun remote_for (libname, { owner, service, url }) =
         case url of
             EXPLICIT u => u
           | IMPLICIT =>
             case service of
-                "github" => "https://github.com/" ^ user ^ "/" ^ libname
-              | "bitbucket" => "https://bitbucket.org/" ^ user ^ "/" ^ libname
+                "github" => "https://github.com/" ^ owner ^ "/" ^ libname
+              | "bitbucket" => "https://bitbucket.org/" ^ owner ^ "/" ^ libname
               | other => raise Fail ("Unsupported implicit git provider \"" ^
                                      other ^ "\"")
 
@@ -322,14 +323,13 @@ structure GitControl :> VCS_CONTROL = struct
         let val command = FileBits.command context libname
             val url = remote_for (libname, provider)
         in
-            if command ["git", "checkout", id] = OK
-            then OK
-            else
+            case command ["git", "checkout", "--detach", id] of
+                OK => OK
+              | ERROR _ => 
                 case command ["git", "pull", url] of
-                    OK => command ["git", "update", id]
+                    OK => command ["git", "checkout", "--detach", id]
                   | ERROR e => ERROR e
         end
-
 end
 
 signature LIB_CONTROL = sig
@@ -378,11 +378,20 @@ functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
         end
 end
 
-structure HgLibControl = LibControlFn(HgControl)
-structure GitLibControl = LibControlFn(GitControl)
+structure AnyLibControl :> LIB_CONTROL = struct
+
+    structure H = LibControlFn(HgControl)
+    structure G = LibControlFn(GitControl)
+
+    fun check context (spec as { vcs, ... } : libspec) =
+        (fn HG => H.check | GIT => G.check) vcs context spec
+
+    fun update context (spec as { vcs, ... } : libspec) =
+        (fn HG => H.update | GIT => G.update) vcs context spec
+end
                                               
 fun main () =
-    let open GitLibControl
+    let open AnyLibControl
         (*!!! options: require that this program is in the root dir,
         and so use the location of this program as the root dir
         location; or require that the program is only ever run from
@@ -395,7 +404,7 @@ fun main () =
 
 (*        case check { rootpath = rootpath, extdir = "ext" }
                { libname = "sml-fft", vcs = HG,
-                 provider = { service = "bitbucket", url = IMPLICIT, user = "cannam" },
+                 provider = { service = "bitbucket", url = IMPLICIT, owner = "cannam" },
                  pin = PINNED "393e07cc4a53" } of
             ABSENT => print "absent\n"
           | CORRECT => print "correct\n"
@@ -409,7 +418,7 @@ fun main () =
                       provider = {
                           service = "bitbucket",
                           url = IMPLICIT,
-                          user = "cannam"
+                          owner = "cannam"
                       },
                       pin = PINNED "393e07cc4a53"
                     } of
@@ -423,12 +432,9 @@ fun main () =
                       provider = {
                           service = "github",
                           url = IMPLICIT,
-                          user = "cannam"
+                          owner = "cannam"
                       },
-                      pin = UNPINNED
-                                (*
                       pin = PINNED "967d7d0b72e3db90"
-*)
                     } of
             OK => print "done\n"
           | ERROR text => print ("error: " ^ text ^ "\n")
