@@ -96,7 +96,7 @@ end = struct
                 in
                     app (fn c =>
                             if isAlphaNum c orelse
-                               List.find (fn x => x = c) valid <> NONE
+                               List.exists (fn v => v = c) valid
                             then ()
                             else raise Fail ("Invalid character '" ^
                                              (Char.toString c) ^
