@@ -570,7 +570,8 @@ structure Json :> JSON = struct
                 if List.all Char.isHexDigit [a,b,c,d]
                 then case Word.fromString ("0wx" ^ (implode [a,b,c,d])) of
                          SOME w => (let val utf = rev (bmpToUtf8 w) in
-                                        lexString' (pos + 6) (utf @ text) NORMAL xs
+                                        lexString' (pos + 6) (utf @ text)
+                                                   NORMAL xs
                                     end
                                     handle Fail err => error pos err)
                        | NONE => error pos "Invalid Unicode BMP escape sequence"
@@ -598,7 +599,8 @@ structure Json :> JSON = struct
                 else if Char.isDigit x orelse List.exists (fn c => x = c) valid
                 then lexNumber' (pos + 1) (x :: digits) xs
                 else (rev digits, x :: xs, pos)
-            val (digits, rest, newpos) = lexNumber' (pos - 1) [] (firstChar :: cc)
+            val (digits, rest, newpos) =
+                lexNumber' (pos - 1) [] (firstChar :: cc)
         in
             case digits of
                 [] => token_error pos
@@ -649,24 +651,27 @@ structure Json :> JSON = struct
               | chkAfterDot (c :: rest) =
                 isDigit c andalso chkAfterDotAndDigit rest
 
+            fun chkPosAfterFirst [] = true
+              | chkPosAfterFirst (#"." :: rest) = chkAfterDot rest
+              | chkPosAfterFirst (#"e" :: rest) = chkExp rest
+              | chkPosAfterFirst (c :: rest) =
+                isDigit c andalso chkPosAfterFirst rest
+                                                      
             fun chkPos [] = false
               | chkPos (#"0" :: []) = true
               | chkPos (#"0" :: #"." :: rest) = chkAfterDot rest
               | chkPos (#"0" :: #"e" :: rest) = chkExp rest
               | chkPos (#"0" :: rest) = false
-              | chkPos (c :: []) = isDigit c
-              | chkPos (c :: #"." :: rest) = isDigit c andalso chkAfterDot rest
-              | chkPos (c :: #"e" :: rest) = chkExp rest
-              | chkPos (c :: rest) = isDigit c andalso chkPos rest
+              | chkPos (c :: rest) = isDigit c andalso chkPosAfterFirst rest
                     
             fun chkNumber (#"-" :: rest) = chkPos rest
               | chkNumber digits = chkPos digits
         in
             if chkNumber digits
             then case Real.fromString (implode digits) of
-                     NONE => ERROR "Invalid number"
+                     NONE => ERROR "Number out of range"
                    | SOME r => OK r
-            else ERROR "Number out of range"
+            else ERROR ("Invalid number \"" ^ (implode digits) ^ "\"")
         end
                                      
     fun parseObject (T.CURLY_R :: xs) = OK (OBJECT [], xs)
