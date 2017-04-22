@@ -1,2 +1,5 @@
 syntax: glob
 *~
+ext
+vext
+src/vext
