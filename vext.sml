@@ -403,8 +403,9 @@ structure AnyLibControl :> LIB_CONTROL = struct
         (fn HG => H.update | GIT => G.update) vcs context spec
 end
 
-(* An RFC-compliant minimal JSON parser with no dependency on anything
-   outside the Basis library. Also includes a simple serialiser.
+(* An RFC-compliant JSON parser in one SML file with no dependency 
+   on anything outside the Basis library. Also includes a simple
+   serialiser.
 
    Parser notes:
 
@@ -526,21 +527,21 @@ structure Json :> JSON = struct
                  else raise Fail ("Invalid BMP point " ^ (Word.toString cp)))
         end
                       
-    fun error pos text = ERROR (text ^ " at position " ^ Int.toString (pos - 1))
-    fun token_error pos expected =
-        error pos ("Malformed token (expected \"" ^ expected ^ "\")")
+    fun error pos text = ERROR (text ^ " at character position " ^
+                                Int.toString (pos - 1))
+    fun token_error pos = error pos ("Unexpected token")
 
     fun lexNull pos acc (#"u" :: #"l" :: #"l" :: xs) =
         lex (pos + 3) (T.NULL :: acc) xs
-      | lexNull pos acc _ = token_error pos "null"
+      | lexNull pos acc _ = token_error pos
 
     and lexTrue pos acc (#"r" :: #"u" :: #"e" :: xs) =
         lex (pos + 3) (T.BOOL true :: acc) xs
-      | lexTrue pos acc _ = token_error pos "true"
+      | lexTrue pos acc _ = token_error pos
 
     and lexFalse pos acc (#"a" :: #"l" :: #"s" :: #"e" :: xs) =
         lex (pos + 4) (T.BOOL false :: acc) xs
-      | lexFalse pos acc _ = token_error pos "false"
+      | lexFalse pos acc _ = token_error pos
 
     and lexChar tok pos acc xs =
         lex pos (tok :: acc) xs
@@ -597,10 +598,10 @@ structure Json :> JSON = struct
                 else if Char.isDigit x orelse List.exists (fn c => x = c) valid
                 then lexNumber' (pos + 1) (x :: digits) xs
                 else (rev digits, x :: xs, pos)
-            val (digits, rest, newpos) = lexNumber' pos [] (firstChar :: cc)
+            val (digits, rest, newpos) = lexNumber' (pos - 1) [] (firstChar :: cc)
         in
             case digits of
-                [] => error pos "Unexpected token"
+                [] => token_error pos
               | _ => lex newpos (T.NUMBER digits :: acc) rest
         end
                                            
@@ -675,7 +676,8 @@ structure Json :> JSON = struct
                      ERROR e => ERROR e
                    | OK (j, xs) => OK ((key, j), xs))
               | parsePair other =
-                ERROR ("Object key/value pair expected before " ^ show other)
+                ERROR ("Object key/value pair expected around \"" ^
+                       show other ^ "\"")
             fun parseObject' acc [] = ERROR "End of input during object"
               | parseObject' acc tokens =
                 case parsePair tokens of
