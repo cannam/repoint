@@ -416,8 +416,8 @@ end
      exist at the time of writing, as listed in "Parsing JSON is a
      Minefield" (http://seriot.ch/parsing_json.php)
  
-   * Parses JSON from string objects, explodes strings, parses in two
-     passes: therefore not suitable for large input files
+   * Two-pass parser using naive exploded strings, therefore not very
+     fast and not suitable for large input files
 
    * Only supports UTF-8 input, not UTF-16 or UTF-32. Doesn't check
      that JSON strings are valid UTF-8 -- the caller must do that --
@@ -665,7 +665,7 @@ structure Json :> JSON = struct
               | chkPos (c :: rest) = isDigit c andalso chkPosAfterFirst rest
                     
             fun chkNumber (#"-" :: rest) = chkPos rest
-              | chkNumber digits = chkPos digits
+              | chkNumber cc = chkPos cc
         in
             if chkNumber digits
             then case Real.fromString (implode digits) of
@@ -732,15 +732,28 @@ structure Json :> JSON = struct
     fun stringEscape s =
         let fun esc x = [x, #"\\"]
             fun escape' acc [] = rev acc
-              | escape' acc (x :: xs) = escape' (case x of
-                                                     #"\"" => esc x @ acc
-                                                   | #"\\" => esc x @ acc
-                                                   | #"\b" => esc #"b" @ acc
-                                                   | #"\f" => esc #"f" @ acc
-                                                   | #"\n" => esc #"n" @ acc
-                                                   | #"\r" => esc #"r" @ acc
-                                                   | #"\t" => esc #"t" @ acc
-                                                   | _ => x :: acc) xs
+              | escape' acc (x :: xs) =
+                escape' (case x of
+                             #"\"" => esc x @ acc
+                           | #"\\" => esc x @ acc
+                           | #"\b" => esc #"b" @ acc
+                           | #"\f" => esc #"f" @ acc
+                           | #"\n" => esc #"n" @ acc
+                           | #"\r" => esc #"r" @ acc
+                           | #"\t" => esc #"t" @ acc
+                           | _ =>
+                             let val c = Char.ord x
+                             in
+                                 if c < 0x20
+                                 then let val hex = Word.toString (Word.fromInt c)
+                                      in (rev o explode) (if c < 0x10
+                                                          then ("\\u000" ^ hex)
+                                                          else ("\\u00" ^ hex))
+                                      end @ acc
+                                 else 
+                                     x :: acc
+                             end)
+                        xs
         in
             implode (escape' [] (explode s))
         end
