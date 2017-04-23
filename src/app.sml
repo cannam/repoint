@@ -27,28 +27,43 @@ fun lookup_mandatory_string json kk =
       | _ => raise Fail ("Config value must be string: " ^
                          (String.concatWith " -> " kk))
                    
+fun lookup_optional_string json kk =
+    case lookup_optional json kk of
+        SOME (Json.STRING s) => SOME s
+      | SOME _ => raise Fail ("Config value (if present) must be string: " ^
+                              (String.concatWith " -> " kk))
+      | NONE => NONE
+                   
 fun load_libspec json libname : libspec =
-    let val libobj = lookup_mandatory json ["libs", libname]
+    let val libobj   = lookup_mandatory json ["libs", libname]
+        val vcs      = lookup_mandatory_string libobj ["vcs"]
+        val retrieve = lookup_optional_string libobj
+        val service  = retrieve ["provider", "service"]
+        val owner    = retrieve ["provider", "owner"]
+        val url      = retrieve ["provider", "url"]
+        val branch   = retrieve ["branch"]
+        val pin      = retrieve ["pin"]
     in
         {
           libname = libname,
-          vcs = case lookup_mandatory_string libobj ["vcs"] of
+          vcs = case vcs of
                     "hg" => HG
                   | "git" => GIT
-                  | other => raise Fail ("Unknown VCS \"" ^ other ^ "\""),
-          provider = {
-              (*!!! which mandatory, which optional? *)
-              service = lookup_mandatory_string libobj ["provider", "service"],
-              owner = lookup_mandatory_string libobj ["provider", "owner"],
-              url = case lookup_optional libobj ["provider", "url"] of
-                        SOME (Json.STRING u) => EXPLICIT u
-                      | SOME _ => raise Fail "String expected for url"
-                      | NONE => IMPLICIT
-          },
-          pin = case lookup_optional libobj ["pin"] of
-                    SOME (Json.STRING p) => PINNED p
-                  | SOME _ => raise Fail "String expected for pin"
-                  | NONE => UNPINNED
+                  | other => raise Fail ("Unknown version-control system \"" ^
+                                         other ^ "\""),
+          provider = case (url, service, owner) of
+                         (SOME u, _, _) => URL u
+                       | (NONE, SOME ss, SOME os) =>
+                         SERVICE { host = ss, owner = os }
+                       | _ => raise Fail ("Must have both service and owner " ^
+                                          "strings in provider if no " ^
+                                          "explicit url supplied"),
+          pin = case pin of
+                    SOME p => PINNED p
+                  | NONE => UNPINNED,
+          branch = case branch of
+                       SOME b => b
+                     | NONE => ""
         }
     end  
 
@@ -82,11 +97,9 @@ fun usage () =
         raise Fail "Incorrect arguments specified"
     end
 
-fun check (config : config) =
+fun check (config as { context, libs } : config) =
     let open AnyLibControl
-        val outcomes = map (fn lib =>
-                               (#libname lib, check (#context config) lib))
-                           (#libs config)
+        val outcomes = map (fn lib => (#libname lib, check context lib)) libs
     in
         app (fn (libname, ABSENT) => print ("ABSENT " ^ libname ^ "\n")
               | (libname, CORRECT) => print ("CORRECT " ^ libname ^ "\n")
@@ -95,11 +108,9 @@ fun check (config : config) =
             outcomes
     end        
 
-fun update (config : config) =
+fun update (config as { context, libs } : config) =
     let open AnyLibControl
-        val outcomes = map (fn lib =>
-                               (#libname lib, update (#context config) lib))
-                           (#libs config)
+        val outcomes = map (fn lib => (#libname lib, update context lib)) libs
     in
         app (fn (libname, OK) => print ("OK " ^ libname ^ "\n")
               | (libname, ERROR e) => print ("FAILED " ^ libname ^ ": " ^ e ^ "\n"))

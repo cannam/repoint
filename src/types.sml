@@ -1,22 +1,18 @@
+
 datatype vcs = HG | GIT
-datatype url = EXPLICIT of string | IMPLICIT
+datatype provider = URL of string | SERVICE of { host : string, owner : string }
 datatype pin = UNPINNED | PINNED of string
 datatype libstate = ABSENT | CORRECT | SUPERSEDED | WRONG
 datatype result = OK | ERROR of string
 datatype output = SUCCEED of string | FAIL of string
                                         
-type provider = {
-    service : string,
-    owner : string,
-    url : url
-}
-
 type libname = string
 
 type libspec = {
     libname : libname,
     vcs : vcs,
     provider : provider,
+    branch : string,
     pin : pin
 }
 
