@@ -62,8 +62,8 @@ fun load_libspec json libname : libspec =
                     SOME p => PINNED p
                   | NONE => UNPINNED,
           branch = case branch of
-                       SOME b => b
-                     | NONE => ""
+                       SOME b => BRANCH b
+                     | NONE => DEFAULT_BRANCH
         }
     end  
 

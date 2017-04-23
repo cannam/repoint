@@ -1,11 +1,11 @@
                                          
 functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
 
-    fun check context ({ libname, provider, pin, ... } : libspec) =
+    fun check context ({ libname, provider, branch, pin, ... } : libspec) =
         let fun check' () =
             case pin of
                 UNPINNED =>
-                if not (V.is_newest context (libname, provider))
+                if not (V.is_newest context (libname, provider, branch))
                 then SUPERSEDED
                 else CORRECT
 
@@ -19,12 +19,12 @@ functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
             else check' ()
         end
 
-    fun update context (spec as { libname, provider, pin, ... } : libspec) =
+    fun update context (spec as { libname, provider, branch, pin, ... } : libspec) =
         let fun update' () =
             case pin of
                 UNPINNED =>
-                if not (V.is_newest context (libname, provider))
-                then V.update context (libname, provider)
+                if not (V.is_newest context (libname, provider, branch))
+                then V.update context (libname, provider, branch)
                 else OK
 
               | PINNED target =>

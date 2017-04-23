@@ -54,7 +54,7 @@ structure HgControl :> VCS_CONTROL = struct
             String.isPrefix id_or_tag id orelse
             List.exists (fn t => t = id_or_tag) tags
             
-    fun is_newest context (libname, provider) = false (*!!!*)
+    fun is_newest context (libname, provider, branch) = false (*!!!*)
 
     fun checkout context (libname, provider) =
         let val command = FileBits.command context ""
@@ -65,18 +65,21 @@ structure HgControl :> VCS_CONTROL = struct
              | ERROR e => ERROR e
         end
                                                     
-    fun update context (libname, provider) =
+    fun update context (libname, provider, branch) =
         let val command = FileBits.command context libname
             val url = remote_for (libname, provider)
             val pull_result = command ["hg", "pull", url]
+            val branch_name = case branch of
+                                  DEFAULT_BRANCH => "default"
+                                | BRANCH b => b
         in
-            case command ["hg", "update"] of
+            case command ["hg", "update", branch_name] of
                 OK => pull_result
               | ERROR e => ERROR e
         end
 
     fun update_to context (libname, provider, "") =
-        update context (libname, provider)
+        raise Fail "Non-empty id (tag or revision id) required for update_to"
       | update_to context (libname, provider, id) = 
         let val command = FileBits.command context libname
             val url = remote_for (libname, provider)

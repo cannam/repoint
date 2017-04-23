@@ -7,6 +7,7 @@ datatype pin = UNPINNED | PINNED of string
 datatype libstate = ABSENT | CORRECT | SUPERSEDED | WRONG
 datatype result = OK | ERROR of string
 datatype output = SUCCEED of string | FAIL of string
+datatype branch = BRANCH of string | DEFAULT_BRANCH
                                         
 type libname = string
 
@@ -14,7 +15,7 @@ type libspec = {
     libname : libname,
     vcs : vcs,
     provider : provider,
-    branch : string,
+    branch : branch,
     pin : pin
 }
 
@@ -31,9 +32,9 @@ type config = {
 signature VCS_CONTROL = sig
     val exists : context -> libname -> bool
     val is_at : context -> libname -> string -> bool
-    val is_newest : context -> libname * provider -> bool
+    val is_newest : context -> libname * provider * branch -> bool
     val checkout : context -> libname * provider -> result
-    val update : context -> libname * provider -> result
+    val update : context -> libname * provider * branch -> result
     val update_to : context -> libname * provider * string -> result
 end
 
@@ -245,7 +246,7 @@ structure HgControl :> VCS_CONTROL = struct
             String.isPrefix id_or_tag id orelse
             List.exists (fn t => t = id_or_tag) tags
             
-    fun is_newest context (libname, provider) = false (*!!!*)
+    fun is_newest context (libname, provider, branch) = false (*!!!*)
 
     fun checkout context (libname, provider) =
         let val command = FileBits.command context ""
@@ -256,18 +257,21 @@ structure HgControl :> VCS_CONTROL = struct
              | ERROR e => ERROR e
         end
                                                     
-    fun update context (libname, provider) =
+    fun update context (libname, provider, branch) =
         let val command = FileBits.command context libname
             val url = remote_for (libname, provider)
             val pull_result = command ["hg", "pull", url]
+            val branch_name = case branch of
+                                  DEFAULT_BRANCH => "default"
+                                | BRANCH b => b
         in
-            case command ["hg", "update"] of
+            case command ["hg", "update", branch_name] of
                 OK => pull_result
               | ERROR e => ERROR e
         end
 
     fun update_to context (libname, provider, "") =
-        update context (libname, provider)
+        raise Fail "Non-empty id (tag or revision id) required for update_to"
       | update_to context (libname, provider, id) = 
         let val command = FileBits.command context libname
             val url = remote_for (libname, provider)
@@ -323,16 +327,18 @@ structure GitControl :> VCS_CONTROL = struct
                 tid = id andalso
                 tid <> id_or_tag (* otherwise id_or_tag was an id, not a tag *)
 
-    fun is_newest context (libname, provider) = false (*!!! *)
+    fun is_newest context (libname, provider, branch) = false (*!!! *)
 
-    (*!!! + branch support - we do need this if we're to perform
-            "update" correctly as it has to update to some branch *)
-            
-    fun update context (libname, provider) =
-        update_to context (libname, provider, "master")
+    fun update context (libname, provider, branch) =
+        let val branch_name = case branch of
+                                  DEFAULT_BRANCH => "master"
+                                | BRANCH b => b
+        in
+            update_to context (libname, provider, branch_name)
+        end
 
     and update_to context (libname, provider, "") = 
-        update context (libname, provider)
+        raise Fail "Non-empty id (tag or revision id) required for update_to"
       | update_to context (libname, provider, id) = 
         let val command = FileBits.command context libname
             val url = remote_for (libname, provider)
@@ -348,11 +354,11 @@ end
                                          
 functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
 
-    fun check context ({ libname, provider, pin, ... } : libspec) =
+    fun check context ({ libname, provider, branch, pin, ... } : libspec) =
         let fun check' () =
             case pin of
                 UNPINNED =>
-                if not (V.is_newest context (libname, provider))
+                if not (V.is_newest context (libname, provider, branch))
                 then SUPERSEDED
                 else CORRECT
 
@@ -366,12 +372,12 @@ functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
             else check' ()
         end
 
-    fun update context (spec as { libname, provider, pin, ... } : libspec) =
+    fun update context (spec as { libname, provider, branch, pin, ... } : libspec) =
         let fun update' () =
             case pin of
                 UNPINNED =>
-                if not (V.is_newest context (libname, provider))
-                then V.update context (libname, provider)
+                if not (V.is_newest context (libname, provider, branch))
+                then V.update context (libname, provider, branch)
                 else OK
 
               | PINNED target =>
@@ -834,8 +840,8 @@ fun load_libspec json libname : libspec =
                     SOME p => PINNED p
                   | NONE => UNPINNED,
           branch = case branch of
-                       SOME b => b
-                     | NONE => ""
+                       SOME b => BRANCH b
+                     | NONE => DEFAULT_BRANCH
         }
     end  
 

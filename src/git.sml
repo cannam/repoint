@@ -40,16 +40,18 @@ structure GitControl :> VCS_CONTROL = struct
                 tid = id andalso
                 tid <> id_or_tag (* otherwise id_or_tag was an id, not a tag *)
 
-    fun is_newest context (libname, provider) = false (*!!! *)
+    fun is_newest context (libname, provider, branch) = false (*!!! *)
 
-    (*!!! + branch support - we do need this if we're to perform
-            "update" correctly as it has to update to some branch *)
-            
-    fun update context (libname, provider) =
-        update_to context (libname, provider, "master")
+    fun update context (libname, provider, branch) =
+        let val branch_name = case branch of
+                                  DEFAULT_BRANCH => "master"
+                                | BRANCH b => b
+        in
+            update_to context (libname, provider, branch_name)
+        end
 
     and update_to context (libname, provider, "") = 
-        update context (libname, provider)
+        raise Fail "Non-empty id (tag or revision id) required for update_to"
       | update_to context (libname, provider, id) = 
         let val command = FileBits.command context libname
             val url = remote_for (libname, provider)

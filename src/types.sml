@@ -5,6 +5,7 @@ datatype pin = UNPINNED | PINNED of string
 datatype libstate = ABSENT | CORRECT | SUPERSEDED | WRONG
 datatype result = OK | ERROR of string
 datatype output = SUCCEED of string | FAIL of string
+datatype branch = BRANCH of string | DEFAULT_BRANCH
                                         
 type libname = string
 
@@ -12,7 +13,7 @@ type libspec = {
     libname : libname,
     vcs : vcs,
     provider : provider,
-    branch : string,
+    branch : branch,
     pin : pin
 }
 
@@ -29,9 +30,9 @@ type config = {
 signature VCS_CONTROL = sig
     val exists : context -> libname -> bool
     val is_at : context -> libname -> string -> bool
-    val is_newest : context -> libname * provider -> bool
+    val is_newest : context -> libname * provider * branch -> bool
     val checkout : context -> libname * provider -> result
-    val update : context -> libname * provider -> result
+    val update : context -> libname * provider * branch -> result
     val update_to : context -> libname * provider * string -> result
 end
 
