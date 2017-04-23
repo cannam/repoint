@@ -858,7 +858,7 @@ fun usage () =
         raise Fail "Incorrect arguments specified"
     end
 
-fun check config =
+fun check (config : config) =
     let open AnyLibControl
         val outcomes = map (fn lib =>
                                (#libname lib, check (#context config) lib))
@@ -871,7 +871,7 @@ fun check config =
             outcomes
     end        
 
-fun update config =
+fun update (config : config) =
     let open AnyLibControl
         val outcomes = map (fn lib =>
                                (#libname lib, update (#context config) lib))
