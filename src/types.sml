@@ -1,11 +1,37 @@
 
-datatype vcs = HG | GIT
-datatype provider = URL of string | SERVICE of { host : string, owner : string }
-datatype pin = UNPINNED | PINNED of string
-datatype libstate = ABSENT | CORRECT | SUPERSEDED | WRONG
-datatype result = OK | ERROR of string
-datatype output = SUCCEED of string | FAIL of string
-datatype branch = BRANCH of string | DEFAULT_BRANCH
+datatype vcs =
+         HG |
+         GIT
+
+datatype provider =
+         URL of string |
+         SERVICE of {
+             host : string,
+             owner : string,
+             repo : string option
+         }
+
+datatype pin =
+         UNPINNED |
+         PINNED of string
+
+datatype libstate =
+         ABSENT |
+         CORRECT |
+         SUPERSEDED |
+         WRONG
+
+datatype result =
+         OK |
+         ERROR of string
+
+datatype output =
+         SUCCEED of string |
+         FAIL of string
+
+datatype branch =
+         BRANCH of string |
+         DEFAULT_BRANCH
                                         
 type libname = string
 

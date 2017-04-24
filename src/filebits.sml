@@ -22,12 +22,13 @@ end = struct
         end
     
     fun subpath { rootpath, extdir } libname remainder =
+        (* NB libname is allowed to be a path fragment, e.g. foo/bar *)
         let val { isAbs, vol, arcs } = OS.Path.fromString rootpath
+            val split = String.fields (fn c => c = #"/")
         in OS.Path.toString {
                 isAbs = isAbs,
                 vol = vol,
-                arcs = arcs @ [ extdir, libname ] @
-                       String.tokens (fn c => c = #"/") remainder
+                arcs = arcs @ [ extdir ] @ split libname @ split remainder
             }
         end
 

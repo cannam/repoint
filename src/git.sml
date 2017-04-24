@@ -8,12 +8,17 @@ structure GitControl :> VCS_CONTROL = struct
     fun remote_for (libname, provider) =
         case provider of
             URL u => u
-          | SERVICE { host, owner } => 
-            case host of
-                "github" => "https://github.com/" ^ owner ^ "/" ^ libname
-              | "bitbucket" => "https://bitbucket.org/" ^ owner ^ "/" ^ libname
-              | other => raise Fail ("Unsupported implicit git provider \"" ^
-                                     other ^ "\"")
+          | SERVICE { host, owner, repo } =>
+            let val r = case repo of
+                            SOME r => r
+                          | NONE => libname
+            in
+                case host of
+                    "github" => "https://github.com/" ^ owner ^ "/" ^ r
+                  | "bitbucket" => "https://bitbucket.org/" ^ owner ^ "/" ^ r
+                  | other => raise Fail ("Unsupported implicit git provider \"" ^
+                                         other ^ "\"")
+            end
 
     fun checkout context (libname, provider) =
         let val command = FileBits.command context ""

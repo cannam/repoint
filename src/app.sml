@@ -40,6 +40,7 @@ fun load_libspec json libname : libspec =
         val retrieve = lookup_optional_string libobj
         val service  = retrieve ["provider", "service"]
         val owner    = retrieve ["provider", "owner"]
+        val repo     = retrieve ["provider", "repository"]
         val url      = retrieve ["provider", "url"]
         val branch   = retrieve ["branch"]
         val pin      = retrieve ["pin"]
@@ -51,10 +52,10 @@ fun load_libspec json libname : libspec =
                   | "git" => GIT
                   | other => raise Fail ("Unknown version-control system \"" ^
                                          other ^ "\""),
-          provider = case (url, service, owner) of
-                         (SOME u, _, _) => URL u
-                       | (NONE, SOME ss, SOME os) =>
-                         SERVICE { host = ss, owner = os }
+          provider = case (url, service, owner, repo) of
+                         (SOME u, _, _, _) => URL u
+                       | (NONE, SOME ss, SOME os, r) =>
+                         SERVICE { host = ss, owner = os, repo = r }
                        | _ => raise Fail ("Must have both service and owner " ^
                                           "strings in provider if no " ^
                                           "explicit url supplied"),

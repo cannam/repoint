@@ -11,11 +11,16 @@ structure HgControl :> VCS_CONTROL = struct
     fun remote_for (libname, provider) =
         case provider of
             URL u => u
-          | SERVICE { host, owner } => 
-            case host of
-                "bitbucket" => "https://bitbucket.org/" ^ owner ^ "/" ^ libname
-              | other => raise Fail ("Unsupported implicit hg provider \"" ^
-                                     other ^ "\"")
+          | SERVICE { host, owner, repo } =>
+            let val r = case repo of
+                            SOME r => r
+                          | NONE => libname
+            in
+                case host of
+                    "bitbucket" => "https://bitbucket.org/" ^ owner ^ "/" ^ r 
+                  | other => raise Fail ("Unsupported implicit hg provider \"" ^
+                                         other ^ "\"")
+            end
 
     fun current_state context libname : vcsstate =
         let fun is_branch text = text <> "" andalso #"(" = hd (explode text)
