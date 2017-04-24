@@ -909,10 +909,10 @@ fun load_libspec json libname : libspec =
     let val libobj   = lookup_mandatory json ["libs", libname]
         val vcs      = lookup_mandatory_string libobj ["vcs"]
         val retrieve = lookup_optional_string libobj
-        val service  = retrieve ["provider", "service"]
-        val owner    = retrieve ["provider", "owner"]
-        val repo     = retrieve ["provider", "repository"]
-        val url      = retrieve ["provider", "url"]
+        val service  = retrieve ["service"]
+        val owner    = retrieve ["owner"]
+        val repo     = retrieve ["repository"]
+        val url      = retrieve ["url"]
         val branch   = retrieve ["branch"]
         val pin      = retrieve ["pin"]
     in
