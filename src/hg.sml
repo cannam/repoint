@@ -8,19 +8,8 @@ structure HgControl :> VCS_CONTROL = struct
         OS.FileSys.isDir (FileBits.subpath context libname ".hg")
         handle _ => false
 
-    fun remote_for (libname, provider) =
-        case provider of
-            URL u => u
-          | SERVICE { host, owner, repo } =>
-            let val r = case repo of
-                            SOME r => r
-                          | NONE => libname
-            in
-                case host of
-                    "bitbucket" => "https://bitbucket.org/" ^ owner ^ "/" ^ r 
-                  | other => raise Fail ("Unsupported implicit hg provider \"" ^
-                                         other ^ "\"")
-            end
+    fun remote_for (libname, source) =
+        Provider.remote_url HG source libname
 
     fun current_state context libname : vcsstate =
         let fun is_branch text = text <> "" andalso #"(" = hd (explode text)
@@ -62,7 +51,7 @@ structure HgControl :> VCS_CONTROL = struct
             String.isPrefix id id_or_tag orelse
             List.exists (fn t => t = id_or_tag) tags
 
-    fun has_incoming context (libname, provider, branch) =
+    fun has_incoming context (libname, source, branch) =
         case FileBits.command_output
                  context libname
                  ["hg", "incoming", "-l1", "-b", branch_name branch,
@@ -72,7 +61,7 @@ structure HgControl :> VCS_CONTROL = struct
             incoming <> "" andalso
             not (String.isSubstring "no changes found" incoming)
                         
-    fun is_newest context (libname, provider, branch) =
+    fun is_newest context (libname, source, branch) =
         case FileBits.command_output
                  context libname
                  ["hg", "log", "-l1", "-b", branch_name branch,
@@ -80,15 +69,15 @@ structure HgControl :> VCS_CONTROL = struct
             FAIL err => raise Fail err
           | SUCCEED newest_in_repo => 
             is_at context libname newest_in_repo andalso
-            not (has_incoming context (libname, provider, branch))
+            not (has_incoming context (libname, source, branch))
 
     fun is_locally_modified context libname =
         case current_state context libname of
             { modified, ... } => modified
                 
-    fun checkout context (libname, provider, branch) =
+    fun checkout context (libname, source, branch) =
         let val command = FileBits.command context ""
-            val url = remote_for (libname, provider)
+            val url = remote_for (libname, source)
         in
             case FileBits.mkpath (FileBits.extpath context) of
                 OK => command ["hg", "clone", "-u", branch_name branch,
@@ -96,9 +85,9 @@ structure HgControl :> VCS_CONTROL = struct
               | ERROR e => ERROR e
         end
                                                     
-    fun update context (libname, provider, branch) =
+    fun update context (libname, source, branch) =
         let val command = FileBits.command context libname
-            val url = remote_for (libname, provider)
+            val url = remote_for (libname, source)
             val pull_result = command ["hg", "pull", url]
         in
             case command ["hg", "update", branch_name branch] of
@@ -106,11 +95,11 @@ structure HgControl :> VCS_CONTROL = struct
               | ERROR e => ERROR e
         end
 
-    fun update_to context (libname, provider, "") =
+    fun update_to context (libname, source, "") =
         raise Fail "Non-empty id (tag or revision id) required for update_to"
-      | update_to context (libname, provider, id) = 
+      | update_to context (libname, source, id) = 
         let val command = FileBits.command context libname
-            val url = remote_for (libname, provider)
+            val url = remote_for (libname, source)
         in
             case command ["hg", "update", "-r" ^ id] of
                 OK => OK

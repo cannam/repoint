@@ -5,11 +5,11 @@ datatype vcs =
          HG |
          GIT
 
-datatype provider =
+datatype source =
          URL of string |
-         SERVICE of {
-             host : string,
-             owner : string,
+         PROVIDER of {
+             service : string,
+             owner : string option,
              repo : string option
          }
 
@@ -44,7 +44,7 @@ type libname = string
 type libspec = {
     libname : libname,
     vcs : vcs,
-    provider : provider,
+    source : source,
     branch : branch,
     pin : pin
 }
@@ -62,11 +62,11 @@ type config = {
 signature VCS_CONTROL = sig
     val exists : context -> libname -> bool
     val is_at : context -> libname -> string -> bool
-    val is_newest : context -> libname * provider * branch -> bool
+    val is_newest : context -> libname * source * branch -> bool
     val is_locally_modified : context -> libname -> bool
-    val checkout : context -> libname * provider * branch -> result
-    val update : context -> libname * provider * branch -> result
-    val update_to : context -> libname * provider * string -> result
+    val checkout : context -> libname * source * branch -> result
+    val update : context -> libname * source * branch -> result
+    val update_to : context -> libname * source * string -> result
 end
 
 signature LIB_CONTROL = sig
@@ -227,6 +227,39 @@ end = struct
                                    ERROR ("Directory creation failed: " ^ e))
 end
 
+structure Provider :> sig
+    val remote_url : vcs -> source -> libname -> string
+end = struct
+
+(*!!! todo: validate owner & repo strings *)
+
+    fun github_like_url domain (SOME owner, repo) =
+        "https://" ^ domain ^ "/" ^ owner ^ "/" ^ repo
+      | github_like_url domain (NONE, _) =
+        raise Fail ("Owner required for repo at " ^ domain)
+
+    val github_url = github_like_url "github.com"
+    val bitbucket_url = github_like_url "bitbucket.org"
+               
+    fun remote_url vcs source libname =
+        case source of
+            URL u => u
+          | PROVIDER { service, owner, repo } =>
+            let val r = case repo of
+                            SOME r => r
+                          | NONE => libname
+                val vcs_name = case vcs of GIT => "git" 
+                                         | HG => "hg"
+            in
+                case service of
+                    "github" => github_url (owner, r)
+                  | "bitbucket" => bitbucket_url (owner, r)
+                  | other => raise Fail ("Unsupported service \"" ^ service ^
+                                         "\" for vcs \"" ^ vcs_name ^ "\"")
+            end
+
+end
+
 structure HgControl :> VCS_CONTROL = struct
                             
     type vcsstate = { id: string, modified: bool,
@@ -236,19 +269,8 @@ structure HgControl :> VCS_CONTROL = struct
         OS.FileSys.isDir (FileBits.subpath context libname ".hg")
         handle _ => false
 
-    fun remote_for (libname, provider) =
-        case provider of
-            URL u => u
-          | SERVICE { host, owner, repo } =>
-            let val r = case repo of
-                            SOME r => r
-                          | NONE => libname
-            in
-                case host of
-                    "bitbucket" => "https://bitbucket.org/" ^ owner ^ "/" ^ r 
-                  | other => raise Fail ("Unsupported implicit hg provider \"" ^
-                                         other ^ "\"")
-            end
+    fun remote_for (libname, source) =
+        Provider.remote_url HG source libname
 
     fun current_state context libname : vcsstate =
         let fun is_branch text = text <> "" andalso #"(" = hd (explode text)
@@ -290,7 +312,7 @@ structure HgControl :> VCS_CONTROL = struct
             String.isPrefix id id_or_tag orelse
             List.exists (fn t => t = id_or_tag) tags
 
-    fun has_incoming context (libname, provider, branch) =
+    fun has_incoming context (libname, source, branch) =
         case FileBits.command_output
                  context libname
                  ["hg", "incoming", "-l1", "-b", branch_name branch,
@@ -300,7 +322,7 @@ structure HgControl :> VCS_CONTROL = struct
             incoming <> "" andalso
             not (String.isSubstring "no changes found" incoming)
                         
-    fun is_newest context (libname, provider, branch) =
+    fun is_newest context (libname, source, branch) =
         case FileBits.command_output
                  context libname
                  ["hg", "log", "-l1", "-b", branch_name branch,
@@ -308,15 +330,15 @@ structure HgControl :> VCS_CONTROL = struct
             FAIL err => raise Fail err
           | SUCCEED newest_in_repo => 
             is_at context libname newest_in_repo andalso
-            not (has_incoming context (libname, provider, branch))
+            not (has_incoming context (libname, source, branch))
 
     fun is_locally_modified context libname =
         case current_state context libname of
             { modified, ... } => modified
                 
-    fun checkout context (libname, provider, branch) =
+    fun checkout context (libname, source, branch) =
         let val command = FileBits.command context ""
-            val url = remote_for (libname, provider)
+            val url = remote_for (libname, source)
         in
             case FileBits.mkpath (FileBits.extpath context) of
                 OK => command ["hg", "clone", "-u", branch_name branch,
@@ -324,9 +346,9 @@ structure HgControl :> VCS_CONTROL = struct
               | ERROR e => ERROR e
         end
                                                     
-    fun update context (libname, provider, branch) =
+    fun update context (libname, source, branch) =
         let val command = FileBits.command context libname
-            val url = remote_for (libname, provider)
+            val url = remote_for (libname, source)
             val pull_result = command ["hg", "pull", url]
         in
             case command ["hg", "update", branch_name branch] of
@@ -334,11 +356,11 @@ structure HgControl :> VCS_CONTROL = struct
               | ERROR e => ERROR e
         end
 
-    fun update_to context (libname, provider, "") =
+    fun update_to context (libname, source, "") =
         raise Fail "Non-empty id (tag or revision id) required for update_to"
-      | update_to context (libname, provider, id) = 
+      | update_to context (libname, source, id) = 
         let val command = FileBits.command context libname
-            val url = remote_for (libname, provider)
+            val url = remote_for (libname, source)
         in
             case command ["hg", "update", "-r" ^ id] of
                 OK => OK
@@ -356,20 +378,8 @@ structure GitControl :> VCS_CONTROL = struct
         OS.FileSys.isDir (FileBits.subpath context libname ".git")
         handle _ => false
 
-    fun remote_for (libname, provider) =
-        case provider of
-            URL u => u
-          | SERVICE { host, owner, repo } =>
-            let val r = case repo of
-                            SOME r => r
-                          | NONE => libname
-            in
-                case host of
-                    "github" => "https://github.com/" ^ owner ^ "/" ^ r
-                  | "bitbucket" => "https://bitbucket.org/" ^ owner ^ "/" ^ r
-                  | other => raise Fail ("Unsupported implicit git provider \"" ^
-                                         other ^ "\"")
-            end
+    fun remote_for (libname, source) =
+        Provider.remote_url GIT source libname
 
     fun branch_name branch = case branch of
                                  DEFAULT_BRANCH => "master"
@@ -443,12 +453,12 @@ end
                                          
 functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
 
-    fun check_libstate context ({ libname, provider,
+    fun check_libstate context ({ libname, source,
                                   branch, pin, ... } : libspec) =
         let fun check' () =
             case pin of
                 UNPINNED =>
-                if not (V.is_newest context (libname, provider, branch))
+                if not (V.is_newest context (libname, source, branch))
                 then SUPERSEDED
                 else CORRECT
 
@@ -469,35 +479,23 @@ functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
                              then MODIFIED
                              else UNMODIFIED)
             
-    fun update context ({ libname, provider, branch, pin, ... } : libspec) =
+    fun update context ({ libname, source, branch, pin, ... } : libspec) =
         let fun update' () =
             case pin of
                 UNPINNED =>
-                if not (V.is_newest context (libname, provider, branch))
-                then V.update context (libname, provider, branch)
+                if not (V.is_newest context (libname, source, branch))
+                then V.update context (libname, source, branch)
                 else OK
 
               | PINNED target =>
                 if V.is_at context libname target
                 then OK
-                else V.update_to context (libname, provider, target)
+                else V.update_to context (libname, source, target)
         in
             if not (V.exists context libname)
-            then V.checkout context (libname, provider, branch)
+            then V.checkout context (libname, source, branch)
             else update' ()
         end
-end
-
-structure AnyLibControl :> LIB_CONTROL = struct
-
-    structure H = LibControlFn(HgControl)
-    structure G = LibControlFn(GitControl)
-
-    fun check context (spec as { vcs, ... } : libspec) =
-        (fn HG => H.check | GIT => G.check) vcs context spec
-
-    fun update context (spec as { vcs, ... } : libspec) =
-        (fn HG => H.update | GIT => G.update) vcs context spec
 end
 
 (* An RFC-compliant JSON parser in one SML file with no dependency 
@@ -872,6 +870,18 @@ structure Json :> JSON = struct
 end
 
 
+structure AnyLibControl :> LIB_CONTROL = struct
+
+    structure H = LibControlFn(HgControl)
+    structure G = LibControlFn(GitControl)
+
+    fun check context (spec as { vcs, ... } : libspec) =
+        (fn HG => H.check | GIT => G.check) vcs context spec
+
+    fun update context (spec as { vcs, ... } : libspec) =
+        (fn HG => H.update | GIT => G.update) vcs context spec
+end
+
 fun lookup_optional json kk =
     let fun lookup key =
             case json of
@@ -925,13 +935,12 @@ fun load_libspec json libname : libspec =
                   | "git" => GIT
                   | other => raise Fail ("Unknown version-control system \"" ^
                                          other ^ "\""),
-          provider = case (url, service, owner, repo) of
-                         (SOME u, _, _, _) => URL u
-                       | (NONE, SOME ss, SOME os, r) =>
-                         SERVICE { host = ss, owner = os, repo = r }
-                       | _ => raise Fail ("Must have both service and owner " ^
-                                          "strings in provider if no " ^
-                                          "explicit url supplied"),
+          source = case (url, service, owner, repo) of
+                       (SOME u, NONE, _, _) => URL u
+                     | (NONE, SOME ss, owner, repo) =>
+                       PROVIDER { service = ss, owner = owner, repo = repo }
+                     | _ => raise Fail ("Must have exactly one of service " ^
+                                        "or url string"),
           pin = case pin of
                     SOME p => PINNED p
                   | NONE => UNPINNED,

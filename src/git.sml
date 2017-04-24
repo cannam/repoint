@@ -5,20 +5,8 @@ structure GitControl :> VCS_CONTROL = struct
         OS.FileSys.isDir (FileBits.subpath context libname ".git")
         handle _ => false
 
-    fun remote_for (libname, provider) =
-        case provider of
-            URL u => u
-          | SERVICE { host, owner, repo } =>
-            let val r = case repo of
-                            SOME r => r
-                          | NONE => libname
-            in
-                case host of
-                    "github" => "https://github.com/" ^ owner ^ "/" ^ r
-                  | "bitbucket" => "https://bitbucket.org/" ^ owner ^ "/" ^ r
-                  | other => raise Fail ("Unsupported implicit git provider \"" ^
-                                         other ^ "\"")
-            end
+    fun remote_for (libname, source) =
+        Provider.remote_url GIT source libname
 
     fun branch_name branch = case branch of
                                  DEFAULT_BRANCH => "master"

@@ -1,12 +1,12 @@
                                          
 functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
 
-    fun check_libstate context ({ libname, provider,
+    fun check_libstate context ({ libname, source,
                                   branch, pin, ... } : libspec) =
         let fun check' () =
             case pin of
                 UNPINNED =>
-                if not (V.is_newest context (libname, provider, branch))
+                if not (V.is_newest context (libname, source, branch))
                 then SUPERSEDED
                 else CORRECT
 
@@ -27,33 +27,21 @@ functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
                              then MODIFIED
                              else UNMODIFIED)
             
-    fun update context ({ libname, provider, branch, pin, ... } : libspec) =
+    fun update context ({ libname, source, branch, pin, ... } : libspec) =
         let fun update' () =
             case pin of
                 UNPINNED =>
-                if not (V.is_newest context (libname, provider, branch))
-                then V.update context (libname, provider, branch)
+                if not (V.is_newest context (libname, source, branch))
+                then V.update context (libname, source, branch)
                 else OK
 
               | PINNED target =>
                 if V.is_at context libname target
                 then OK
-                else V.update_to context (libname, provider, target)
+                else V.update_to context (libname, source, target)
         in
             if not (V.exists context libname)
-            then V.checkout context (libname, provider, branch)
+            then V.checkout context (libname, source, branch)
             else update' ()
         end
-end
-
-structure AnyLibControl :> LIB_CONTROL = struct
-
-    structure H = LibControlFn(HgControl)
-    structure G = LibControlFn(GitControl)
-
-    fun check context (spec as { vcs, ... } : libspec) =
-        (fn HG => H.check | GIT => G.check) vcs context spec
-
-    fun update context (spec as { vcs, ... } : libspec) =
-        (fn HG => H.update | GIT => G.update) vcs context spec
 end

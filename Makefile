@@ -11,6 +11,7 @@ vext:	vext.sml
 SOURCES	:= \
 	src/types.sml \
 	src/filebits.sml \
+	src/provider.sml \
 	src/hg.sml \
 	src/git.sml \
 	src/control.sml \

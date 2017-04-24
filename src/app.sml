@@ -1,4 +1,16 @@
 
+structure AnyLibControl :> LIB_CONTROL = struct
+
+    structure H = LibControlFn(HgControl)
+    structure G = LibControlFn(GitControl)
+
+    fun check context (spec as { vcs, ... } : libspec) =
+        (fn HG => H.check | GIT => G.check) vcs context spec
+
+    fun update context (spec as { vcs, ... } : libspec) =
+        (fn HG => H.update | GIT => G.update) vcs context spec
+end
+
 fun lookup_optional json kk =
     let fun lookup key =
             case json of
@@ -52,13 +64,12 @@ fun load_libspec json libname : libspec =
                   | "git" => GIT
                   | other => raise Fail ("Unknown version-control system \"" ^
                                          other ^ "\""),
-          provider = case (url, service, owner, repo) of
-                         (SOME u, _, _, _) => URL u
-                       | (NONE, SOME ss, SOME os, r) =>
-                         SERVICE { host = ss, owner = os, repo = r }
-                       | _ => raise Fail ("Must have both service and owner " ^
-                                          "strings in provider if no " ^
-                                          "explicit url supplied"),
+          source = case (url, service, owner, repo) of
+                       (SOME u, NONE, _, _) => URL u
+                     | (NONE, SOME ss, owner, repo) =>
+                       PROVIDER { service = ss, owner = owner, repo = repo }
+                     | _ => raise Fail ("Must have exactly one of service " ^
+                                        "or url string"),
           pin = case pin of
                     SOME p => PINNED p
                   | NONE => UNPINNED,
