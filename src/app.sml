@@ -106,11 +106,15 @@ fun usage () =
 fun check (config as { context, libs } : config) =
     let open AnyLibControl
         val outcomes = map (fn lib => (#libname lib, check context lib)) libs
+        fun print_for libname state m = print (state ^ " " ^ libname ^
+                                               (case m of
+                                                    MODIFIED => " [* modified]"
+                                                  | UNMODIFIED => "") ^ "\n")
     in
-        app (fn (libname, ABSENT) => print ("ABSENT " ^ libname ^ "\n")
-              | (libname, CORRECT) => print ("CORRECT " ^ libname ^ "\n")
-              | (libname, SUPERSEDED) => print ("SUPERSEDED " ^ libname ^ "\n")
-              | (libname, WRONG) => print ("WRONG " ^ libname ^ "\n"))
+        app (fn (n, (ABSENT, _)) => print_for n "ABSENT" UNMODIFIED
+              | (n, (CORRECT, m)) => print_for n "CORRECT" m
+              | (n, (SUPERSEDED, m)) => print_for n "SUPERSEDED" m
+              | (n, (WRONG, m)) => print_for n "WRONG" m)
             outcomes
     end        
 
@@ -118,8 +122,10 @@ fun update (config as { context, libs } : config) =
     let open AnyLibControl
         val outcomes = map (fn lib => (#libname lib, update context lib)) libs
     in
-        app (fn (libname, OK) => print ("OK " ^ libname ^ "\n")
-              | (libname, ERROR e) => print ("FAILED " ^ libname ^ ": " ^ e ^ "\n"))
+        app (fn (libname, OK) =>
+                print ("OK " ^ libname ^ "\n")
+              | (libname, ERROR e) =>
+                print ("FAILED " ^ libname ^ ": " ^ e ^ "\n"))
             outcomes
     end        
        

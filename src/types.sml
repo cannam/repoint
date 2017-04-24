@@ -21,6 +21,10 @@ datatype libstate =
          SUPERSEDED |
          WRONG
 
+datatype localstate =
+         MODIFIED |
+         UNMODIFIED
+             
 datatype result =
          OK |
          ERROR of string
@@ -57,12 +61,13 @@ signature VCS_CONTROL = sig
     val exists : context -> libname -> bool
     val is_at : context -> libname -> string -> bool
     val is_newest : context -> libname * provider * branch -> bool
+    val is_locally_modified : context -> libname -> bool
     val checkout : context -> libname * provider * branch -> result
     val update : context -> libname * provider * branch -> result
     val update_to : context -> libname * provider * string -> result
 end
 
 signature LIB_CONTROL = sig
-    val check : context -> libspec -> libstate
+    val check : context -> libspec -> libstate * localstate
     val update : context -> libspec -> result
 end

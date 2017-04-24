@@ -23,6 +23,10 @@ datatype libstate =
          SUPERSEDED |
          WRONG
 
+datatype localstate =
+         MODIFIED |
+         UNMODIFIED
+             
 datatype result =
          OK |
          ERROR of string
@@ -59,13 +63,14 @@ signature VCS_CONTROL = sig
     val exists : context -> libname -> bool
     val is_at : context -> libname -> string -> bool
     val is_newest : context -> libname * provider * branch -> bool
+    val is_locally_modified : context -> libname -> bool
     val checkout : context -> libname * provider * branch -> result
     val update : context -> libname * provider * branch -> result
     val update_to : context -> libname * provider * string -> result
 end
 
 signature LIB_CONTROL = sig
-    val check : context -> libspec -> libstate
+    val check : context -> libspec -> libstate * localstate
     val update : context -> libspec -> result
 end
 
@@ -304,6 +309,10 @@ structure HgControl :> VCS_CONTROL = struct
             is_at context libname newest_in_repo andalso
             not (has_incoming context (libname, provider, branch))
 
+    fun is_locally_modified context libname =
+        case current_state context libname of
+            { modified, ... } => modified
+                
     fun checkout context (libname, provider, branch) =
         let val command = FileBits.command context ""
             val url = remote_for (libname, provider)
@@ -393,20 +402,26 @@ structure GitControl :> VCS_CONTROL = struct
                 tid <> id_or_tag (* otherwise id_or_tag was an id, not a tag *)
 
     fun is_newest context (libname, provider, branch) =
-      let fun newest_here () =
-            case FileBits.command_output
-                     context libname
-                     ["git", "rev-list", "-1", branch_name branch] of
-                FAIL err => raise Fail err
-              | SUCCEED rev => is_at context libname rev
-      in
-          if not (newest_here ())
-          then false
-          else case FileBits.command context libname ["git", "fetch"] of
-                   ERROR err => raise Fail err
-                 | OK => newest_here ()
-      end
+        let fun newest_here () =
+              case FileBits.command_output
+                       context libname
+                       ["git", "rev-list", "-1", branch_name branch] of
+                  FAIL err => raise Fail err
+                | SUCCEED rev => is_at context libname rev
+        in
+            if not (newest_here ())
+            then false
+            else case FileBits.command context libname ["git", "fetch"] of
+                     ERROR err => raise Fail err
+                   | OK => newest_here ()
+        end
 
+    fun is_locally_modified context libname =
+        case FileBits.command_output context libname ["git", "status", "-s"] of
+            FAIL err => raise Fail err
+          | SUCCEED "" => false
+          | SUCCEED _ => true
+            
     fun update context (libname, provider, branch) =
         update_to context (libname, provider, branch_name branch)
 
@@ -427,7 +442,8 @@ end
                                          
 functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
 
-    fun check context ({ libname, provider, branch, pin, ... } : libspec) =
+    fun check_libstate context ({ libname, provider,
+                                  branch, pin, ... } : libspec) =
         let fun check' () =
             case pin of
                 UNPINNED =>
@@ -445,6 +461,12 @@ functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
             else check' ()
         end
 
+    fun check context (spec as { libname, ... } : libspec) =
+        (check_libstate context spec,
+         if V.is_locally_modified context libname
+         then MODIFIED
+         else UNMODIFIED)
+            
     fun update context ({ libname, provider, branch, pin, ... } : libspec) =
         let fun update' () =
             case pin of
@@ -761,7 +783,7 @@ structure Json :> JSON = struct
                 case parsePair tokens of
                     ERROR e => ERROR e
                   | OK (pair, T.COMMA :: xs) => parseObject' (pair :: acc) xs
-                  | OK (pair, T.CURLY_R :: xs) => OK (OBJECT (pair :: acc), xs)
+                  | OK (pair, T.CURLY_R :: xs) => OK (OBJECT (rev (pair :: acc)), xs)
                   | OK (_, _) => ERROR "Expected , or } after object element"
         in
             parseObject' [] tokens
@@ -955,11 +977,15 @@ fun usage () =
 fun check (config as { context, libs } : config) =
     let open AnyLibControl
         val outcomes = map (fn lib => (#libname lib, check context lib)) libs
+        fun print_for libname state m = print (state ^ " " ^ libname ^
+                                               (case m of
+                                                    MODIFIED => " [* modified]"
+                                                  | UNMODIFIED => "") ^ "\n")
     in
-        app (fn (libname, ABSENT) => print ("ABSENT " ^ libname ^ "\n")
-              | (libname, CORRECT) => print ("CORRECT " ^ libname ^ "\n")
-              | (libname, SUPERSEDED) => print ("SUPERSEDED " ^ libname ^ "\n")
-              | (libname, WRONG) => print ("WRONG " ^ libname ^ "\n"))
+        app (fn (n, (ABSENT, _)) => print_for n "ABSENT" UNMODIFIED
+              | (n, (CORRECT, m)) => print_for n "CORRECT" m
+              | (n, (SUPERSEDED, m)) => print_for n "SUPERSEDED" m
+              | (n, (WRONG, m)) => print_for n "WRONG" m)
             outcomes
     end        
 
@@ -967,8 +993,10 @@ fun update (config as { context, libs } : config) =
     let open AnyLibControl
         val outcomes = map (fn lib => (#libname lib, update context lib)) libs
     in
-        app (fn (libname, OK) => print ("OK " ^ libname ^ "\n")
-              | (libname, ERROR e) => print ("FAILED " ^ libname ^ ": " ^ e ^ "\n"))
+        app (fn (libname, OK) =>
+                print ("OK " ^ libname ^ "\n")
+              | (libname, ERROR e) =>
+                print ("FAILED " ^ libname ^ ": " ^ e ^ "\n"))
             outcomes
     end        
        

@@ -82,6 +82,10 @@ structure HgControl :> VCS_CONTROL = struct
             is_at context libname newest_in_repo andalso
             not (has_incoming context (libname, provider, branch))
 
+    fun is_locally_modified context libname =
+        case current_state context libname of
+            { modified, ... } => modified
+                
     fun checkout context (libname, provider, branch) =
         let val command = FileBits.command context ""
             val url = remote_for (libname, provider)

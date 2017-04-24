@@ -1,7 +1,8 @@
                                          
 functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
 
-    fun check context ({ libname, provider, branch, pin, ... } : libspec) =
+    fun check_libstate context ({ libname, provider,
+                                  branch, pin, ... } : libspec) =
         let fun check' () =
             case pin of
                 UNPINNED =>
@@ -19,6 +20,12 @@ functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
             else check' ()
         end
 
+    fun check context (spec as { libname, ... } : libspec) =
+        (check_libstate context spec,
+         if V.is_locally_modified context libname
+         then MODIFIED
+         else UNMODIFIED)
+            
     fun update context ({ libname, provider, branch, pin, ... } : libspec) =
         let fun update' () =
             case pin of

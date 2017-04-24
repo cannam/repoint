@@ -52,20 +52,26 @@ structure GitControl :> VCS_CONTROL = struct
                 tid <> id_or_tag (* otherwise id_or_tag was an id, not a tag *)
 
     fun is_newest context (libname, provider, branch) =
-      let fun newest_here () =
-            case FileBits.command_output
-                     context libname
-                     ["git", "rev-list", "-1", branch_name branch] of
-                FAIL err => raise Fail err
-              | SUCCEED rev => is_at context libname rev
-      in
-          if not (newest_here ())
-          then false
-          else case FileBits.command context libname ["git", "fetch"] of
-                   ERROR err => raise Fail err
-                 | OK => newest_here ()
-      end
+        let fun newest_here () =
+              case FileBits.command_output
+                       context libname
+                       ["git", "rev-list", "-1", branch_name branch] of
+                  FAIL err => raise Fail err
+                | SUCCEED rev => is_at context libname rev
+        in
+            if not (newest_here ())
+            then false
+            else case FileBits.command context libname ["git", "fetch"] of
+                     ERROR err => raise Fail err
+                   | OK => newest_here ()
+        end
 
+    fun is_locally_modified context libname =
+        case FileBits.command_output context libname ["git", "status", "-s"] of
+            FAIL err => raise Fail err
+          | SUCCEED "" => false
+          | SUCCEED _ => true
+            
     fun update context (libname, provider, branch) =
         update_to context (libname, provider, branch_name branch)
 
