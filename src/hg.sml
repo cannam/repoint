@@ -51,34 +51,53 @@ structure HgControl :> VCS_CONTROL = struct
                   | _ => raise Fail ("Unexpected output from hg id: " ^ out)
         end
 
-    (*!!! + branch support? *)
-            
+    fun branch_name branch = case branch of
+                                 DEFAULT_BRANCH => "default"
+                               | BRANCH b => b
+
     fun is_at context libname id_or_tag =
         case current_state context libname of
             { id, tags, ... } => 
             String.isPrefix id_or_tag id orelse
+            String.isPrefix id id_or_tag orelse
             List.exists (fn t => t = id_or_tag) tags
-            
-    fun is_newest context (libname, provider, branch) = false (*!!!*)
 
-    fun checkout context (libname, provider) =
+    fun has_incoming context (libname, provider, branch) =
+        case FileBits.command_output
+                 context libname
+                 ["hg", "incoming", "-l1", "-b", branch_name branch,
+                  "--template", "{node}"] of
+            FAIL err => false (* hg incoming is odd that way *)
+          | SUCCEED incoming => 
+            incoming <> "" andalso
+            not (String.isSubstring "no changes found" incoming)
+                        
+    fun is_newest context (libname, provider, branch) =
+        case FileBits.command_output
+                 context libname
+                 ["hg", "log", "-l1", "-b", branch_name branch,
+                  "--template", "{node}"] of
+            FAIL err => raise Fail err
+          | SUCCEED newest_in_repo => 
+            is_at context libname newest_in_repo andalso
+            not (has_incoming context (libname, provider, branch))
+
+    fun checkout context (libname, provider, branch) =
         let val command = FileBits.command context ""
             val url = remote_for (libname, provider)
         in
             case FileBits.mkpath (FileBits.extpath context) of
-               OK => command ["hg", "clone", url, libname]
-             | ERROR e => ERROR e
+                OK => command ["hg", "clone", "-u", branch_name branch,
+                               url, libname]
+              | ERROR e => ERROR e
         end
                                                     
     fun update context (libname, provider, branch) =
         let val command = FileBits.command context libname
             val url = remote_for (libname, provider)
             val pull_result = command ["hg", "pull", url]
-            val branch_name = case branch of
-                                  DEFAULT_BRANCH => "default"
-                                | BRANCH b => b
         in
-            case command ["hg", "update", branch_name] of
+            case command ["hg", "update", branch_name branch] of
                 OK => pull_result
               | ERROR e => ERROR e
         end

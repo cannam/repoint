@@ -59,7 +59,7 @@ signature VCS_CONTROL = sig
     val exists : context -> libname -> bool
     val is_at : context -> libname -> string -> bool
     val is_newest : context -> libname * provider * branch -> bool
-    val checkout : context -> libname * provider -> result
+    val checkout : context -> libname * provider * branch -> result
     val update : context -> libname * provider * branch -> result
     val update_to : context -> libname * provider * string -> result
 end
@@ -146,7 +146,7 @@ end = struct
                 then arg
                 else "\"" ^ arg ^ "\""
             fun check arg =
-                let val valid = explode " /#:;?,._-"
+                let val valid = explode " /#:;?,._-{}"
                 in
                     app (fn c =>
                             if isAlphaNum c orelse
@@ -273,34 +273,53 @@ structure HgControl :> VCS_CONTROL = struct
                   | _ => raise Fail ("Unexpected output from hg id: " ^ out)
         end
 
-    (*!!! + branch support? *)
-            
+    fun branch_name branch = case branch of
+                                 DEFAULT_BRANCH => "default"
+                               | BRANCH b => b
+
     fun is_at context libname id_or_tag =
         case current_state context libname of
             { id, tags, ... } => 
             String.isPrefix id_or_tag id orelse
+            String.isPrefix id id_or_tag orelse
             List.exists (fn t => t = id_or_tag) tags
-            
-    fun is_newest context (libname, provider, branch) = false (*!!!*)
 
-    fun checkout context (libname, provider) =
+    fun has_incoming context (libname, provider, branch) =
+        case FileBits.command_output
+                 context libname
+                 ["hg", "incoming", "-l1", "-b", branch_name branch,
+                  "--template", "{node}"] of
+            FAIL err => false (* hg incoming is odd that way *)
+          | SUCCEED incoming => 
+            incoming <> "" andalso
+            not (String.isSubstring "no changes found" incoming)
+                        
+    fun is_newest context (libname, provider, branch) =
+        case FileBits.command_output
+                 context libname
+                 ["hg", "log", "-l1", "-b", branch_name branch,
+                  "--template", "{node}"] of
+            FAIL err => raise Fail err
+          | SUCCEED newest_in_repo => 
+            is_at context libname newest_in_repo andalso
+            not (has_incoming context (libname, provider, branch))
+
+    fun checkout context (libname, provider, branch) =
         let val command = FileBits.command context ""
             val url = remote_for (libname, provider)
         in
             case FileBits.mkpath (FileBits.extpath context) of
-               OK => command ["hg", "clone", url, libname]
-             | ERROR e => ERROR e
+                OK => command ["hg", "clone", "-u", branch_name branch,
+                               url, libname]
+              | ERROR e => ERROR e
         end
                                                     
     fun update context (libname, provider, branch) =
         let val command = FileBits.command context libname
             val url = remote_for (libname, provider)
             val pull_result = command ["hg", "pull", url]
-            val branch_name = case branch of
-                                  DEFAULT_BRANCH => "default"
-                                | BRANCH b => b
         in
-            case command ["hg", "update", branch_name] of
+            case command ["hg", "update", branch_name branch] of
                 OK => pull_result
               | ERROR e => ERROR e
         end
@@ -342,13 +361,18 @@ structure GitControl :> VCS_CONTROL = struct
                                          other ^ "\"")
             end
 
-    fun checkout context (libname, provider) =
+    fun branch_name branch = case branch of
+                                 DEFAULT_BRANCH => "master"
+                               | BRANCH b => b
+
+    fun checkout context (libname, provider, branch) =
         let val command = FileBits.command context ""
             val url = remote_for (libname, provider)
         in
             case FileBits.mkpath (FileBits.extpath context) of
-               OK => command ["git", "clone", url, libname]
-             | ERROR e => ERROR e
+                OK => command ["git", "clone", "-b", branch_name branch,
+                               url, libname]
+              | ERROR e => ERROR e
         end
 
     (* NB git rev-parse HEAD shows revision id of current checkout;
@@ -360,6 +384,7 @@ structure GitControl :> VCS_CONTROL = struct
             FAIL err => raise Fail err
           | SUCCEED id =>
             String.isPrefix id_or_tag id orelse
+            String.isPrefix id id_or_tag orelse
             case FileBits.command_output context libname
                                          ["git", "rev-list", "-1", id_or_tag] of
                 FAIL err => raise Fail err
@@ -367,15 +392,23 @@ structure GitControl :> VCS_CONTROL = struct
                 tid = id andalso
                 tid <> id_or_tag (* otherwise id_or_tag was an id, not a tag *)
 
-    fun is_newest context (libname, provider, branch) = false (*!!! *)
+    fun is_newest context (libname, provider, branch) =
+      let fun newest_here () =
+            case FileBits.command_output
+                     context libname
+                     ["git", "rev-list", "-1", branch_name branch] of
+                FAIL err => raise Fail err
+              | SUCCEED rev => is_at context libname rev
+      in
+          if not (newest_here ())
+          then false
+          else case FileBits.command context libname ["git", "fetch"] of
+                   ERROR err => raise Fail err
+                 | OK => newest_here ()
+      end
 
     fun update context (libname, provider, branch) =
-        let val branch_name = case branch of
-                                  DEFAULT_BRANCH => "master"
-                                | BRANCH b => b
-        in
-            update_to context (libname, provider, branch_name)
-        end
+        update_to context (libname, provider, branch_name branch)
 
     and update_to context (libname, provider, "") = 
         raise Fail "Non-empty id (tag or revision id) required for update_to"
@@ -412,7 +445,7 @@ functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
             else check' ()
         end
 
-    fun update context (spec as { libname, provider, branch, pin, ... } : libspec) =
+    fun update context ({ libname, provider, branch, pin, ... } : libspec) =
         let fun update' () =
             case pin of
                 UNPINNED =>
@@ -426,9 +459,7 @@ functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
                 else V.update_to context (libname, provider, target)
         in
             if not (V.exists context libname)
-            then case V.checkout context (libname, provider) of
-                     OK => update' ()
-                   | ERROR e => ERROR e
+            then V.checkout context (libname, provider, branch)
             else update' ()
         end
 end

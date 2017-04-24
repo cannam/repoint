@@ -57,7 +57,7 @@ signature VCS_CONTROL = sig
     val exists : context -> libname -> bool
     val is_at : context -> libname -> string -> bool
     val is_newest : context -> libname * provider * branch -> bool
-    val checkout : context -> libname * provider -> result
+    val checkout : context -> libname * provider * branch -> result
     val update : context -> libname * provider * branch -> result
     val update_to : context -> libname * provider * string -> result
 end

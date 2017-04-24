@@ -19,7 +19,7 @@ functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
             else check' ()
         end
 
-    fun update context (spec as { libname, provider, branch, pin, ... } : libspec) =
+    fun update context ({ libname, provider, branch, pin, ... } : libspec) =
         let fun update' () =
             case pin of
                 UNPINNED =>
@@ -33,9 +33,7 @@ functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
                 else V.update_to context (libname, provider, target)
         in
             if not (V.exists context libname)
-            then case V.checkout context (libname, provider) of
-                     OK => update' ()
-                   | ERROR e => ERROR e
+            then V.checkout context (libname, provider, branch)
             else update' ()
         end
 end
