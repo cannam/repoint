@@ -8,7 +8,8 @@ structure FileBits :> sig
     val file_contents : string -> string
     val mydir : unit -> string
     val mkpath : string -> result
-    val vexfile : string -> string
+    val vexfile : unit -> string
+    val vexpath : string -> string
 end = struct
 
     fun extpath { rootpath, extdir } =
@@ -35,12 +36,14 @@ end = struct
       | libpath context libname =
         subpath context libname ""
 
-    fun vexfile rootpath =
+    fun vexfile () = "vextspec.json"
+
+    fun vexpath rootpath =
         let val { isAbs, vol, arcs } = OS.Path.fromString rootpath
         in OS.Path.toString {
                 isAbs = isAbs,
                 vol = vol,
-                arcs = arcs @ [ ".vex" ]
+                arcs = arcs @ [ vexfile () ]
             }
         end
             

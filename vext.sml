@@ -52,7 +52,8 @@ structure FileBits :> sig
     val file_contents : string -> string
     val mydir : unit -> string
     val mkpath : string -> result
-    val vexfile : string -> string
+    val vexfile : unit -> string
+    val vexpath : string -> string
 end = struct
 
     fun extpath { rootpath, extdir } =
@@ -79,12 +80,14 @@ end = struct
       | libpath context libname =
         subpath context libname ""
 
-    fun vexfile rootpath =
+    fun vexfile () = "vextspec.json"
+
+    fun vexpath rootpath =
         let val { isAbs, vol, arcs } = OS.Path.fromString rootpath
         in OS.Path.toString {
                 isAbs = isAbs,
                 vol = vol,
-                arcs = arcs @ [ ".vex" ]
+                arcs = arcs @ [ vexfile () ]
             }
         end
             
@@ -846,9 +849,14 @@ fun load_libspec json libname : libspec =
     end  
 
 fun load_config rootpath : config =
-    let val vexfile = FileBits.vexfile rootpath
-        val _ = print ("path is " ^ rootpath ^ ", vex file is " ^ vexfile ^ "\n")
-        val json = case Json.parse (FileBits.file_contents vexfile) of
+    let val specfile = FileBits.vexpath rootpath
+        val _ = if OS.FileSys.access (specfile, [OS.FileSys.A_READ])
+                then ()
+                else raise Fail ("Failed to open project spec " ^
+                                 (FileBits.vexfile ()) ^ " in " ^ rootpath ^
+                                 ".\nPlease ensure the spec file is in the " ^
+                                 "project root and run this from there.")
+        val json = case Json.parse (FileBits.file_contents specfile) of
                        Json.OK json => json
                      | Json.ERROR e => raise Fail e
         val extdir = lookup_mandatory_string json ["config", "extdir"]
@@ -896,13 +904,7 @@ fun update (config as { context, libs } : config) =
     end        
        
 fun main () =
-    let (*!!! options: require that this program is in the root dir,
-        and so use the location of this program as the root dir
-        location; or require that the program is only ever run from
-        the root dir; or use some mechanism to scan upwards in the dir
-        hierarchy until we find a plausible root (e.g. a .vex file is
-        present [and we are not within an ext dir?] *)
-        val rootpath = FileBits.mydir ()
+    let val rootpath = OS.FileSys.getDir ()
         val config = load_config rootpath
     in
         case CommandLine.arguments () of
