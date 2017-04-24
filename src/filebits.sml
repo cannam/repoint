@@ -97,9 +97,9 @@ end = struct
     fun run_command context libname cmdlist redirect =
         let open OS
             val dir = libpath context libname
-            val _ = FileSys.chDir dir
             val cmd = expand_commandline cmdlist
             val _ = print ("Running: " ^ cmd ^ " (in dir " ^ dir ^ ")...\n")
+            val _ = FileSys.chDir dir
             val status = case redirect of
                              NONE => Process.system cmd
                            | SOME file => Process.system (cmd ^ ">" ^ file)
@@ -108,7 +108,7 @@ end = struct
             then OK
             else ERROR ("Command failed: " ^ cmd ^ " (in dir " ^ dir ^ ")")
         end
-        handle ex => ERROR (exnMessage ex)
+        handle ex => ERROR ("Unable to run command: " ^ exnMessage ex)
 
     fun command context libname cmdlist =
         run_command context libname cmdlist NONE
@@ -148,5 +148,6 @@ end = struct
                                    arcs = rev (tl (rev arcs)) }) of
                      ERROR e => ERROR e
                    | OK => ((OS.FileSys.mkDir path; OK)
-                            handle OS.SysErr (e, _) => ERROR e)
+                            handle OS.SysErr (e, _) =>
+                                   ERROR ("Directory creation failed: " ^ e))
 end

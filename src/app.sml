@@ -78,7 +78,8 @@ fun load_config rootpath : config =
                                  "project root and run this from there.")
         val json = case Json.parse (FileBits.file_contents specfile) of
                        Json.OK json => json
-                     | Json.ERROR e => raise Fail e
+                     | Json.ERROR e =>
+                       raise Fail ("Failed to parse spec file: " ^ e)
         val extdir = lookup_mandatory_string json ["config", "extdir"]
         val libs = lookup_optional json ["libs"]
         val libnames = case libs of

@@ -21,10 +21,11 @@ functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
         end
 
     fun check context (spec as { libname, ... } : libspec) =
-        (check_libstate context spec,
-         if V.is_locally_modified context libname
-         then MODIFIED
-         else UNMODIFIED)
+        case check_libstate context spec of
+            ABSENT => (ABSENT, UNMODIFIED)
+          | state => (state, if V.is_locally_modified context libname
+                             then MODIFIED
+                             else UNMODIFIED)
             
     fun update context ({ libname, provider, branch, pin, ... } : libspec) =
         let fun update' () =

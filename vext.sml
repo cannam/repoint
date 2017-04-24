@@ -172,9 +172,9 @@ end = struct
     fun run_command context libname cmdlist redirect =
         let open OS
             val dir = libpath context libname
-            val _ = FileSys.chDir dir
             val cmd = expand_commandline cmdlist
             val _ = print ("Running: " ^ cmd ^ " (in dir " ^ dir ^ ")...\n")
+            val _ = FileSys.chDir dir
             val status = case redirect of
                              NONE => Process.system cmd
                            | SOME file => Process.system (cmd ^ ">" ^ file)
@@ -183,7 +183,7 @@ end = struct
             then OK
             else ERROR ("Command failed: " ^ cmd ^ " (in dir " ^ dir ^ ")")
         end
-        handle ex => ERROR (exnMessage ex)
+        handle ex => ERROR ("Unable to run command: " ^ exnMessage ex)
 
     fun command context libname cmdlist =
         run_command context libname cmdlist NONE
@@ -223,7 +223,8 @@ end = struct
                                    arcs = rev (tl (rev arcs)) }) of
                      ERROR e => ERROR e
                    | OK => ((OS.FileSys.mkDir path; OK)
-                            handle OS.SysErr (e, _) => ERROR e)
+                            handle OS.SysErr (e, _) =>
+                                   ERROR ("Directory creation failed: " ^ e))
 end
 
 structure HgControl :> VCS_CONTROL = struct
@@ -462,10 +463,11 @@ functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
         end
 
     fun check context (spec as { libname, ... } : libspec) =
-        (check_libstate context spec,
-         if V.is_locally_modified context libname
-         then MODIFIED
-         else UNMODIFIED)
+        case check_libstate context spec of
+            ABSENT => (ABSENT, UNMODIFIED)
+          | state => (state, if V.is_locally_modified context libname
+                             then MODIFIED
+                             else UNMODIFIED)
             
     fun update context ({ libname, provider, branch, pin, ... } : libspec) =
         let fun update' () =
@@ -783,7 +785,7 @@ structure Json :> JSON = struct
                 case parsePair tokens of
                     ERROR e => ERROR e
                   | OK (pair, T.COMMA :: xs) => parseObject' (pair :: acc) xs
-                  | OK (pair, T.CURLY_R :: xs) => OK (OBJECT (rev (pair :: acc)), xs)
+                  | OK (pair, T.CURLY_R :: xs) => OK (OBJECT (pair :: acc), xs)
                   | OK (_, _) => ERROR "Expected , or } after object element"
         in
             parseObject' [] tokens
@@ -949,7 +951,8 @@ fun load_config rootpath : config =
                                  "project root and run this from there.")
         val json = case Json.parse (FileBits.file_contents specfile) of
                        Json.OK json => json
-                     | Json.ERROR e => raise Fail e
+                     | Json.ERROR e =>
+                       raise Fail ("Failed to parse spec file: " ^ e)
         val extdir = lookup_mandatory_string json ["config", "extdir"]
         val libs = lookup_optional json ["libs"]
         val libnames = case libs of
