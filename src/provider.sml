@@ -4,24 +4,28 @@ structure Provider :> sig
 end = struct
 
     type url_spec = string
-    type remote_spec = { anon : url_spec option, logged : url_spec option }
+    type remote_spec = { anon : url_spec option, auth : url_spec option }
     type known_provider = string * vcs list * remote_spec
                            
     val known_providers : known_provider list = [
         ("bitbucket", [HG, GIT], {
              anon = SOME "https://bitbucket.org/{owner}/{repo}",
-             logged = SOME "ssh://{vcs}@bitbucket.org/{owner}/{repo}"
+             auth = SOME "ssh://{vcs}@bitbucket.org/{owner}/{repo}"
          }),
         ("github", [GIT], {
              anon = SOME "https://github.com/{owner}/{repo}",
-             logged = SOME "ssh://{vcs}@github.com/{owner}/{repo}"
+             auth = SOME "ssh://{vcs}@github.com/{owner}/{repo}"
          }),
         ("soundsoftware", [HG, GIT], {
              anon = SOME "https://code.soundsoftware.ac.uk/{vcs}/{repo}",
-             logged = SOME "https://{account}@code.soundsoftware.ac.uk/{vcs}/{repo}"
+             auth = SOME "https://{account}@code.soundsoftware.ac.uk/{vcs}/{repo}"
         })
     ]
 
+    (*!!! -> read further providers from project spec, + allow override from user config *)
+
+    (*!!! -> pick up account names from user config *)
+                                                    
     fun vcs_name vcs = case vcs of GIT => "git" 
                                  | HG => "hg"
 
