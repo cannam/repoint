@@ -98,8 +98,9 @@ only when they are in Absent or Out-of-date state.
 
 to add:
 
- + locally modified status
+ + locally modified status (+status command that doesn't go to the network)
  + archive command
  + note about not handling libraries having their own dependencies
  + ability to commit and/or push?
-
+ + dry-run option (print commands)
+ 
