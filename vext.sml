@@ -698,14 +698,14 @@ end
 
 
 structure JsonBits :> sig
-    val load_json : string -> Json.json
+    val load_json_from : string -> Json.json (* filename -> json *)
     val lookup_optional : Json.json -> string list -> Json.json option
     val lookup_optional_string : Json.json -> string list -> string option
     val lookup_mandatory : Json.json -> string list -> Json.json
     val lookup_mandatory_string : Json.json -> string list -> string
 end = struct
 
-    fun load_json filename =
+    fun load_json_from filename =
         case Json.parse (FileBits.file_contents filename) of
             Json.OK json => json
           | Json.ERROR e => raise Fail ("Failed to parse file: " ^ e)
@@ -770,12 +770,43 @@ end = struct
           }
         ]
 
-    (*!!! -> read further providers from project spec, + allow override from user config *)
+    fun vcs_name vcs =
+        case vcs of GIT => "git" |
+                    HG => "hg"
+                                             
+    fun vcs_from_name name =
+        case name of "git" => GIT 
+                   | "hg" => HG
+                   | other => raise Fail ("Unknown vcs name \"" ^ name ^ "\"")
+
+    fun load_providers json =
+        let open JsonBits
+            fun load_provider json pname : provider =
+                {
+                  service = pname,
+                  supports =
+                  case lookup_mandatory json [pname, "vcs"] of
+                      Json.ARRAY vv =>
+                      map (fn (Json.STRING v) => vcs_from_name v
+                          | _ => raise Fail "Strings expected in vcs array")
+                          vv
+                    | _ => raise Fail "Array expected for vcs",
+                  remote_spec = {
+                      anon = lookup_optional_string json [pname, "anon"],
+                      auth = lookup_optional_string json [pname, "auth"]
+                  }
+                }
+        in
+            case lookup_optional json ["providers"] of
+                NONE => []
+              | SOME (Json.OBJECT pl) => map (fn (k, v) => load_provider v k) pl
+              | _ => raise Fail "Object expected for providers in config"
+        end
+            
+    (*!!! -> load_providers is written (above), now use it to read further providers from project spec, + allow override from user config *)
 
     (*!!! -> pick up account names from user config *)
                                                     
-    fun vcs_name vcs = case vcs of GIT => "git" | HG => "hg"
-
     fun expand_spec spec { vcs, service, owner, repo } =
         (* ugly *)
         let fun replace str = 
@@ -1085,7 +1116,7 @@ fun load_project rootpath : project =
                                  (FileBits.vexfile ()) ^ " in " ^ rootpath ^
                                  ".\nPlease ensure the spec file is in the " ^
                                  "project root and run this from there.")
-        val json = JsonBits.load_json specfile
+        val json = JsonBits.load_json_from specfile
         val extdir = JsonBits.lookup_mandatory_string json ["config", "extdir"]
         val libs = JsonBits.lookup_optional json ["libs"]
         val libnames = case libs of

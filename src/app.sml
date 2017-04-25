@@ -53,7 +53,7 @@ fun load_project rootpath : project =
                                  (FileBits.vexfile ()) ^ " in " ^ rootpath ^
                                  ".\nPlease ensure the spec file is in the " ^
                                  "project root and run this from there.")
-        val json = JsonBits.load_json specfile
+        val json = JsonBits.load_json_from specfile
         val extdir = JsonBits.lookup_mandatory_string json ["config", "extdir"]
         val libs = JsonBits.lookup_optional json ["libs"]
         val libnames = case libs of

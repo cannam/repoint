@@ -1,13 +1,13 @@
 
 structure JsonBits :> sig
-    val load_json : string -> Json.json
+    val load_json_from : string -> Json.json (* filename -> json *)
     val lookup_optional : Json.json -> string list -> Json.json option
     val lookup_optional_string : Json.json -> string list -> string option
     val lookup_mandatory : Json.json -> string list -> Json.json
     val lookup_mandatory_string : Json.json -> string list -> string
 end = struct
 
-    fun load_json filename =
+    fun load_json_from filename =
         case Json.parse (FileBits.file_contents filename) of
             Json.OK json => json
           | Json.ERROR e => raise Fail ("Failed to parse file: " ^ e)
