@@ -3,6 +3,34 @@ structure Provider :> sig
     val remote_url : vcs -> source -> libname -> string
 end = struct
 
+    datatype account_status = WITH_ACCOUNT | WITHOUT_ACCOUNT
+    datatype url_arg = LIT of string | OWNER | REPO | ACCOUNT | VCS | DIV
+
+    type url_spec = url_arg list
+                                                                              
+    type remote_spec = { anon : url_spec option, logged : url_spec option }
+
+    type known_provider = string * vcs list * remote_spec
+                           
+    val known : known_provider list = [
+        ("bitbucket", [HG, GIT],
+         { anon   = SOME [ LIT "https://bitbucket.org/",
+                           OWNER, DIV, REPO ],
+           logged = SOME [ LIT "ssh://", VCS, LIT "@bitbucket.org/",
+                           OWNER, DIV, REPO ] }),
+        ("github", [GIT],
+         { anon   = SOME [ LIT "https://github.com/",
+                           OWNER, DIV, REPO ],
+           logged = SOME [ LIT "ssh://", VCS, LIT "@github.com/",
+                           OWNER, DIV, REPO ] }),
+        ("soundsoftware", [HG, GIT],
+         { anon   = SOME [ LIT "https://code.soundsoftware.ac.uk/",
+                           VCS, DIV, REPO ],
+           logged = SOME [ LIT "https://", OWNER, LIT "@code.soundsoftware.ac.uk/",
+                           VCS, DIV, REPO ] })
+    ]
+
+
 (*!!! todo: validate owner & repo strings *)
 
     fun github_like_url domain (SOME owner, repo) =
