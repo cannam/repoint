@@ -52,7 +52,23 @@ type context = {
     extdir : string
 }
 
-type config = {
+type remote_spec = {
+    anon : string option,
+    auth : string option
+}
+
+type provider = {
+    service : string,
+    supports : vcs list,
+    remote_spec : remote_spec
+}
+
+type userconfig = {
+    accounts : (string * string) list,
+    providers : provider list
+}
+                   
+type project = {
     context : context,
     libs : libspec list
 }

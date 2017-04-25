@@ -3,45 +3,44 @@ structure Provider :> sig
     val remote_url : vcs -> source -> libname -> string
 end = struct
 
-    type url_spec = string
-    type remote_spec = { anon : url_spec option, auth : url_spec option }
-    type known_provider = string * vcs list * remote_spec
-                           
-    val known_providers : known_provider list = [
-        ("bitbucket", [HG, GIT], {
-             anon = SOME "https://bitbucket.org/{owner}/{repo}",
-             auth = SOME "ssh://{vcs}@bitbucket.org/{owner}/{repo}"
-         }),
-        ("github", [GIT], {
-             anon = SOME "https://github.com/{owner}/{repo}",
-             auth = SOME "ssh://{vcs}@github.com/{owner}/{repo}"
-         }),
-        ("soundsoftware", [HG, GIT], {
-             anon = SOME "https://code.soundsoftware.ac.uk/{vcs}/{repo}",
-             auth = SOME "https://{account}@code.soundsoftware.ac.uk/{vcs}/{repo}"
-        })
-    ]
+    val known_providers : provider list =
+        [ {
+            service = "bitbucket",
+            supports = [HG, GIT],
+            remote_spec = {
+                anon = SOME "https://bitbucket.org/{owner}/{repo}",
+                auth = SOME "ssh://{vcs}@bitbucket.org/{owner}/{repo}"
+            }
+          },
+          {
+            service = "github",
+            supports = [GIT],
+            remote_spec = {
+                anon = SOME "https://github.com/{owner}/{repo}",
+                auth = SOME "ssh://{vcs}@github.com/{owner}/{repo}"
+            }
+          }
+        ]
 
     (*!!! -> read further providers from project spec, + allow override from user config *)
 
     (*!!! -> pick up account names from user config *)
                                                     
-    fun vcs_name vcs = case vcs of GIT => "git" 
-                                 | HG => "hg"
+    fun vcs_name vcs = case vcs of GIT => "git" | HG => "hg"
 
     fun expand_spec spec { vcs, service, owner, repo } =
         (* ugly *)
-        let fun make_replacement tok = 
-                case tok of
-                    "{vcs" => vcs_name vcs
-                  | "{service" => service
-                  | "{owner" =>
+        let fun replace str = 
+                case str of
+                    "vcs" => vcs_name vcs
+                  | "service" => service
+                  | "owner" =>
                     (case owner of
                          SOME ostr => ostr
                        | NONE => raise Fail ("Owner not specified for service " ^
                                              service))
-                  | "{repo" => repo
-                  | "{account" => raise Fail "not implemented yet" (*!!!*)
+                  | "repo" => repo
+                  | "account" => raise Fail "not implemented yet" (*!!!*)
                   | other => raise Fail ("Unknown variable " ^ other ^
                                          "} for service " ^ service)
             fun expand' acc sstr =
@@ -55,7 +54,10 @@ end = struct
                             if Substring.isEmpty remainder
                             then rev (tok :: pfx :: acc)
                             else let val replacement =
-                                         make_replacement (Substring.string tok)
+                                         replace
+                                             (* tok begins with "{": *)
+                                             (Substring.string
+                                                  (Substring.triml 1 tok))
                                  in
                                      expand' (Substring.full replacement ::
                                               pfx :: acc)
@@ -66,17 +68,16 @@ end = struct
             Substring.concat (expand' [] (Substring.full spec))
         end
         
-    fun provider_url { vcs, service, owner, repo } [] =
-        raise Fail ("Unsupported service \"" ^ service ^
-                    "\" for vcs \"" ^ (vcs_name vcs) ^ "\"")
-      | provider_url (req as { vcs, service, owner, repo })
-                     ((service_name, vcses, specs) :: rest) = 
-        if service_name <> service orelse
-           not (List.exists (fn v => v = vcs) vcses)
+    fun provider_url req [] =
+        raise Fail ("Unknown service \"" ^ (#service req) ^
+                    "\" for vcs \"" ^ (vcs_name (#vcs req)) ^ "\"")
+      | provider_url req ({ service, supports, remote_spec } :: rest) = 
+        if service <> (#service req) orelse
+           not (List.exists (fn v => v = (#vcs req)) supports)
         then provider_url req rest
-        else case (#anon specs) of
-                NONE => provider_url req rest
-              | SOME spec => expand_spec spec req
+        else case (#anon remote_spec) of
+                 NONE => provider_url req rest
+               | SOME spec => expand_spec spec req
                                         
     fun remote_url vcs source libname =
         case source of

@@ -45,7 +45,7 @@ fun load_libspec json libname : libspec =
         }
     end  
 
-fun load_config rootpath : config =
+fun load_project rootpath : project =
     let val specfile = FileBits.vexpath rootpath
         val _ = if OS.FileSys.access (specfile, [OS.FileSys.A_READ])
                 then ()
@@ -78,7 +78,7 @@ fun usage () =
         raise Fail "Incorrect arguments specified"
     end
 
-fun check (config as { context, libs } : config) =
+fun check (project as { context, libs } : project) =
     let open AnyLibControl
         val outcomes = map (fn lib => (#libname lib, check context lib)) libs
         fun print_for libname state m = print (state ^ " " ^ libname ^
@@ -93,7 +93,7 @@ fun check (config as { context, libs } : config) =
             outcomes
     end        
 
-fun update (config as { context, libs } : config) =
+fun update (project as { context, libs } : project) =
     let open AnyLibControl
         val outcomes = map (fn lib => (#libname lib, update context lib)) libs
     in
@@ -106,12 +106,13 @@ fun update (config as { context, libs } : config) =
        
 fun main () =
     let val rootpath = OS.FileSys.getDir ()
-        val config = load_config rootpath
+        val project = load_project rootpath
     in
         case CommandLine.arguments () of
-            ["check"] => check config
-          | ["update"] => update config
+            ["check"] => check project
+          | ["update"] => update project
           | _ => usage ()
     end
     handle Fail err => print ("ERROR: " ^ err ^ "\n")
          | e => print ("Failed with exception: " ^ (exnMessage e) ^ "\n")
+
