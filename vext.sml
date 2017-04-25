@@ -186,7 +186,7 @@ end = struct
                 then arg
                 else "\"" ^ arg ^ "\""
             fun check arg =
-                let val valid = explode " /#:;?,._-{}"
+                let val valid = explode " /#:;?,._-{}@"
                 in
                     app (fn c =>
                             if isAlphaNum c orelse
@@ -769,6 +769,7 @@ end = struct
                        | NONE => raise Fail ("Owner not specified for service " ^
                                              service))
                   | "{repo" => repo
+                  | "{account" => raise Fail "not implemented yet" (*!!!*)
                   | other => raise Fail ("Unknown variable " ^ other ^
                                          "} for service " ^ service)
             fun expand' acc sstr =

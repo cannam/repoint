@@ -37,6 +37,7 @@ end = struct
                        | NONE => raise Fail ("Owner not specified for service " ^
                                              service))
                   | "{repo" => repo
+                  | "{account" => raise Fail "not implemented yet" (*!!!*)
                   | other => raise Fail ("Unknown variable " ^ other ^
                                          "} for service " ^ service)
             fun expand' acc sstr =
