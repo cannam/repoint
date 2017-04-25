@@ -10,44 +10,10 @@ structure AnyLibControl :> LIB_CONTROL = struct
     fun update context (spec as { vcs, ... } : libspec) =
         (fn HG => H.update | GIT => G.update) vcs context spec
 end
-
-fun lookup_optional json kk =
-    let fun lookup key =
-            case json of
-                Json.OBJECT kvs => (case List.find (fn (k, v) => k = key) kvs of
-                                        SOME (k, v) => SOME v
-                                      | NONE => NONE)
-              | _ => raise Fail "Object expected"
-    in
-        case kk of
-            [] => NONE
-          | key::[] => lookup key
-          | key::kk => case lookup key of
-                           NONE => NONE
-                         | SOME j => lookup_optional j kk
-    end
-
-fun lookup_mandatory json kk =
-    case lookup_optional json kk of
-        SOME v => v
-      | NONE => raise Fail ("Config value is mandatory: " ^
-                            (String.concatWith " -> " kk))
-                   
-fun lookup_mandatory_string json kk =
-    case lookup_optional json kk of
-        SOME (Json.STRING s) => s
-      | _ => raise Fail ("Config value must be string: " ^
-                         (String.concatWith " -> " kk))
-                   
-fun lookup_optional_string json kk =
-    case lookup_optional json kk of
-        SOME (Json.STRING s) => SOME s
-      | SOME _ => raise Fail ("Config value (if present) must be string: " ^
-                              (String.concatWith " -> " kk))
-      | NONE => NONE
                    
 fun load_libspec json libname : libspec =
-    let val libobj   = lookup_mandatory json ["libs", libname]
+    let open JsonBits
+        val libobj   = lookup_mandatory json ["libs", libname]
         val vcs      = lookup_mandatory_string libobj ["vcs"]
         val retrieve = lookup_optional_string libobj
         val service  = retrieve ["service"]
@@ -87,12 +53,9 @@ fun load_config rootpath : config =
                                  (FileBits.vexfile ()) ^ " in " ^ rootpath ^
                                  ".\nPlease ensure the spec file is in the " ^
                                  "project root and run this from there.")
-        val json = case Json.parse (FileBits.file_contents specfile) of
-                       Json.OK json => json
-                     | Json.ERROR e =>
-                       raise Fail ("Failed to parse spec file: " ^ e)
-        val extdir = lookup_mandatory_string json ["config", "extdir"]
-        val libs = lookup_optional json ["libs"]
+        val json = JsonBits.load_json specfile
+        val extdir = JsonBits.lookup_mandatory_string json ["config", "extdir"]
+        val libs = JsonBits.lookup_optional json ["libs"]
         val libnames = case libs of
                            NONE => []
                          | SOME (Json.OBJECT ll) => map (fn (k, v) => k) ll

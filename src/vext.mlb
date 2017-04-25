@@ -2,9 +2,10 @@ $(SML_LIB)/basis/basis.mlb
 types.sml
 filebits.sml
 control.sml
+../../sml-simplejson/json.sml
+jsonbits.sml
 provider.sml
 hg.sml
 git.sml
-../../sml-simplejson/json.sml
 app.sml
 main.sml

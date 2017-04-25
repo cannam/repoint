@@ -226,250 +226,6 @@ end = struct
                             handle OS.SysErr (e, _) =>
                                    ERROR ("Directory creation failed: " ^ e))
 end
-
-structure Provider :> sig
-    val remote_url : vcs -> source -> libname -> string
-end = struct
-
-    type url_spec = string
-    type remote_spec = { anon : url_spec option, logged : url_spec option }
-    type known_provider = string * vcs list * remote_spec
-                           
-    val known : known_provider list = [
-        ("bitbucket", [HG, GIT], {
-             anon = SOME "https://bitbucket.org/{owner}/{repo}",
-             logged = SOME "ssh://{vcs}@bitbucket.org/{owner}/{repo}"
-         }),
-        ("github", [GIT], {
-             anon = SOME "https://github.com/{owner}/{repo}",
-             logged = SOME "ssh://{vcs}@github.com/{owner}/{repo}"
-         }),
-        ("soundsoftware", [HG, GIT], {
-             anon = SOME "https://code.soundsoftware.ac.uk/{vcs}/{repo}",
-             logged = SOME "https://{account}@code.soundsoftware.ac.uk/{vcs}/{repo}"
-        })
-    ]
-
-
-(*!!! todo: validate owner & repo strings *)
-
-    fun github_like_url domain (SOME owner, repo) =
-        "https://" ^ domain ^ "/" ^ owner ^ "/" ^ repo
-      | github_like_url domain (NONE, _) =
-        raise Fail ("Owner required for repo at " ^ domain)
-
-    val github_url = github_like_url "github.com"
-    val bitbucket_url = github_like_url "bitbucket.org"
-               
-    fun remote_url vcs source libname =
-        case source of
-            URL u => u
-          | PROVIDER { service, owner, repo } =>
-            let val r = case repo of
-                            SOME r => r
-                          | NONE => libname
-                val vcs_name = case vcs of GIT => "git" 
-                                         | HG => "hg"
-            in
-                case service of
-                    "github" => github_url (owner, r)
-                  | "bitbucket" => bitbucket_url (owner, r)
-                  | other => raise Fail ("Unsupported service \"" ^ service ^
-                                         "\" for vcs \"" ^ vcs_name ^ "\"")
-            end
-
-end
-
-structure HgControl :> VCS_CONTROL = struct
-                            
-    type vcsstate = { id: string, modified: bool,
-                      branch: string, tags: string list }
-                  
-    fun exists context libname =
-        OS.FileSys.isDir (FileBits.subpath context libname ".hg")
-        handle _ => false
-
-    fun remote_for (libname, source) =
-        Provider.remote_url HG source libname
-
-    fun current_state context libname : vcsstate =
-        let fun is_branch text = text <> "" andalso #"(" = hd (explode text)
-            and extract_branch b =
-                if is_branch b     (* need to remove enclosing parens *)
-                then (implode o rev o tl o rev o tl o explode) b
-                else ""
-            and is_modified id = id <> "" andalso #"+" = hd (rev (explode id))
-            and extract_id id =
-                if is_modified id  (* need to remove trailing "+" *)
-                then (implode o rev o tl o rev o explode) id
-                else id
-            and split_tags tags = String.tokens (fn c => c = #"/") tags
-            and state_for (id, branch, tags) = { id = extract_id id,
-                                                 modified = is_modified id,
-                                                 branch = extract_branch branch,
-                                                 tags = split_tags tags }
-        in        
-            case FileBits.command_output context libname ["hg", "id"] of
-                FAIL err => raise Fail err
-              | SUCCEED out =>
-                case String.tokens (fn x => x = #" ") out of
-                    [id, branch, tags] => state_for (id, branch, tags)
-                  | [id, other] => if is_branch other
-                                   then state_for (id, other, "")
-                                   else state_for (id, "", other)
-                  | [id] => state_for (id, "", "")
-                  | _ => raise Fail ("Unexpected output from hg id: " ^ out)
-        end
-
-    fun branch_name branch = case branch of
-                                 DEFAULT_BRANCH => "default"
-                               | BRANCH b => b
-
-    fun is_at context libname id_or_tag =
-        case current_state context libname of
-            { id, tags, ... } => 
-            String.isPrefix id_or_tag id orelse
-            String.isPrefix id id_or_tag orelse
-            List.exists (fn t => t = id_or_tag) tags
-
-    fun has_incoming context (libname, source, branch) =
-        case FileBits.command_output
-                 context libname
-                 ["hg", "incoming", "-l1", "-b", branch_name branch,
-                  "--template", "{node}"] of
-            FAIL err => false (* hg incoming is odd that way *)
-          | SUCCEED incoming => 
-            incoming <> "" andalso
-            not (String.isSubstring "no changes found" incoming)
-                        
-    fun is_newest context (libname, source, branch) =
-        case FileBits.command_output
-                 context libname
-                 ["hg", "log", "-l1", "-b", branch_name branch,
-                  "--template", "{node}"] of
-            FAIL err => raise Fail err
-          | SUCCEED newest_in_repo => 
-            is_at context libname newest_in_repo andalso
-            not (has_incoming context (libname, source, branch))
-
-    fun is_locally_modified context libname =
-        case current_state context libname of
-            { modified, ... } => modified
-                
-    fun checkout context (libname, source, branch) =
-        let val command = FileBits.command context ""
-            val url = remote_for (libname, source)
-        in
-            case FileBits.mkpath (FileBits.extpath context) of
-                OK => command ["hg", "clone", "-u", branch_name branch,
-                               url, libname]
-              | ERROR e => ERROR e
-        end
-                                                    
-    fun update context (libname, source, branch) =
-        let val command = FileBits.command context libname
-            val url = remote_for (libname, source)
-            val pull_result = command ["hg", "pull", url]
-        in
-            case command ["hg", "update", branch_name branch] of
-                OK => pull_result
-              | ERROR e => ERROR e
-        end
-
-    fun update_to context (libname, source, "") =
-        raise Fail "Non-empty id (tag or revision id) required for update_to"
-      | update_to context (libname, source, id) = 
-        let val command = FileBits.command context libname
-            val url = remote_for (libname, source)
-        in
-            case command ["hg", "update", "-r" ^ id] of
-                OK => OK
-              | ERROR _ => 
-                case command ["hg", "pull", url] of
-                    OK => command ["hg", "update", "-r" ^ id]
-                  | ERROR e => ERROR e
-        end
-                  
-end
-
-structure GitControl :> VCS_CONTROL = struct
-                            
-    fun exists context libname =
-        OS.FileSys.isDir (FileBits.subpath context libname ".git")
-        handle _ => false
-
-    fun remote_for (libname, source) =
-        Provider.remote_url GIT source libname
-
-    fun branch_name branch = case branch of
-                                 DEFAULT_BRANCH => "master"
-                               | BRANCH b => b
-
-    fun checkout context (libname, provider, branch) =
-        let val command = FileBits.command context ""
-            val url = remote_for (libname, provider)
-        in
-            case FileBits.mkpath (FileBits.extpath context) of
-                OK => command ["git", "clone", "-b", branch_name branch,
-                               url, libname]
-              | ERROR e => ERROR e
-        end
-
-    (* NB git rev-parse HEAD shows revision id of current checkout;
-    git rev-list -1 <tag> shows revision id of revision with that tag *)
-
-    fun is_at context libname id_or_tag =
-        case FileBits.command_output context libname
-                                     ["git", "rev-parse", "HEAD"] of
-            FAIL err => raise Fail err
-          | SUCCEED id =>
-            String.isPrefix id_or_tag id orelse
-            String.isPrefix id id_or_tag orelse
-            case FileBits.command_output context libname
-                                         ["git", "rev-list", "-1", id_or_tag] of
-                FAIL err => raise Fail err
-              | SUCCEED tid =>
-                tid = id andalso
-                tid <> id_or_tag (* otherwise id_or_tag was an id, not a tag *)
-
-    fun is_newest context (libname, provider, branch) =
-        let fun newest_here () =
-              case FileBits.command_output
-                       context libname
-                       ["git", "rev-list", "-1", branch_name branch] of
-                  FAIL err => raise Fail err
-                | SUCCEED rev => is_at context libname rev
-        in
-            if not (newest_here ())
-            then false
-            else case FileBits.command context libname ["git", "fetch"] of
-                     ERROR err => raise Fail err
-                   | OK => newest_here ()
-        end
-
-    fun is_locally_modified context libname =
-        case FileBits.command_output context libname ["git", "status", "-s"] of
-            FAIL err => raise Fail err
-          | SUCCEED "" => false
-          | SUCCEED _ => true
-            
-    fun update context (libname, provider, branch) =
-        update_to context (libname, provider, branch_name branch)
-
-    and update_to context (libname, provider, "") = 
-        raise Fail "Non-empty id (tag or revision id) required for update_to"
-      | update_to context (libname, provider, id) = 
-        let val command = FileBits.command context libname
-            val url = remote_for (libname, provider)
-        in
-            case command ["git", "checkout", "--detach", id] of
-                OK => OK
-              | ERROR _ => 
-                case command ["git", "pull", url] of
-                    OK => command ["git", "checkout", "--detach", id]
-                  | ERROR e => ERROR e
-        end
-end
                                          
 functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
 
@@ -890,6 +646,300 @@ structure Json :> JSON = struct
 end
 
 
+structure JsonBits :> sig
+    val load_json : string -> Json.json
+    val lookup_optional : Json.json -> string list -> Json.json option
+    val lookup_optional_string : Json.json -> string list -> string option
+    val lookup_mandatory : Json.json -> string list -> Json.json
+    val lookup_mandatory_string : Json.json -> string list -> string
+end = struct
+
+    fun load_json filename =
+        case Json.parse (FileBits.file_contents filename) of
+            Json.OK json => json
+          | Json.ERROR e => raise Fail ("Failed to parse file: " ^ e)
+                                  
+    fun lookup_optional json kk =
+        let fun lookup key =
+                case json of
+                    Json.OBJECT kvs =>
+                    (case List.find (fn (k, v) => k = key) kvs of
+                         SOME (k, v) => SOME v
+                       | NONE => NONE)
+                  | _ => raise Fail "Object expected"
+        in
+            case kk of
+                [] => NONE
+              | key::[] => lookup key
+              | key::kk => case lookup key of
+                               NONE => NONE
+                             | SOME j => lookup_optional j kk
+        end
+                       
+    fun lookup_optional_string json kk =
+        case lookup_optional json kk of
+            SOME (Json.STRING s) => SOME s
+          | SOME _ => raise Fail ("Value (if present) must be string: " ^
+                                  (String.concatWith " -> " kk))
+          | NONE => NONE
+
+    fun lookup_mandatory json kk =
+        case lookup_optional json kk of
+            SOME v => v
+          | NONE => raise Fail ("Value is mandatory: " ^
+                                (String.concatWith " -> " kk))
+                          
+    fun lookup_mandatory_string json kk =
+        case lookup_optional json kk of
+            SOME (Json.STRING s) => s
+          | _ => raise Fail ("Value must be string: " ^
+                             (String.concatWith " -> " kk))
+end
+
+structure Provider :> sig
+    val remote_url : vcs -> source -> libname -> string
+end = struct
+
+    type url_spec = string
+    type remote_spec = { anon : url_spec option, logged : url_spec option }
+    type known_provider = string * vcs list * remote_spec
+                           
+    val known : known_provider list = [
+        ("bitbucket", [HG, GIT], {
+             anon = SOME "https://bitbucket.org/{owner}/{repo}",
+             logged = SOME "ssh://{vcs}@bitbucket.org/{owner}/{repo}"
+         }),
+        ("github", [GIT], {
+             anon = SOME "https://github.com/{owner}/{repo}",
+             logged = SOME "ssh://{vcs}@github.com/{owner}/{repo}"
+         }),
+        ("soundsoftware", [HG, GIT], {
+             anon = SOME "https://code.soundsoftware.ac.uk/{vcs}/{repo}",
+             logged = SOME "https://{account}@code.soundsoftware.ac.uk/{vcs}/{repo}"
+        })
+    ]
+
+
+(*!!! todo: validate owner & repo strings *)
+
+    fun github_like_url domain (SOME owner, repo) =
+        "https://" ^ domain ^ "/" ^ owner ^ "/" ^ repo
+      | github_like_url domain (NONE, _) =
+        raise Fail ("Owner required for repo at " ^ domain)
+
+    val github_url = github_like_url "github.com"
+    val bitbucket_url = github_like_url "bitbucket.org"
+               
+    fun remote_url vcs source libname =
+        case source of
+            URL u => u
+          | PROVIDER { service, owner, repo } =>
+            let val r = case repo of
+                            SOME r => r
+                          | NONE => libname
+                val vcs_name = case vcs of GIT => "git" 
+                                         | HG => "hg"
+            in
+                case service of
+                    "github" => github_url (owner, r)
+                  | "bitbucket" => bitbucket_url (owner, r)
+                  | other => raise Fail ("Unsupported service \"" ^ service ^
+                                         "\" for vcs \"" ^ vcs_name ^ "\"")
+            end
+
+end
+
+structure HgControl :> VCS_CONTROL = struct
+                            
+    type vcsstate = { id: string, modified: bool,
+                      branch: string, tags: string list }
+                  
+    fun exists context libname =
+        OS.FileSys.isDir (FileBits.subpath context libname ".hg")
+        handle _ => false
+
+    fun remote_for (libname, source) =
+        Provider.remote_url HG source libname
+
+    fun current_state context libname : vcsstate =
+        let fun is_branch text = text <> "" andalso #"(" = hd (explode text)
+            and extract_branch b =
+                if is_branch b     (* need to remove enclosing parens *)
+                then (implode o rev o tl o rev o tl o explode) b
+                else ""
+            and is_modified id = id <> "" andalso #"+" = hd (rev (explode id))
+            and extract_id id =
+                if is_modified id  (* need to remove trailing "+" *)
+                then (implode o rev o tl o rev o explode) id
+                else id
+            and split_tags tags = String.tokens (fn c => c = #"/") tags
+            and state_for (id, branch, tags) = { id = extract_id id,
+                                                 modified = is_modified id,
+                                                 branch = extract_branch branch,
+                                                 tags = split_tags tags }
+        in        
+            case FileBits.command_output context libname ["hg", "id"] of
+                FAIL err => raise Fail err
+              | SUCCEED out =>
+                case String.tokens (fn x => x = #" ") out of
+                    [id, branch, tags] => state_for (id, branch, tags)
+                  | [id, other] => if is_branch other
+                                   then state_for (id, other, "")
+                                   else state_for (id, "", other)
+                  | [id] => state_for (id, "", "")
+                  | _ => raise Fail ("Unexpected output from hg id: " ^ out)
+        end
+
+    fun branch_name branch = case branch of
+                                 DEFAULT_BRANCH => "default"
+                               | BRANCH b => b
+
+    fun is_at context libname id_or_tag =
+        case current_state context libname of
+            { id, tags, ... } => 
+            String.isPrefix id_or_tag id orelse
+            String.isPrefix id id_or_tag orelse
+            List.exists (fn t => t = id_or_tag) tags
+
+    fun has_incoming context (libname, source, branch) =
+        case FileBits.command_output
+                 context libname
+                 ["hg", "incoming", "-l1", "-b", branch_name branch,
+                  "--template", "{node}"] of
+            FAIL err => false (* hg incoming is odd that way *)
+          | SUCCEED incoming => 
+            incoming <> "" andalso
+            not (String.isSubstring "no changes found" incoming)
+                        
+    fun is_newest context (libname, source, branch) =
+        case FileBits.command_output
+                 context libname
+                 ["hg", "log", "-l1", "-b", branch_name branch,
+                  "--template", "{node}"] of
+            FAIL err => raise Fail err
+          | SUCCEED newest_in_repo => 
+            is_at context libname newest_in_repo andalso
+            not (has_incoming context (libname, source, branch))
+
+    fun is_locally_modified context libname =
+        case current_state context libname of
+            { modified, ... } => modified
+                
+    fun checkout context (libname, source, branch) =
+        let val command = FileBits.command context ""
+            val url = remote_for (libname, source)
+        in
+            case FileBits.mkpath (FileBits.extpath context) of
+                OK => command ["hg", "clone", "-u", branch_name branch,
+                               url, libname]
+              | ERROR e => ERROR e
+        end
+                                                    
+    fun update context (libname, source, branch) =
+        let val command = FileBits.command context libname
+            val url = remote_for (libname, source)
+            val pull_result = command ["hg", "pull", url]
+        in
+            case command ["hg", "update", branch_name branch] of
+                OK => pull_result
+              | ERROR e => ERROR e
+        end
+
+    fun update_to context (libname, source, "") =
+        raise Fail "Non-empty id (tag or revision id) required for update_to"
+      | update_to context (libname, source, id) = 
+        let val command = FileBits.command context libname
+            val url = remote_for (libname, source)
+        in
+            case command ["hg", "update", "-r" ^ id] of
+                OK => OK
+              | ERROR _ => 
+                case command ["hg", "pull", url] of
+                    OK => command ["hg", "update", "-r" ^ id]
+                  | ERROR e => ERROR e
+        end
+                  
+end
+
+structure GitControl :> VCS_CONTROL = struct
+                            
+    fun exists context libname =
+        OS.FileSys.isDir (FileBits.subpath context libname ".git")
+        handle _ => false
+
+    fun remote_for (libname, source) =
+        Provider.remote_url GIT source libname
+
+    fun branch_name branch = case branch of
+                                 DEFAULT_BRANCH => "master"
+                               | BRANCH b => b
+
+    fun checkout context (libname, provider, branch) =
+        let val command = FileBits.command context ""
+            val url = remote_for (libname, provider)
+        in
+            case FileBits.mkpath (FileBits.extpath context) of
+                OK => command ["git", "clone", "-b", branch_name branch,
+                               url, libname]
+              | ERROR e => ERROR e
+        end
+
+    (* NB git rev-parse HEAD shows revision id of current checkout;
+    git rev-list -1 <tag> shows revision id of revision with that tag *)
+
+    fun is_at context libname id_or_tag =
+        case FileBits.command_output context libname
+                                     ["git", "rev-parse", "HEAD"] of
+            FAIL err => raise Fail err
+          | SUCCEED id =>
+            String.isPrefix id_or_tag id orelse
+            String.isPrefix id id_or_tag orelse
+            case FileBits.command_output context libname
+                                         ["git", "rev-list", "-1", id_or_tag] of
+                FAIL err => raise Fail err
+              | SUCCEED tid =>
+                tid = id andalso
+                tid <> id_or_tag (* otherwise id_or_tag was an id, not a tag *)
+
+    fun is_newest context (libname, provider, branch) =
+        let fun newest_here () =
+              case FileBits.command_output
+                       context libname
+                       ["git", "rev-list", "-1", branch_name branch] of
+                  FAIL err => raise Fail err
+                | SUCCEED rev => is_at context libname rev
+        in
+            if not (newest_here ())
+            then false
+            else case FileBits.command context libname ["git", "fetch"] of
+                     ERROR err => raise Fail err
+                   | OK => newest_here ()
+        end
+
+    fun is_locally_modified context libname =
+        case FileBits.command_output context libname ["git", "status", "-s"] of
+            FAIL err => raise Fail err
+          | SUCCEED "" => false
+          | SUCCEED _ => true
+            
+    fun update context (libname, provider, branch) =
+        update_to context (libname, provider, branch_name branch)
+
+    and update_to context (libname, provider, "") = 
+        raise Fail "Non-empty id (tag or revision id) required for update_to"
+      | update_to context (libname, provider, id) = 
+        let val command = FileBits.command context libname
+            val url = remote_for (libname, provider)
+        in
+            case command ["git", "checkout", "--detach", id] of
+                OK => OK
+              | ERROR _ => 
+                case command ["git", "pull", url] of
+                    OK => command ["git", "checkout", "--detach", id]
+                  | ERROR e => ERROR e
+        end
+end
+
 structure AnyLibControl :> LIB_CONTROL = struct
 
     structure H = LibControlFn(HgControl)
@@ -901,44 +951,10 @@ structure AnyLibControl :> LIB_CONTROL = struct
     fun update context (spec as { vcs, ... } : libspec) =
         (fn HG => H.update | GIT => G.update) vcs context spec
 end
-
-fun lookup_optional json kk =
-    let fun lookup key =
-            case json of
-                Json.OBJECT kvs => (case List.find (fn (k, v) => k = key) kvs of
-                                        SOME (k, v) => SOME v
-                                      | NONE => NONE)
-              | _ => raise Fail "Object expected"
-    in
-        case kk of
-            [] => NONE
-          | key::[] => lookup key
-          | key::kk => case lookup key of
-                           NONE => NONE
-                         | SOME j => lookup_optional j kk
-    end
-
-fun lookup_mandatory json kk =
-    case lookup_optional json kk of
-        SOME v => v
-      | NONE => raise Fail ("Config value is mandatory: " ^
-                            (String.concatWith " -> " kk))
-                   
-fun lookup_mandatory_string json kk =
-    case lookup_optional json kk of
-        SOME (Json.STRING s) => s
-      | _ => raise Fail ("Config value must be string: " ^
-                         (String.concatWith " -> " kk))
-                   
-fun lookup_optional_string json kk =
-    case lookup_optional json kk of
-        SOME (Json.STRING s) => SOME s
-      | SOME _ => raise Fail ("Config value (if present) must be string: " ^
-                              (String.concatWith " -> " kk))
-      | NONE => NONE
                    
 fun load_libspec json libname : libspec =
-    let val libobj   = lookup_mandatory json ["libs", libname]
+    let open JsonBits
+        val libobj   = lookup_mandatory json ["libs", libname]
         val vcs      = lookup_mandatory_string libobj ["vcs"]
         val retrieve = lookup_optional_string libobj
         val service  = retrieve ["service"]
@@ -978,12 +994,9 @@ fun load_config rootpath : config =
                                  (FileBits.vexfile ()) ^ " in " ^ rootpath ^
                                  ".\nPlease ensure the spec file is in the " ^
                                  "project root and run this from there.")
-        val json = case Json.parse (FileBits.file_contents specfile) of
-                       Json.OK json => json
-                     | Json.ERROR e =>
-                       raise Fail ("Failed to parse spec file: " ^ e)
-        val extdir = lookup_mandatory_string json ["config", "extdir"]
-        val libs = lookup_optional json ["libs"]
+        val json = JsonBits.load_json specfile
+        val extdir = JsonBits.lookup_mandatory_string json ["config", "extdir"]
+        val libs = JsonBits.lookup_optional json ["libs"]
         val libnames = case libs of
                            NONE => []
                          | SOME (Json.OBJECT ll) => map (fn (k, v) => k) ll

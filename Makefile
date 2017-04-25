@@ -11,11 +11,12 @@ vext:	vext.sml
 SOURCES	:= \
 	src/types.sml \
 	src/filebits.sml \
+	src/control.sml \
+	../sml-simplejson/json.sml \
+	src/jsonbits.sml \
 	src/provider.sml \
 	src/hg.sml \
 	src/git.sml \
-	src/control.sml \
-	../sml-simplejson/json.sml \
 	src/app.sml \
 	src/main.sml
 
