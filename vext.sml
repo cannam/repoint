@@ -393,6 +393,7 @@ signature JSON = sig
 
     val parse : string -> json result
     val serialise : json -> string
+    val serialiseIndented : json -> string
 
 end
 
@@ -555,41 +556,41 @@ structure Json :> JSON = struct
         (* Note lexNumber already case-insensitised the E for us *)
         let open Char
 
-            fun chkExpNumber [] = false
-              | chkExpNumber (c :: []) = isDigit c
-              | chkExpNumber (c :: rest) = isDigit c andalso chkExpNumber rest
+            fun okExpDigits [] = false
+              | okExpDigits (c :: []) = isDigit c
+              | okExpDigits (c :: cs) = isDigit c andalso okExpDigits cs
 
-            fun chkExp [] = false
-              | chkExp (#"+" :: rest) = chkExpNumber rest
-              | chkExp (#"-" :: rest) = chkExpNumber rest
-              | chkExp cc = chkExpNumber cc
+            fun okExponent [] = false
+              | okExponent (#"+" :: cs) = okExpDigits cs
+              | okExponent (#"-" :: cs) = okExpDigits cs
+              | okExponent cc = okExpDigits cc
 
-            fun chkAfterDotAndDigit [] = true
-              | chkAfterDotAndDigit (c :: rest) =
-                (isDigit c andalso chkAfterDotAndDigit rest) orelse
-                (c = #"e" andalso chkExp rest)
+            fun okFracTrailing [] = true
+              | okFracTrailing (c :: cs) =
+                (isDigit c andalso okFracTrailing cs) orelse
+                (c = #"e" andalso okExponent cs)
 
-            fun chkAfterDot [] = false
-              | chkAfterDot (c :: rest) =
-                isDigit c andalso chkAfterDotAndDigit rest
+            fun okFraction [] = false
+              | okFraction (c :: cs) =
+                isDigit c andalso okFracTrailing cs
 
-            fun chkPosAfterFirst [] = true
-              | chkPosAfterFirst (#"." :: rest) = chkAfterDot rest
-              | chkPosAfterFirst (#"e" :: rest) = chkExp rest
-              | chkPosAfterFirst (c :: rest) =
-                isDigit c andalso chkPosAfterFirst rest
+            fun okPosTrailing [] = true
+              | okPosTrailing (#"." :: cs) = okFraction cs
+              | okPosTrailing (#"e" :: cs) = okExponent cs
+              | okPosTrailing (c :: cs) =
+                isDigit c andalso okPosTrailing cs
                                                       
-            fun chkPos [] = false
-              | chkPos (#"0" :: []) = true
-              | chkPos (#"0" :: #"." :: rest) = chkAfterDot rest
-              | chkPos (#"0" :: #"e" :: rest) = chkExp rest
-              | chkPos (#"0" :: rest) = false
-              | chkPos (c :: rest) = isDigit c andalso chkPosAfterFirst rest
+            fun okPositive [] = false
+              | okPositive (#"0" :: []) = true
+              | okPositive (#"0" :: #"." :: cs) = okFraction cs
+              | okPositive (#"0" :: #"e" :: cs) = okExponent cs
+              | okPositive (#"0" :: cs) = false
+              | okPositive (c :: cs) = isDigit c andalso okPosTrailing cs
                     
-            fun chkNumber (#"-" :: rest) = chkPos rest
-              | chkNumber cc = chkPos cc
+            fun okNumber (#"-" :: cs) = okPositive cs
+              | okNumber cc = okPositive cc
         in
-            if chkNumber digits
+            if okNumber digits
             then case Real.fromString (implode digits) of
                      NONE => ERROR "Number out of range"
                    | SOME r => OK r
@@ -693,6 +694,33 @@ structure Json :> JSON = struct
           | STRING s => "\"" ^ stringEscape s ^ "\""
           | BOOL b => Bool.toString b
           | NULL => "null"
+        
+    fun serialiseIndented json =
+        let fun indent 0 = ""
+              | indent i = "  " ^ indent (i - 1)
+            fun serialiseIndented' i json =
+                let val ser = serialiseIndented' (i + 1)
+                in
+                    case json of
+                        OBJECT [] => "{}"
+                      | ARRAY [] => "[]"
+                      | OBJECT pp => "{\n" ^ indent (i + 1) ^
+                                     String.concatWith
+                                         (",\n" ^ indent (i + 1))
+                                         (map (fn (key, value) =>
+                                                  ser (STRING key) ^ ": " ^
+                                                  ser value) pp) ^
+                                     "\n" ^ indent i ^ "}"
+                      | ARRAY arr => "[\n" ^ indent (i + 1) ^
+                                     String.concatWith
+                                         (",\n" ^ indent (i + 1))
+                                         (map ser arr) ^
+                                     "\n" ^ indent i ^ "]"
+                      | other => serialise other
+                end
+        in
+            serialiseIndented' 0 json ^ "\n"
+        end
                                              
 end
 
