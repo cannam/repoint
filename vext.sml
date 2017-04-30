@@ -779,6 +779,7 @@ end
 
 structure Provider :> sig
     val load_providers : Json.json -> provider list
+    val load_more_providers : provider list -> Json.json -> provider list
     val remote_url : provider list -> vcs -> source -> libname -> string
 end = struct
 
@@ -810,7 +811,7 @@ end = struct
                    | "hg" => HG
                    | other => raise Fail ("Unknown vcs name \"" ^ name ^ "\"")
 
-    fun load_new_providers previously_loaded json =
+    fun load_more_providers previously_loaded json =
         let open JsonBits
             fun load pjson pname : provider =
                 {
@@ -832,17 +833,17 @@ end = struct
                     NONE => []
                   | SOME (Json.OBJECT pl) => map (fn (k, v) => load v k) pl
                   | _ => raise Fail "Object expected for providers in config"
-            val still_valid =
+            val newly_loaded =
                 List.filter (fn p => not (List.exists (fn pp => #service p =
                                                                 #service pp)
-                                                      loaded))
-                            previously_loaded
+                                                      previously_loaded))
+                            loaded
         in
-            still_valid @ loaded
+            previously_loaded @ newly_loaded
         end
 
     fun load_providers json =
-        load_new_providers known_providers json
+        load_more_providers known_providers json
             
     (*!!! -> load_providers is written (above), now use it to read further providers from project spec, + allow override from user config *)
 
@@ -1115,7 +1116,7 @@ structure AnyLibControl :> LIB_CONTROL = struct
     fun update context (spec as { vcs, ... } : libspec) =
         (fn HG => H.update | GIT => G.update) vcs context spec
 end
-                   
+
 fun load_libspec json libname : libspec =
     let open JsonBits
         val libobj   = lookup_mandatory json ["libs", libname]
@@ -1150,7 +1151,28 @@ fun load_libspec json libname : libspec =
         }
     end  
 
-fun load_project rootpath : project =
+fun load_userconfig () : userconfig =
+    let val json = 
+            case OS.Process.getEnv("HOME") of
+                NONE => raise Fail "Failed to obtain home dir ($HOME not set?)"
+              | SOME home =>
+                JsonBits.load_json_from
+                    (OS.Path.joinDirFile { dir = home, file = ".vext.json" })
+    in
+        {
+          accounts = case JsonBits.lookup_optional json ["accounts"] of
+                         NONE => []
+                       | SOME (Json.OBJECT aa) =>
+                         map (fn (k, (Json.STRING v)) => (k, v)
+                             | _ => raise Fail
+                                          "String expected for account name")
+                             aa
+                       | _ => raise Fail "Array expected for accounts",
+          providers = Provider.load_providers json
+        }
+    end
+
+fun load_project userconfig rootpath : project =
     let val specfile = FileBits.vexpath rootpath
         val _ = if OS.FileSys.access (specfile, [OS.FileSys.A_READ])
                 then ()
@@ -1161,8 +1183,8 @@ fun load_project rootpath : project =
         val json = JsonBits.load_json_from specfile
         val extdir = JsonBits.lookup_mandatory_string json ["config", "extdir"]
         val libs = JsonBits.lookup_optional json ["libs"]
-        (*!!! todo: first load from user config *)
-        val providers = Provider.load_providers json
+        val providers = Provider.load_more_providers
+                            (#providers userconfig) json
         val libnames = case libs of
                            NONE => []
                          | SOME (Json.OBJECT ll) => map (fn (k, v) => k) ll
@@ -1177,7 +1199,7 @@ fun load_project rootpath : project =
           libs = map (load_libspec json) libnames
         }
     end
-
+                                             
 fun usage () =
     let open TextIO in
 	output (stdErr,
@@ -1214,7 +1236,8 @@ fun update (project as { context, libs } : project) =
        
 fun main () =
     let val rootpath = OS.FileSys.getDir ()
-        val project = load_project rootpath
+        val userconfig = load_userconfig ()
+        val project = load_project userconfig rootpath
     in
         case CommandLine.arguments () of
             ["check"] => check project

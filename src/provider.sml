@@ -1,6 +1,7 @@
 
 structure Provider :> sig
     val load_providers : Json.json -> provider list
+    val load_more_providers : provider list -> Json.json -> provider list
     val remote_url : provider list -> vcs -> source -> libname -> string
 end = struct
 
@@ -32,7 +33,7 @@ end = struct
                    | "hg" => HG
                    | other => raise Fail ("Unknown vcs name \"" ^ name ^ "\"")
 
-    fun load_new_providers previously_loaded json =
+    fun load_more_providers previously_loaded json =
         let open JsonBits
             fun load pjson pname : provider =
                 {
@@ -54,17 +55,17 @@ end = struct
                     NONE => []
                   | SOME (Json.OBJECT pl) => map (fn (k, v) => load v k) pl
                   | _ => raise Fail "Object expected for providers in config"
-            val still_valid =
+            val newly_loaded =
                 List.filter (fn p => not (List.exists (fn pp => #service p =
                                                                 #service pp)
-                                                      loaded))
-                            previously_loaded
+                                                      previously_loaded))
+                            loaded
         in
-            still_valid @ loaded
+            previously_loaded @ newly_loaded
         end
 
     fun load_providers json =
-        load_new_providers known_providers json
+        load_more_providers known_providers json
             
     (*!!! -> load_providers is written (above), now use it to read further providers from project spec, + allow override from user config *)
 
