@@ -1,6 +1,7 @@
 
 structure Provider :> sig
-    val remote_url : vcs -> source -> libname -> string
+    val load_providers : Json.json -> provider list
+    val remote_url : provider list -> vcs -> source -> libname -> string
 end = struct
 
     val known_providers : provider list =
@@ -31,29 +32,39 @@ end = struct
                    | "hg" => HG
                    | other => raise Fail ("Unknown vcs name \"" ^ name ^ "\"")
 
-    fun load_providers json =
+    fun load_new_providers previously_loaded json =
         let open JsonBits
-            fun load_provider json pname : provider =
+            fun load pjson pname : provider =
                 {
                   service = pname,
                   supports =
-                  case lookup_mandatory json [pname, "vcs"] of
+                  case lookup_mandatory pjson ["vcs"] of
                       Json.ARRAY vv =>
                       map (fn (Json.STRING v) => vcs_from_name v
                           | _ => raise Fail "Strings expected in vcs array")
                           vv
                     | _ => raise Fail "Array expected for vcs",
                   remote_spec = {
-                      anon = lookup_optional_string json [pname, "anon"],
-                      auth = lookup_optional_string json [pname, "auth"]
+                      anon = lookup_optional_string pjson ["anon"],
+                      auth = lookup_optional_string pjson ["auth"]
                   }
                 }
+            val loaded = 
+                case lookup_optional json ["providers"] of
+                    NONE => []
+                  | SOME (Json.OBJECT pl) => map (fn (k, v) => load v k) pl
+                  | _ => raise Fail "Object expected for providers in config"
+            val still_valid =
+                List.filter (fn p => not (List.exists (fn pp => #service p =
+                                                                #service pp)
+                                                      loaded))
+                            previously_loaded
         in
-            case lookup_optional json ["providers"] of
-                NONE => []
-              | SOME (Json.OBJECT pl) => map (fn (k, v) => load_provider v k) pl
-              | _ => raise Fail "Object expected for providers in config"
+            still_valid @ loaded
         end
+
+    fun load_providers json =
+        load_new_providers known_providers json
             
     (*!!! -> load_providers is written (above), now use it to read further providers from project spec, + allow override from user config *)
 
@@ -102,7 +113,8 @@ end = struct
     fun provider_url req [] =
         raise Fail ("Unknown service \"" ^ (#service req) ^
                     "\" for vcs \"" ^ (vcs_name (#vcs req)) ^ "\"")
-      | provider_url req ({ service, supports, remote_spec } :: rest) = 
+      | provider_url req (({ service, supports, remote_spec } : provider) ::
+                          rest) = 
         if service <> (#service req) orelse
            not (List.exists (fn v => v = (#vcs req)) supports)
         then provider_url req rest
@@ -110,7 +122,7 @@ end = struct
                  NONE => provider_url req rest
                | SOME spec => expand_spec spec req
                                         
-    fun remote_url vcs source libname =
+    fun remote_url providers vcs source libname =
         case source of
             URL u => u
           | PROVIDER { service, owner, repo } =>
@@ -120,5 +132,5 @@ end = struct
                            repo = case repo of
                                       SOME r => r
                                     | NONE => libname }
-                         known_providers
+                         providers
 end

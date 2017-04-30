@@ -47,11 +47,6 @@ type libspec = {
     pin : pin
 }
 
-type context = {
-    rootpath : string,
-    extdir : string
-}
-
 type remote_spec = {
     anon : string option,
     auth : string option
@@ -61,6 +56,12 @@ type provider = {
     service : string,
     supports : vcs list,
     remote_spec : remote_spec
+}
+
+type context = {
+    rootpath : string,
+    extdir : string,
+    providers : provider list
 }
 
 type userconfig = {

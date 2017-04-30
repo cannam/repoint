@@ -12,7 +12,7 @@ structure FileBits :> sig
     val vexpath : string -> string
 end = struct
 
-    fun extpath { rootpath, extdir } =
+    fun extpath ({ rootpath, extdir, ... } : context) =
         let val { isAbs, vol, arcs } = OS.Path.fromString rootpath
         in OS.Path.toString {
                 isAbs = isAbs,
@@ -21,7 +21,7 @@ end = struct
             }
         end
     
-    fun subpath { rootpath, extdir } libname remainder =
+    fun subpath ({ rootpath, extdir, ... } : context) libname remainder =
         (* NB libname is allowed to be a path fragment, e.g. foo/bar *)
         let val { isAbs, vol, arcs } = OS.Path.fromString rootpath
             val split = String.fields (fn c => c = #"/")

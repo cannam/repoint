@@ -56,6 +56,8 @@ fun load_project rootpath : project =
         val json = JsonBits.load_json_from specfile
         val extdir = JsonBits.lookup_mandatory_string json ["config", "extdir"]
         val libs = JsonBits.lookup_optional json ["libs"]
+        (*!!! todo: first load from user config *)
+        val providers = Provider.load_providers json
         val libnames = case libs of
                            NONE => []
                          | SOME (Json.OBJECT ll) => map (fn (k, v) => k) ll
@@ -64,7 +66,8 @@ fun load_project rootpath : project =
         {
           context = {
             rootpath = rootpath,
-            extdir = extdir
+            extdir = extdir,
+            providers = providers
           },
           libs = map (load_libspec json) libnames
         }

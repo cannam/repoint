@@ -40,7 +40,8 @@ end = struct
         case lookup_optional json kk of
             SOME v => v
           | NONE => raise Fail ("Value is mandatory: " ^
-                                (String.concatWith " -> " kk))
+                                (String.concatWith " -> " kk) ^ " in json: " ^
+                                (Json.serialise json))
                           
     fun lookup_mandatory_string json kk =
         case lookup_optional json kk of

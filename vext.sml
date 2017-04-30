@@ -84,11 +84,6 @@ type libspec = {
     pin : pin
 }
 
-type context = {
-    rootpath : string,
-    extdir : string
-}
-
 type remote_spec = {
     anon : string option,
     auth : string option
@@ -98,6 +93,12 @@ type provider = {
     service : string,
     supports : vcs list,
     remote_spec : remote_spec
+}
+
+type context = {
+    rootpath : string,
+    extdir : string,
+    providers : provider list
 }
 
 type userconfig = {
@@ -138,7 +139,7 @@ structure FileBits :> sig
     val vexpath : string -> string
 end = struct
 
-    fun extpath { rootpath, extdir } =
+    fun extpath ({ rootpath, extdir, ... } : context) =
         let val { isAbs, vol, arcs } = OS.Path.fromString rootpath
         in OS.Path.toString {
                 isAbs = isAbs,
@@ -147,7 +148,7 @@ end = struct
             }
         end
     
-    fun subpath { rootpath, extdir } libname remainder =
+    fun subpath ({ rootpath, extdir, ... } : context) libname remainder =
         (* NB libname is allowed to be a path fragment, e.g. foo/bar *)
         let val { isAbs, vol, arcs } = OS.Path.fromString rootpath
             val split = String.fields (fn c => c = #"/")
@@ -766,7 +767,8 @@ end = struct
         case lookup_optional json kk of
             SOME v => v
           | NONE => raise Fail ("Value is mandatory: " ^
-                                (String.concatWith " -> " kk))
+                                (String.concatWith " -> " kk) ^ " in json: " ^
+                                (Json.serialise json))
                           
     fun lookup_mandatory_string json kk =
         case lookup_optional json kk of
@@ -776,7 +778,8 @@ end = struct
 end
 
 structure Provider :> sig
-    val remote_url : vcs -> source -> libname -> string
+    val load_providers : Json.json -> provider list
+    val remote_url : provider list -> vcs -> source -> libname -> string
 end = struct
 
     val known_providers : provider list =
@@ -807,29 +810,39 @@ end = struct
                    | "hg" => HG
                    | other => raise Fail ("Unknown vcs name \"" ^ name ^ "\"")
 
-    fun load_providers json =
+    fun load_new_providers previously_loaded json =
         let open JsonBits
-            fun load_provider json pname : provider =
+            fun load pjson pname : provider =
                 {
                   service = pname,
                   supports =
-                  case lookup_mandatory json [pname, "vcs"] of
+                  case lookup_mandatory pjson ["vcs"] of
                       Json.ARRAY vv =>
                       map (fn (Json.STRING v) => vcs_from_name v
                           | _ => raise Fail "Strings expected in vcs array")
                           vv
                     | _ => raise Fail "Array expected for vcs",
                   remote_spec = {
-                      anon = lookup_optional_string json [pname, "anon"],
-                      auth = lookup_optional_string json [pname, "auth"]
+                      anon = lookup_optional_string pjson ["anon"],
+                      auth = lookup_optional_string pjson ["auth"]
                   }
                 }
+            val loaded = 
+                case lookup_optional json ["providers"] of
+                    NONE => []
+                  | SOME (Json.OBJECT pl) => map (fn (k, v) => load v k) pl
+                  | _ => raise Fail "Object expected for providers in config"
+            val still_valid =
+                List.filter (fn p => not (List.exists (fn pp => #service p =
+                                                                #service pp)
+                                                      loaded))
+                            previously_loaded
         in
-            case lookup_optional json ["providers"] of
-                NONE => []
-              | SOME (Json.OBJECT pl) => map (fn (k, v) => load_provider v k) pl
-              | _ => raise Fail "Object expected for providers in config"
+            still_valid @ loaded
         end
+
+    fun load_providers json =
+        load_new_providers known_providers json
             
     (*!!! -> load_providers is written (above), now use it to read further providers from project spec, + allow override from user config *)
 
@@ -878,7 +891,8 @@ end = struct
     fun provider_url req [] =
         raise Fail ("Unknown service \"" ^ (#service req) ^
                     "\" for vcs \"" ^ (vcs_name (#vcs req)) ^ "\"")
-      | provider_url req ({ service, supports, remote_spec } :: rest) = 
+      | provider_url req (({ service, supports, remote_spec } : provider) ::
+                          rest) = 
         if service <> (#service req) orelse
            not (List.exists (fn v => v = (#vcs req)) supports)
         then provider_url req rest
@@ -886,7 +900,7 @@ end = struct
                  NONE => provider_url req rest
                | SOME spec => expand_spec spec req
                                         
-    fun remote_url vcs source libname =
+    fun remote_url providers vcs source libname =
         case source of
             URL u => u
           | PROVIDER { service, owner, repo } =>
@@ -896,7 +910,7 @@ end = struct
                            repo = case repo of
                                       SOME r => r
                                     | NONE => libname }
-                         known_providers
+                         providers
 end
 
 structure HgControl :> VCS_CONTROL = struct
@@ -908,8 +922,8 @@ structure HgControl :> VCS_CONTROL = struct
         OS.FileSys.isDir (FileBits.subpath context libname ".hg")
         handle _ => false
 
-    fun remote_for (libname, source) =
-        Provider.remote_url HG source libname
+    fun remote_for context (libname, source) =
+        Provider.remote_url (#providers context) HG source libname
 
     fun current_state context libname : vcsstate =
         let fun is_branch text = text <> "" andalso #"(" = hd (explode text)
@@ -977,7 +991,7 @@ structure HgControl :> VCS_CONTROL = struct
                 
     fun checkout context (libname, source, branch) =
         let val command = FileBits.command context ""
-            val url = remote_for (libname, source)
+            val url = remote_for context (libname, source)
         in
             case FileBits.mkpath (FileBits.extpath context) of
                 OK => command ["hg", "clone", "-u", branch_name branch,
@@ -987,7 +1001,7 @@ structure HgControl :> VCS_CONTROL = struct
                                                     
     fun update context (libname, source, branch) =
         let val command = FileBits.command context libname
-            val url = remote_for (libname, source)
+            val url = remote_for context (libname, source)
             val pull_result = command ["hg", "pull", url]
         in
             case command ["hg", "update", branch_name branch] of
@@ -999,7 +1013,7 @@ structure HgControl :> VCS_CONTROL = struct
         raise Fail "Non-empty id (tag or revision id) required for update_to"
       | update_to context (libname, source, id) = 
         let val command = FileBits.command context libname
-            val url = remote_for (libname, source)
+            val url = remote_for context (libname, source)
         in
             case command ["hg", "update", "-r" ^ id] of
                 OK => OK
@@ -1017,8 +1031,8 @@ structure GitControl :> VCS_CONTROL = struct
         OS.FileSys.isDir (FileBits.subpath context libname ".git")
         handle _ => false
 
-    fun remote_for (libname, source) =
-        Provider.remote_url GIT source libname
+    fun remote_for context (libname, source) =
+        Provider.remote_url (#providers context) GIT source libname
 
     fun branch_name branch = case branch of
                                  DEFAULT_BRANCH => "master"
@@ -1026,7 +1040,7 @@ structure GitControl :> VCS_CONTROL = struct
 
     fun checkout context (libname, provider, branch) =
         let val command = FileBits.command context ""
-            val url = remote_for (libname, provider)
+            val url = remote_for context (libname, provider)
         in
             case FileBits.mkpath (FileBits.extpath context) of
                 OK => command ["git", "clone", "-b", branch_name branch,
@@ -1079,7 +1093,7 @@ structure GitControl :> VCS_CONTROL = struct
         raise Fail "Non-empty id (tag or revision id) required for update_to"
       | update_to context (libname, provider, id) = 
         let val command = FileBits.command context libname
-            val url = remote_for (libname, provider)
+            val url = remote_for context (libname, provider)
         in
             case command ["git", "checkout", "--detach", id] of
                 OK => OK
@@ -1147,6 +1161,8 @@ fun load_project rootpath : project =
         val json = JsonBits.load_json_from specfile
         val extdir = JsonBits.lookup_mandatory_string json ["config", "extdir"]
         val libs = JsonBits.lookup_optional json ["libs"]
+        (*!!! todo: first load from user config *)
+        val providers = Provider.load_providers json
         val libnames = case libs of
                            NONE => []
                          | SOME (Json.OBJECT ll) => map (fn (k, v) => k) ll
@@ -1155,7 +1171,8 @@ fun load_project rootpath : project =
         {
           context = {
             rootpath = rootpath,
-            extdir = extdir
+            extdir = extdir,
+            providers = providers
           },
           libs = map (load_libspec json) libnames
         }

@@ -8,8 +8,8 @@ structure HgControl :> VCS_CONTROL = struct
         OS.FileSys.isDir (FileBits.subpath context libname ".hg")
         handle _ => false
 
-    fun remote_for (libname, source) =
-        Provider.remote_url HG source libname
+    fun remote_for context (libname, source) =
+        Provider.remote_url (#providers context) HG source libname
 
     fun current_state context libname : vcsstate =
         let fun is_branch text = text <> "" andalso #"(" = hd (explode text)
@@ -77,7 +77,7 @@ structure HgControl :> VCS_CONTROL = struct
                 
     fun checkout context (libname, source, branch) =
         let val command = FileBits.command context ""
-            val url = remote_for (libname, source)
+            val url = remote_for context (libname, source)
         in
             case FileBits.mkpath (FileBits.extpath context) of
                 OK => command ["hg", "clone", "-u", branch_name branch,
@@ -87,7 +87,7 @@ structure HgControl :> VCS_CONTROL = struct
                                                     
     fun update context (libname, source, branch) =
         let val command = FileBits.command context libname
-            val url = remote_for (libname, source)
+            val url = remote_for context (libname, source)
             val pull_result = command ["hg", "pull", url]
         in
             case command ["hg", "update", branch_name branch] of
@@ -99,7 +99,7 @@ structure HgControl :> VCS_CONTROL = struct
         raise Fail "Non-empty id (tag or revision id) required for update_to"
       | update_to context (libname, source, id) = 
         let val command = FileBits.command context libname
-            val url = remote_for (libname, source)
+            val url = remote_for context (libname, source)
         in
             case command ["hg", "update", "-r" ^ id] of
                 OK => OK

@@ -5,8 +5,8 @@ structure GitControl :> VCS_CONTROL = struct
         OS.FileSys.isDir (FileBits.subpath context libname ".git")
         handle _ => false
 
-    fun remote_for (libname, source) =
-        Provider.remote_url GIT source libname
+    fun remote_for context (libname, source) =
+        Provider.remote_url (#providers context) GIT source libname
 
     fun branch_name branch = case branch of
                                  DEFAULT_BRANCH => "master"
@@ -14,7 +14,7 @@ structure GitControl :> VCS_CONTROL = struct
 
     fun checkout context (libname, provider, branch) =
         let val command = FileBits.command context ""
-            val url = remote_for (libname, provider)
+            val url = remote_for context (libname, provider)
         in
             case FileBits.mkpath (FileBits.extpath context) of
                 OK => command ["git", "clone", "-b", branch_name branch,
@@ -67,7 +67,7 @@ structure GitControl :> VCS_CONTROL = struct
         raise Fail "Non-empty id (tag or revision id) required for update_to"
       | update_to context (libname, provider, id) = 
         let val command = FileBits.command context libname
-            val url = remote_for (libname, provider)
+            val url = remote_for context (libname, provider)
         in
             case command ["git", "checkout", "--detach", id] of
                 OK => OK
