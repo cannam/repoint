@@ -57,7 +57,8 @@ fun load_userconfig () : userconfig =
           accounts = case JsonBits.lookup_optional json ["accounts"] of
                          NONE => []
                        | SOME (Json.OBJECT aa) =>
-                         map (fn (k, (Json.STRING v)) => (k, v)
+                         map (fn (k, (Json.STRING v)) =>
+                                 { service = k, login = v }
                              | _ => raise Fail
                                           "String expected for account name")
                              aa
@@ -88,7 +89,8 @@ fun load_project userconfig rootpath : project =
           context = {
             rootpath = rootpath,
             extdir = extdir,
-            providers = providers
+            providers = providers,
+            accounts = #accounts userconfig
           },
           libs = map (load_libspec json) libnames
         }

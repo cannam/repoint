@@ -95,15 +95,21 @@ type provider = {
     remote_spec : remote_spec
 }
 
+type account = {
+    service : string,
+    login : string
+}
+                    
 type context = {
     rootpath : string,
     extdir : string,
-    providers : provider list
+    providers : provider list,
+    accounts : account list
 }
 
 type userconfig = {
-    accounts : (string * string) list,
-    providers : provider list
+    providers : provider list,
+    accounts : account list
 }
                    
 type project = {
@@ -780,7 +786,7 @@ end
 structure Provider :> sig
     val load_providers : Json.json -> provider list
     val load_more_providers : provider list -> Json.json -> provider list
-    val remote_url : provider list -> vcs -> source -> libname -> string
+    val remote_url : context -> vcs -> source -> libname -> string
 end = struct
 
     val known_providers : provider list =
@@ -844,12 +850,8 @@ end = struct
 
     fun load_providers json =
         load_more_providers known_providers json
-            
-    (*!!! -> load_providers is written (above), now use it to read further providers from project spec, + allow override from user config *)
-
-    (*!!! -> pick up account names from user config *)
                                                     
-    fun expand_spec spec { vcs, service, owner, repo } =
+    fun expand_spec spec { vcs, service, owner, repo } login =
         (* ugly *)
         let fun replace str = 
                 case str of
@@ -861,9 +863,13 @@ end = struct
                        | NONE => raise Fail ("Owner not specified for service " ^
                                              service))
                   | "repo" => repo
-                  | "account" => raise Fail "not implemented yet" (*!!!*)
-                  | other => raise Fail ("Unknown variable " ^ other ^
-                                         "} for service " ^ service)
+                  | "account" =>
+                    (case login of
+                         SOME acc => acc
+                       | NONE => raise Fail ("Account not given for service " ^
+                                             service))
+                  | other => raise Fail ("Unknown variable \"" ^ other ^
+                                         "\" in spec for service " ^ service)
             fun expand' acc sstr =
                 case Substring.splitl (fn c => c <> #"{") sstr of
                     (pfx, sfx) =>
@@ -889,19 +895,28 @@ end = struct
             Substring.concat (expand' [] (Substring.full spec))
         end
         
-    fun provider_url req [] =
-        raise Fail ("Unknown service \"" ^ (#service req) ^
-                    "\" for vcs \"" ^ (vcs_name (#vcs req)) ^ "\"")
-      | provider_url req (({ service, supports, remote_spec } : provider) ::
-                          rest) = 
-        if service <> (#service req) orelse
-           not (List.exists (fn v => v = (#vcs req)) supports)
-        then provider_url req rest
-        else case (#anon remote_spec) of
-                 NONE => provider_url req rest
-               | SOME spec => expand_spec spec req
-                                        
-    fun remote_url providers vcs source libname =
+    fun provider_url req login providers =
+        case providers of
+            [] => raise Fail ("Unknown service \"" ^ (#service req) ^
+                              "\" for vcs \"" ^ (vcs_name (#vcs req)) ^ "\"")
+          | ({ service, supports, remote_spec } :: rest) =>
+            if service <> (#service req) orelse
+               not (List.exists (fn v => v = (#vcs req)) supports)
+            then provider_url req login rest
+            else
+                case (login, #auth remote_spec, #anon remote_spec) of
+                    (SOME _, SOME auth, _) => expand_spec auth req login
+                  | (SOME _, _, SOME anon) => expand_spec anon req NONE
+                  | (NONE,   _, SOME anon) => expand_spec anon req NONE
+                  | _ => raise Fail ("No suitable anon/auth URL spec " ^
+                                     "provided for service \"" ^ service ^ "\"")
+
+    fun login_for ({ accounts, ... } : context) service =
+        case List.find (fn a => service = #service a) accounts of
+            SOME { login, ... } => SOME login
+          | NONE => NONE
+                                          
+    fun remote_url (context : context) vcs source libname =
         case source of
             URL u => u
           | PROVIDER { service, owner, repo } =>
@@ -911,7 +926,8 @@ end = struct
                            repo = case repo of
                                       SOME r => r
                                     | NONE => libname }
-                         providers
+                         (login_for context service)
+                         (#providers context)
 end
 
 structure HgControl :> VCS_CONTROL = struct
@@ -924,7 +940,7 @@ structure HgControl :> VCS_CONTROL = struct
         handle _ => false
 
     fun remote_for context (libname, source) =
-        Provider.remote_url (#providers context) HG source libname
+        Provider.remote_url context HG source libname
 
     fun current_state context libname : vcsstate =
         let fun is_branch text = text <> "" andalso #"(" = hd (explode text)
@@ -1033,7 +1049,7 @@ structure GitControl :> VCS_CONTROL = struct
         handle _ => false
 
     fun remote_for context (libname, source) =
-        Provider.remote_url (#providers context) GIT source libname
+        Provider.remote_url context GIT source libname
 
     fun branch_name branch = case branch of
                                  DEFAULT_BRANCH => "master"
@@ -1163,7 +1179,8 @@ fun load_userconfig () : userconfig =
           accounts = case JsonBits.lookup_optional json ["accounts"] of
                          NONE => []
                        | SOME (Json.OBJECT aa) =>
-                         map (fn (k, (Json.STRING v)) => (k, v)
+                         map (fn (k, (Json.STRING v)) =>
+                                 { service = k, login = v }
                              | _ => raise Fail
                                           "String expected for account name")
                              aa
@@ -1194,7 +1211,8 @@ fun load_project userconfig rootpath : project =
           context = {
             rootpath = rootpath,
             extdir = extdir,
-            providers = providers
+            providers = providers,
+            accounts = #accounts userconfig
           },
           libs = map (load_libspec json) libnames
         }

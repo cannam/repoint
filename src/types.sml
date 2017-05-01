@@ -58,15 +58,21 @@ type provider = {
     remote_spec : remote_spec
 }
 
+type account = {
+    service : string,
+    login : string
+}
+                    
 type context = {
     rootpath : string,
     extdir : string,
-    providers : provider list
+    providers : provider list,
+    accounts : account list
 }
 
 type userconfig = {
-    accounts : (string * string) list,
-    providers : provider list
+    providers : provider list,
+    accounts : account list
 }
                    
 type project = {

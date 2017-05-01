@@ -6,7 +6,7 @@ structure GitControl :> VCS_CONTROL = struct
         handle _ => false
 
     fun remote_for context (libname, source) =
-        Provider.remote_url (#providers context) GIT source libname
+        Provider.remote_url context GIT source libname
 
     fun branch_name branch = case branch of
                                  DEFAULT_BRANCH => "master"

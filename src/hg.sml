@@ -9,7 +9,7 @@ structure HgControl :> VCS_CONTROL = struct
         handle _ => false
 
     fun remote_for context (libname, source) =
-        Provider.remote_url (#providers context) HG source libname
+        Provider.remote_url context HG source libname
 
     fun current_state context libname : vcsstate =
         let fun is_branch text = text <> "" andalso #"(" = hd (explode text)
