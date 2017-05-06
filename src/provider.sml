@@ -115,7 +115,7 @@ end = struct
         case providers of
             [] => raise Fail ("Unknown service \"" ^ (#service req) ^
                               "\" for vcs \"" ^ (vcs_name (#vcs req)) ^ "\"")
-          | ({ service, supports, remote_spec } :: rest) =>
+          | ({ service, supports, remote_spec : remote_spec } :: rest) =>
             if service <> (#service req) orelse
                not (List.exists (fn v => v = (#vcs req)) supports)
             then provider_url req login rest

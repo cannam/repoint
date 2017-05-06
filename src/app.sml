@@ -46,12 +46,18 @@ fun load_libspec json libname : libspec =
     end  
 
 fun load_userconfig () : userconfig =
-    let val json = 
-            case OS.Process.getEnv("HOME") of
+    let val homedir = case (OS.Process.getEnv "HOME",
+  			    OS.Process.getEnv "HOMEPATH") of
+			  (SOME home, _) => SOME home
+			| (NONE, SOME home) => SOME home
+			| (NONE, NONE) => NONE
+	val json = 
+            case homedir of
                 NONE => raise Fail "Failed to obtain home dir ($HOME not set?)"
               | SOME home =>
                 JsonBits.load_json_from
                     (OS.Path.joinDirFile { dir = home, file = ".vext.json" })
+		handle IO.Io _ => Json.OBJECT []
     in
         {
           accounts = case JsonBits.lookup_optional json ["accounts"] of
@@ -67,7 +73,7 @@ fun load_userconfig () : userconfig =
         }
     end
 
-fun load_project userconfig rootpath : project =
+fun load_project (userconfig : userconfig) rootpath : project =
     let val specfile = FileBits.vexpath rootpath
         val _ = if OS.FileSys.access (specfile, [OS.FileSys.A_READ])
                 then ()
@@ -104,7 +110,7 @@ fun usage () =
         raise Fail "Incorrect arguments specified"
     end
 
-fun check (project as { context, libs } : project) =
+fun check_project (project as { context, libs } : project) =
     let open AnyLibControl
         val outcomes = map (fn lib => (#libname lib, check context lib)) libs
         fun print_for libname state m = print (state ^ " " ^ libname ^
@@ -119,7 +125,7 @@ fun check (project as { context, libs } : project) =
             outcomes
     end        
 
-fun update (project as { context, libs } : project) =
+fun update_project (project as { context, libs } : project) =
     let open AnyLibControl
         val outcomes = map (fn lib => (#libname lib, update context lib)) libs
     in
@@ -129,17 +135,31 @@ fun update (project as { context, libs } : project) =
                 print ("FAILED " ^ libname ^ ": " ^ e ^ "\n"))
             outcomes
     end        
-       
-fun main () =
+
+fun check () =
     let val rootpath = OS.FileSys.getDir ()
         val userconfig = load_userconfig ()
         val project = load_project userconfig rootpath
     in
-        case CommandLine.arguments () of
-            ["check"] => check project
-          | ["update"] => update project
-          | _ => usage ()
+	check_project project
     end
     handle Fail err => print ("ERROR: " ^ err ^ "\n")
          | e => print ("Failed with exception: " ^ (exnMessage e) ^ "\n")
 
+fun update () =
+    let val rootpath = OS.FileSys.getDir ()
+        val userconfig = load_userconfig ()
+        val project = load_project userconfig rootpath
+    in
+	update_project project
+    end
+    handle Fail err => print ("ERROR: " ^ err ^ "\n")
+         | e => print ("Failed with exception: " ^ (exnMessage e) ^ "\n")
+	
+fun main () =
+    case CommandLine.arguments () of
+         ["check"] => check ()
+       | ["update"] => update ()
+       | _ => usage ()
+
+val _ = main ()
