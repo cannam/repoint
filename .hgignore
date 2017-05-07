@@ -3,3 +3,5 @@ syntax: glob
 ext
 vext
 src/vext
+src/vext.mlb
+

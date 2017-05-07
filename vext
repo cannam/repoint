@@ -1,0 +1,83 @@
+#!/bin/sh
+
+# We need one of Poly/ML, SML/NJ, or MLton. Since we're running a
+# single-file SML program as if it were a script, the first two are
+# probably preferable (in that order).
+
+set -eu
+
+sml=""
+
+if poly -v | grep -q 'Poly/ML'; then
+    sml="poly"
+elif sml -h | grep -q 'Standard ML of New Jersey'; then
+    sml="smlnj"
+elif mlton | grep -q 'MLton'; then
+    sml="mlton"
+else
+    cat <<EOF
+
+  This program needs a Standard ML compiler or interpreter.
+
+  Please ensure you have one of the following Standard ML
+  implementations (listed in order of preference for this task)
+  installed and present in your PATH, and try again:
+
+    1. Poly/ML
+       - most likely distribution package name: polyml
+       - executable name: poly
+
+    2. Standard ML of New Jersey
+       - most likely distribution package name: smlnj
+       - executable name: sml
+
+    3. MLton
+       - most likely distribution package name: mlton
+       - executable name: mlton
+ 
+EOF
+    exit 2
+fi
+
+tmp_sml=$(mktemp /tmp/vext-XXXXXXXX.sml)
+tmp_out=$(mktemp /tmp/vext-XXXXXXXX.bin)
+
+trap "rm -f $tmp_sml $tmp_out" 0
+
+case "$sml" in
+    poly) echo 'use "./vext.sml"; check ()' | poly -q --error-exit ;;
+    mlton)
+	cat ./vext.sml > "$tmp_sml"
+	echo 'val _ = main ()' >> "$tmp_sml"
+	mlton -output "$tmp_out" "$tmp_sml"
+	"$tmp_out" check ;;
+    smlnj)
+	cat ./vext.sml | (
+	    cat <<EOF
+val smlrun__cp = 
+    let val x = !Control.Print.out in
+        Control.Print.out := { say = fn _ => (), flush = fn () => () };
+        x
+    end;
+val smlrun__prev = ref "";
+Control.Print.out := { 
+    say = fn s => 
+        (if String.isSubstring " Error" s
+         then (Control.Print.out := smlrun__cp;
+               (#say smlrun__cp) (!smlrun__prev);
+               (#say smlrun__cp) s)
+         else (smlrun__prev := s; ())),
+    flush = fn s => ()
+};
+EOF
+	    cat -
+	    cat <<EOF
+
+val _ = main ();
+val _ = OS.Process.exit (OS.Process.success);
+EOF
+            ) > "$tmp_sml"
+	CM_VERBOSE=false sml "$tmp_sml" check ;;
+esac
+
+       
