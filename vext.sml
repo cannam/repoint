@@ -332,9 +332,16 @@ functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
         end
 end
 
-(* An RFC-compliant JSON parser in one SML file with no dependency 
+(* Simple Standard ML JSON parser
+   ==============================
+
+   https://bitbucket.org/cannam/sml-simplejson
+
+   An RFC-compliant JSON parser in one SML file with no dependency 
    on anything outside the Basis library. Also includes a simple
    serialiser.
+
+   Tested with MLton, Poly/ML, and SML/NJ compilers.
 
    Parser notes:
 
@@ -345,8 +352,8 @@ end
      exist at the time of writing, as listed in "Parsing JSON is a
      Minefield" (http://seriot.ch/parsing_json.php)
  
-   * Two-pass parser using naive exploded strings, therefore not very
-     fast and not suitable for large input files
+   * Two-pass parser using naive exploded strings, therefore not
+     particularly fast and not suitable for large input files
 
    * Only supports UTF-8 input, not UTF-16 or UTF-32. Doesn't check
      that JSON strings are valid UTF-8 -- the caller must do that --
@@ -356,10 +363,8 @@ end
      float type (common but not guaranteed in SML) then we're pretty
      standard for a JSON parser
 
-   Some of this is based on the JSON parser in the Ponyo library by
-   Phil Eaton.
-
    Copyright 2017 Chris Cannam.
+   Parts based on the JSON parser in the Ponyo library by Phil Eaton.
 
    Permission is hereby granted, free of charge, to any person
    obtaining a copy of this software and associated documentation
@@ -617,8 +622,10 @@ structure Json :> JSON = struct
               | parseObject' acc tokens =
                 case parsePair tokens of
                     ERROR e => ERROR e
-                  | OK (pair, T.COMMA :: xs) => parseObject' (pair :: acc) xs
-                  | OK (pair, T.CURLY_R :: xs) => OK (OBJECT (rev (pair :: acc)), xs)
+                  | OK (pair, T.COMMA :: xs) =>
+                    parseObject' (pair :: acc) xs
+                  | OK (pair, T.CURLY_R :: xs) =>
+                    OK (OBJECT (rev (pair :: acc)), xs)
                   | OK (_, _) => ERROR "Expected , or } after object element"
         in
             parseObject' [] tokens
@@ -1169,17 +1176,17 @@ fun load_libspec json libname : libspec =
 
 fun load_userconfig () : userconfig =
     let val homedir = case (OS.Process.getEnv "HOME",
-  			    OS.Process.getEnv "HOMEPATH") of
-			  (SOME home, _) => SOME home
-			| (NONE, SOME home) => SOME home
-			| (NONE, NONE) => NONE
-	val json = 
+                            OS.Process.getEnv "HOMEPATH") of
+                          (SOME home, _) => SOME home
+                        | (NONE, SOME home) => SOME home
+                        | (NONE, NONE) => NONE
+        val json = 
             case homedir of
                 NONE => raise Fail "Failed to obtain home dir ($HOME not set?)"
               | SOME home =>
                 JsonBits.load_json_from
                     (OS.Path.joinDirFile { dir = home, file = ".vext.json" })
-		handle IO.Io _ => Json.OBJECT []
+                handle IO.Io _ => Json.OBJECT []
     in
         {
           accounts = case JsonBits.lookup_optional json ["accounts"] of
@@ -1198,7 +1205,7 @@ fun load_userconfig () : userconfig =
 fun load_project (userconfig : userconfig) rootpath : project =
     let val specfile = FileBits.vexpath rootpath
         val _ = if OS.FileSys.access (specfile, [OS.FileSys.A_READ])
-		   handle OS.SysErr _ => false
+                   handle OS.SysErr _ => false
                 then ()
                 else raise Fail ("Failed to open project spec " ^
                                  (FileBits.vexfile ()) ^ " in " ^ rootpath ^
@@ -1225,14 +1232,6 @@ fun load_project (userconfig : userconfig) rootpath : project =
         }
     end
                                              
-fun usage () =
-    let open TextIO in
-	output (stdErr,
-	    "Usage:\n" ^
-            "    vext <check|update>\n");
-        raise Fail "Incorrect arguments specified"
-    end
-
 fun check_project (project as { context, libs } : project) =
     let open AnyLibControl
         val outcomes = map (fn lib => (#libname lib, check context lib)) libs
@@ -1264,7 +1263,7 @@ fun check () =
         val userconfig = load_userconfig ()
         val project = load_project userconfig rootpath
     in
-	check_project project
+        check_project project
     end
     handle Fail err => print ("ERROR: " ^ err ^ "\n")
          | e => print ("Failed with exception: " ^ (exnMessage e) ^ "\n")
@@ -1274,17 +1273,23 @@ fun update () =
         val userconfig = load_userconfig ()
         val project = load_project userconfig rootpath
     in
-	update_project project
+        update_project project
     end
     handle Fail err => print ("ERROR: " ^ err ^ "\n")
          | e => print ("Failed with exception: " ^ (exnMessage e) ^ "\n")
-	
+
+fun version () =
+    print ("Vext v" ^ vext_version ^ "\n");
+                      
+fun usage () =
+    (version ();
+     print ("Usage:\n" ^
+            "    vext <check|update>\n"))
+
 fun main () =
     case CommandLine.arguments () of
          ["check"] => check ()
        | ["update"] => update ()
+       | ["-v"] => version ()
        | _ => usage ()
 
-val _ = main ()
-
-             
