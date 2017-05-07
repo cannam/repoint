@@ -1,5 +1,12 @@
-#echo 'use "vext.sml"; check ();' | ..\..\PolyML-5.7-x64-windows-console\PolyML.exe -q --error-exit
-#exit
+
+# echo 'use "vext.sml"; check ();' | ..\..\PolyML-5.7-x64-windows-console\PolyML.exe -q --error-exit
+# exit
+
+if ($args -match "[^a-z]") {
+    $arglist = '["usage"]'
+} else {
+    $arglist = '["' + ($args -join '","') + '"]'
+}
 
 $lines = @(Get-Content vext.sml)
 $lines = $lines -notmatch "val _ = main ()"
@@ -23,7 +30,7 @@ Control.Print.out := {
 "@ -split "[\r\n]+"
 
 $outro = @"
-val _ = check ();
+val _ = vext $arglist;
 val _ = OS.Process.exit (OS.Process.success);
 "@ -split "[\r\n]+"
 
@@ -42,5 +49,4 @@ sml $tmpfile $args[1,$args.Length]
 
 del $tmpfile
 
-#echo 'use "vext.sml"; check ();' | sml @SMLcmdname=vext.sml -Ccm.verbose=false 
 
