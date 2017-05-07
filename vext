@@ -1,13 +1,12 @@
 #!/bin/sh
 
 # We need one of Poly/ML, SML/NJ, or MLton. Since we're running a
-# single-file SML program as if it were a script, the first two are
-# probably preferable (in that order).
+# single-file SML program as if it were a script, our order of
+# preference is based on startup speed.
 
 set -eu
 
 sml=""
-
 if poly -v | grep -q 'Poly/ML'; then
     sml="poly"
 elif sml -h | grep -q 'Standard ML of New Jersey'; then
@@ -44,13 +43,22 @@ tmp_out=$(mktemp /tmp/vext-XXXXXXXX.bin)
 
 trap "rm -f $tmp_sml $tmp_out" 0
 
+arglist=""
+for arg in "$@"; do
+    if [ -n "$arglist" ]; then arglist="$arglist,"; fi
+    case "$arg" in
+	*[^a-z]*) arglist="$arglist\"usage\"";;
+	*) arglist="$arglist\"$arg\"";;
+    esac
+done
+
 case "$sml" in
-    poly) echo 'use "./vext.sml"; check ()' | poly -q --error-exit ;;
+    poly) echo 'use "./vext.sml"; vext ['"$arglist"'];' | poly -q --error-exit ;;
     mlton)
 	cat ./vext.sml > "$tmp_sml"
 	echo 'val _ = main ()' >> "$tmp_sml"
 	mlton -output "$tmp_out" "$tmp_sml"
-	"$tmp_out" check ;;
+	"$tmp_out" "$@" ;;
     smlnj)
 	cat ./vext.sml | (
 	    cat <<EOF
@@ -72,12 +80,10 @@ Control.Print.out := {
 EOF
 	    cat -
 	    cat <<EOF
-
-val _ = main ();
+val _ = vext [$arglist];
 val _ = OS.Process.exit (OS.Process.success);
 EOF
             ) > "$tmp_sml"
-	CM_VERBOSE=false sml "$tmp_sml" check ;;
+	CM_VERBOSE=false sml "$tmp_sml" ;;
 esac
-
        

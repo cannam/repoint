@@ -46,18 +46,11 @@ fun load_libspec json libname : libspec =
     end  
 
 fun load_userconfig () : userconfig =
-    let val homedir = case (OS.Process.getEnv "HOME",
-                            OS.Process.getEnv "HOMEPATH") of
-                          (SOME home, _) => SOME home
-                        | (NONE, SOME home) => SOME home
-                        | (NONE, NONE) => NONE
+    let val home = FileBits.homedir ()
         val json = 
-            case homedir of
-                NONE => raise Fail "Failed to obtain home dir ($HOME not set?)"
-              | SOME home =>
-                JsonBits.load_json_from
-                    (OS.Path.joinDirFile { dir = home, file = ".vext.json" })
-                handle IO.Io _ => Json.OBJECT []
+            JsonBits.load_json_from
+                (OS.Path.joinDirFile { dir = home, file = ".vext.json" })
+            handle IO.Io _ => Json.OBJECT []
     in
         {
           accounts = case JsonBits.lookup_optional json ["accounts"] of
@@ -129,23 +122,20 @@ fun update_project (project as { context, libs } : project) =
             outcomes
     end        
 
-fun check () =
-    let val rootpath = OS.FileSys.getDir ()
-        val userconfig = load_userconfig ()
-        val project = load_project userconfig rootpath
+fun load_local_project () =
+    let val userconfig = load_userconfig ()
+        val rootpath = OS.FileSys.getDir ()
     in
-        check_project project
-    end
+        load_project userconfig rootpath
+    end    
+    
+fun check_local_project () =
+    check_project (load_local_project ())
     handle Fail err => print ("ERROR: " ^ err ^ "\n")
          | e => print ("Failed with exception: " ^ (exnMessage e) ^ "\n")
 
-fun update () =
-    let val rootpath = OS.FileSys.getDir ()
-        val userconfig = load_userconfig ()
-        val project = load_project userconfig rootpath
-    in
-        update_project project
-    end
+fun update_local_project () =
+    update_project (load_local_project ())
     handle Fail err => print ("ERROR: " ^ err ^ "\n")
          | e => print ("Failed with exception: " ^ (exnMessage e) ^ "\n")
 
@@ -157,10 +147,12 @@ fun usage () =
      print ("Usage:\n" ^
             "    vext <check|update>\n"))
 
+fun vext args =
+    case args of
+        ["check"] => check_local_project ()
+      | ["update"] => update_local_project ()
+      | ["version"] => version ()
+      | _ => usage ()
+        
 fun main () =
-    case CommandLine.arguments () of
-         ["check"] => check ()
-       | ["update"] => update ()
-       | ["-v"] => version ()
-       | _ => usage ()
-
+    vext (CommandLine.arguments ())

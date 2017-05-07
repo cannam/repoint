@@ -25,7 +25,7 @@ vext.sml:	$(SOURCES)
 	echo "   source files in the Vext repository. *)" >> $@
 	echo >> $@
 	cat $(SOURCES) >> $@
-	echo 'use "vext.sml"; version ()' | poly -q --error-exit
+	./vext version
 
 clean:
 	rm -f vext.sml src/vext.mlb src/vext

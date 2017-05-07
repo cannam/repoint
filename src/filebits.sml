@@ -7,6 +7,7 @@ structure FileBits :> sig
     val command : context -> libname -> string list -> result
     val file_contents : string -> string
     val mydir : unit -> string
+    val homedir : unit -> string
     val mkpath : string -> result
     val vexfile : unit -> string
     val vexpath : string -> string
@@ -134,6 +135,15 @@ end = struct
                  then dir
                  else Path.concat (FileSys.getDir (), dir))
         end
+
+    fun homedir () =
+        (* Failure is not routine, so we use an exception here *)
+        case (OS.Process.getEnv "HOME",
+              OS.Process.getEnv "HOMEPATH") of
+            (SOME home, _) => home
+          | (NONE, SOME home) => home
+          | (NONE, NONE) =>
+            raise Fail "Failed to look up home directory from environment"
 
     fun mkpath path =
         if OS.FileSys.isDir path handle _ => false
