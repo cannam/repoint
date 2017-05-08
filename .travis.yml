@@ -1,0 +1,23 @@
+dist:
+  - trusty
+
+language:
+  - cpp
+
+sudo:
+  - false
+
+os:
+  - linux
+
+addons:
+  apt:
+    packages:
+      - mlton
+      - smlnj
+      - libsmlnj-smlnj
+      - polyml
+      
+script:
+  - make
+  
