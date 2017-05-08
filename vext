@@ -51,6 +51,7 @@ trap "rm -f $tmp_sml $tmp_out" 0
 
 arglist=""
 for arg in "$@"; do
+    echo "checking arg \"$arg\"..."
     if [ -n "$arglist" ]; then arglist="$arglist,"; fi
     case "$arg" in
 	*[^a-z]*) arglist="$arglist\"usage\"";;
