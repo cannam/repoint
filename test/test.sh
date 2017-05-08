@@ -6,7 +6,7 @@ set -eu
 
 cd "$mydir"
 
-for sml in default smlnj mlton; do
+for sml in default poly smlnj mlton; do
     echo
     echo "Testing with implementation: $sml"
     echo

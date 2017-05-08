@@ -16,6 +16,7 @@ addons:
       - mlton
       - smlnj
       - libsmlnj-smlnj
+      - polyml
       
 script:
   - make test
