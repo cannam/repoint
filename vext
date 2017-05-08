@@ -53,10 +53,11 @@ arglist=""
 for arg in "$@"; do
     echo "checking arg \"$arg\"..."
     if [ -n "$arglist" ]; then arglist="$arglist,"; fi
-    case "$arg" in
-	*[^a-z]*) arglist="$arglist\"usage\"";;
-	*) arglist="$arglist\"$arg\"";;
-    esac
+    if echo "$arg" | grep -q '[^a-z]' ; then
+	arglist="$arglist\"usage\""
+    else
+	arglist="$arglist\"$arg\""
+    fi
 done
 
 echo "arglist is \"$arglist\""
