@@ -51,7 +51,6 @@ trap "rm -f $tmp_sml $tmp_out" 0
 
 arglist=""
 for arg in "$@"; do
-    echo "checking arg \"$arg\"..."
     if [ -n "$arglist" ]; then arglist="$arglist,"; fi
     if echo "$arg" | grep -q '[^a-z]' ; then
 	arglist="$arglist\"usage\""
@@ -59,8 +58,6 @@ for arg in "$@"; do
 	arglist="$arglist\"$arg\""
     fi
 done
-
-echo "arglist is \"$arglist\""
 
 case "$sml" in
     poly) echo 'use "'"$program"'"; vext ['"$arglist"'];' |
