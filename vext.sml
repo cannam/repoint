@@ -277,7 +277,7 @@ end = struct
           | (NONE, SOME home) => home
           | (NONE, NONE) =>
             raise Fail "Failed to look up home directory from environment"
-                                              
+
     fun mkpath path =
         if OS.FileSys.isDir path handle _ => false
         then OK
