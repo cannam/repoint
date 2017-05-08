@@ -8,7 +8,7 @@ if ($args -match "[^a-z]") {
     $arglist = '["' + ($args -join '","') + '"]'
 }
 
-$lines = @(Get-Content vext.sml)
+$lines = @(Get-Content $PSScriptRoot/vext.sml)
 $lines = $lines -notmatch "val _ = main ()"
 
 $intro = @"
