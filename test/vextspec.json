@@ -1,0 +1,18 @@
+{
+    "config": {
+        "extdir": "ext"
+    },
+    "libs": {
+        "vext": {
+            "vcs": "hg",
+	    "service": "bitbucket",
+	    "owner": "cannam"
+        },
+        "vext2": {
+            "vcs": "git",
+	    "service": "github",
+	    "owner": "cannam",
+	    "repository": "vext"
+        }
+    }
+}

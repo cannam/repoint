@@ -16,6 +16,8 @@ SOURCES	:= \
 	src/git.sml \
 	src/app.sml
 
+default:	test
+
 vext.sml:	$(SOURCES)
 	echo '$$(SML_LIB)/basis/basis.mlb' > src/vext.mlb
 	echo $(SOURCES) | sed 's,src/,,g' | fmt -1 >> src/vext.mlb
@@ -26,6 +28,9 @@ vext.sml:	$(SOURCES)
 	echo >> $@
 	cat $(SOURCES) >> $@
 	./vext version
+
+test:	vext.sml
+	cd test && ./test.sh
 
 clean:
 	rm -f vext.sml src/vext.mlb src/vext

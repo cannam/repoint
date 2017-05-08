@@ -19,5 +19,9 @@ addons:
       - polyml
       
 script:
-  - make
+  - make test
+  - make clean  # so we rebuild the aggregated vext.sml
+  - make test
+
+
   

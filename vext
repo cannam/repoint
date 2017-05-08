@@ -4,20 +4,22 @@
 # single-file SML program as if it were a script, our order of
 # preference is based on startup speed.
 
+sml="$VEXT_SML"
+
 set -eu
 
 mydir=$(dirname "$0")
 program="$mydir/vext.sml"
 
-sml=""
-if poly -v | grep -q 'Poly/ML'; then
-    sml="poly"
-elif sml -h | grep -q 'Standard ML of New Jersey'; then
-    sml="smlnj"
-elif mlton | grep -q 'MLton'; then
-    sml="mlton"
-else
-    cat <<EOF
+if [ -z "$sml" ]; then
+    if poly -v | grep -q 'Poly/ML'; then
+	sml="poly"
+    elif sml -h | grep -q 'Standard ML of New Jersey'; then
+	sml="smlnj"
+    elif mlton | grep -q 'MLton'; then
+	sml="mlton"
+    else
+	cat <<EOF
 
   This program needs a Standard ML compiler or interpreter.
 
@@ -36,9 +38,10 @@ else
     3. MLton
        - most likely distribution package name: mlton
        - executable name: mlton
- 
+
 EOF
-    exit 2
+	exit 2
+    fi
 fi
 
 tmp_sml=$(mktemp /tmp/vext-XXXXXXXX.sml)
@@ -89,5 +92,8 @@ val _ = OS.Process.exit (OS.Process.success);
 EOF
             ) > "$tmp_sml"
 	CM_VERBOSE=false sml "$tmp_sml" ;;
+    *)
+	echo "Unknown SML implementation name: $sml";
+	exit 2 ;;
 esac
        
