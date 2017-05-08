@@ -140,12 +140,18 @@ fun update_local_project () =
          | e => print ("Failed with exception: " ^ (exnMessage e) ^ "\n")
 
 fun version () =
-    print ("Vext v" ^ vext_version ^ "\n");
+    print ("v" ^ vext_version ^ "\n");
                       
 fun usage () =
-    (version ();
-     print ("Usage:\n" ^
-            "    vext <check|update>\n"))
+    (print "\nVext ";
+     version ();
+     print ("\nA simple manager for third-party source code dependencies.\n\n"
+            ^ "Usage:\n\n"
+            ^ "    vext <command>\n\n"
+            ^ "where <command> is one of:\n\n"
+            ^ "    check    review configured libraries against their providers, and report\n"
+            ^ "    update   update configured libraries according to the project specs\n"
+            ^ "    version  print the Vext version number and exit\n\n"))
 
 fun vext args =
     case args of
