@@ -6,6 +6,9 @@
 
 set -eu
 
+mydir=$(dirname "$0")
+program="$mydir/vext.sml"
+
 sml=""
 if poly -v | grep -q 'Poly/ML'; then
     sml="poly"
@@ -53,14 +56,15 @@ for arg in "$@"; do
 done
 
 case "$sml" in
-    poly) echo 'use "./vext.sml"; vext ['"$arglist"'];' | poly -q --error-exit ;;
+    poly) echo 'use "'"$program"'"; vext ['"$arglist"'];' |
+		poly -q --error-exit ;;
     mlton)
-	cat ./vext.sml > "$tmp_sml"
+	cat "$program" > "$tmp_sml"
 	echo 'val _ = main ()' >> "$tmp_sml"
 	mlton -output "$tmp_out" "$tmp_sml"
 	"$tmp_out" "$@" ;;
     smlnj)
-	cat ./vext.sml | (
+	cat "$program" | (
 	    cat <<EOF
 val smlrun__cp = 
     let val x = !Control.Print.out in
