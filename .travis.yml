@@ -16,10 +16,8 @@ addons:
       - mlton
       - smlnj
       - libsmlnj-smlnj
-      - polyml
       
 script:
-  - poly -v
   - make test
   - make clean  # so we rebuild the aggregated vext.sml
   - make test
