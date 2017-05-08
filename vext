@@ -12,11 +12,11 @@ mydir=$(dirname "$0")
 program="$mydir/vext.sml"
 
 if [ -z "$sml" ]; then
-    if poly -v | grep -q 'Poly/ML'; then
+    if poly -v 2>&1 | grep -q 'Poly/ML'; then
 	sml="poly"
-    elif sml -h | grep -q 'Standard ML of New Jersey'; then
+    elif sml -h 2>&1 | grep -q 'Standard ML of New Jersey'; then
 	sml="smlnj"
-    elif mlton | grep -q 'MLton'; then
+    elif mlton 2>&1 | grep -q 'MLton'; then
 	sml="mlton"
     else
 	cat <<EOF
@@ -57,6 +57,8 @@ for arg in "$@"; do
 	*) arglist="$arglist\"$arg\"";;
     esac
 done
+
+echo "arglist is \"$arglist\""
 
 case "$sml" in
     poly) echo 'use "'"$program"'"; vext ['"$arglist"'];' |
