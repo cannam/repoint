@@ -77,7 +77,7 @@ end = struct
                 then arg
                 else "\"" ^ arg ^ "\""
             fun check arg =
-                let val valid = explode " /#:;?,._-{}@"
+                let val valid = explode " /#:;?,._-{}@="
                 in
                     app (fn c =>
                             if isAlphaNum c orelse

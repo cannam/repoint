@@ -3,7 +3,15 @@ structure HgControl :> VCS_CONTROL = struct
                             
     type vcsstate = { id: string, modified: bool,
                       branch: string, tags: string list }
-                  
+
+    val hg_args = [ "--config", "ui.interactive=true" ]
+                        
+    fun hg_command context libname args =
+        FileBits.command context libname ("hg" :: hg_args @ args)
+
+    fun hg_command_output context libname args =
+        FileBits.command_output context libname ("hg" :: hg_args @ args)
+                        
     fun exists context libname =
         OS.FileSys.isDir (FileBits.subpath context libname ".hg")
         handle _ => false
@@ -28,7 +36,7 @@ structure HgControl :> VCS_CONTROL = struct
                                                  branch = extract_branch branch,
                                                  tags = split_tags tags }
         in        
-            case FileBits.command_output context libname ["hg", "id"] of
+            case hg_command_output context libname ["id"] of
                 FAIL err => raise Fail err
               | SUCCEED out =>
                 case String.tokens (fn x => x = #" ") out of
@@ -52,20 +60,20 @@ structure HgControl :> VCS_CONTROL = struct
             List.exists (fn t => t = id_or_tag) tags
 
     fun has_incoming context (libname, source, branch) =
-        case FileBits.command_output
-                 context libname
-                 ["hg", "incoming", "-l1", "-b", branch_name branch,
-                  "--template", "{node}"] of
+        case hg_command_output context libname
+                               ["incoming", "-l1",
+                                "-b", branch_name branch,
+                                "--template", "{node}"] of
             FAIL err => false (* hg incoming is odd that way *)
           | SUCCEED incoming => 
             incoming <> "" andalso
             not (String.isSubstring "no changes found" incoming)
                         
     fun is_newest context (libname, source, branch) =
-        case FileBits.command_output
-                 context libname
-                 ["hg", "log", "-l1", "-b", branch_name branch,
-                  "--template", "{node}"] of
+        case hg_command_output context libname
+                               ["log", "-l1",
+                                "-b", branch_name branch,
+                                "--template", "{node}"] of
             FAIL err => raise Fail err
           | SUCCEED newest_in_repo => 
             is_at context libname newest_in_repo andalso
@@ -76,21 +84,20 @@ structure HgControl :> VCS_CONTROL = struct
             { modified, ... } => modified
                 
     fun checkout context (libname, source, branch) =
-        let val command = FileBits.command context ""
-            val url = remote_for context (libname, source)
+        let val url = remote_for context (libname, source)
         in
             case FileBits.mkpath (FileBits.extpath context) of
-                OK => command ["hg", "clone", "-u", branch_name branch,
-                               url, libname]
+                OK => hg_command context ""
+                                 ["clone", "-u", branch_name branch,
+                                  url, libname]
               | ERROR e => ERROR e
         end
                                                     
     fun update context (libname, source, branch) =
-        let val command = FileBits.command context libname
-            val url = remote_for context (libname, source)
-            val pull_result = command ["hg", "pull", url]
+        let val url = remote_for context (libname, source)
+            val pull_result = hg_command context libname ["pull", url]
         in
-            case command ["hg", "update", branch_name branch] of
+            case hg_command context libname ["update", branch_name branch] of
                 OK => pull_result
               | ERROR e => ERROR e
         end
@@ -98,14 +105,13 @@ structure HgControl :> VCS_CONTROL = struct
     fun update_to context (libname, source, "") =
         raise Fail "Non-empty id (tag or revision id) required for update_to"
       | update_to context (libname, source, id) = 
-        let val command = FileBits.command context libname
-            val url = remote_for context (libname, source)
+        let val url = remote_for context (libname, source)
         in
-            case command ["hg", "update", "-r" ^ id] of
+            case hg_command context libname ["update", "-r" ^ id] of
                 OK => OK
               | ERROR _ => 
-                case command ["hg", "pull", url] of
-                    OK => command ["hg", "update", "-r" ^ id]
+                case hg_command context libname ["pull", url] of
+                    OK => hg_command context libname ["update", "-r" ^ id]
                   | ERROR e => ERROR e
         end
                   
