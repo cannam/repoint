@@ -104,3 +104,5 @@ to add:
  + ability to commit and/or push?
  + dry-run option (print commands)
  
+
+[![Build Status](https://travis-ci.org/cannam/vext.svg?branch=master)](https://travis-ci.org/cannam/vext)

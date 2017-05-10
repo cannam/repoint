@@ -9,6 +9,7 @@ sudo:
 
 os:
   - linux
+  - osx
 
 addons:
   apt:
@@ -17,6 +18,9 @@ addons:
       - smlnj
       - libsmlnj-smlnj
       - polyml
+
+before_install:
+  - if [[ "$TRAVIS_OS_NAME" = "osx" ]] ; then brew install mlton smlnj polyml ; fi
       
 script:
   - make test
