@@ -8,7 +8,8 @@ Run "vext help" for more documentation.
 
 $sml = $env:VEXT_SML
 
-$program = "$PSScriptRoot/vext.sml"
+$mydir = Split-Path $MyInvocation.MyCommand.Path -Parent
+$program = "$mydir/vext.sml"
 
 # We need either Poly/ML or SML/NJ. No great preference as to which.
 
