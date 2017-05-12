@@ -18,7 +18,7 @@ foreach ($sml in $smlOptions) {
         $env:VEXT_SML=$sml
     }
 
-    Remove-Item ext -Recurse -ErrorAction SilentlyContinue
+    Remove-Item ext -Recurse -Force -ErrorAction SilentlyContinue
     
     ..\vext check
     ..\vext update
