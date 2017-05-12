@@ -1,6 +1,4 @@
 
-"Hello"
-
 $mydir = Split-Path $MyInvocation.MyCommand.Path -Parent
 
 cd $mydir
