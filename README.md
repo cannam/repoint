@@ -6,12 +6,13 @@ Vext
 
 A simple manager for third-party source code dependencies.
 
-Vext is a program that manages a directory of external source code
-repositories that will be used during a build process. You configure
-it with a list of libraries, their repository locations, and any
-revision or tag information you want a checkout to be associated
-with. This list is stored in your repository, and the Vext utility
-checks out the necessary code with the appropriate (or latest)
+Vext is a program that maintains for you a directory of the external
+source code repositories that are needed to build your own program.
+
+You configure it with a list of libraries, their remote repository
+locations, and any revision or tag information you want a checkout to
+be associated with. This list is stored in your repository, and the
+Vext utility checks out the necessary code with the appropriate
 revision. It's like using Mercurial subrepositories or Git submodules,
 but without any version control system integration, and agnostic to
 which system you use.
@@ -25,7 +26,7 @@ managers:
  the repository would be too expensive, then Vext won't help.
 
  2. It can only bring code in to a subdirectory of the local directory
- (vendoring). There is no per-user or per-system package install
+ (vendoring). There is no per-user or system-wide package installation
  location. Every local working copy gets its own copy.
 
  3. It doesn't know how to build anything. It just brings in the
@@ -33,15 +34,17 @@ managers:
  with it. This also means it doesn't care what language the source
  code is in.
 
-Libraries are listed in a .vex file in the top-level working-copy
-directory, and Vext checks them out into subdirectories of a directory
-called ext. The ext directory should normally be excluded from version
-control (included in the .hgignore, .gitignore etc file).
+Libraries are listed in a vextspec.json file in the top-level
+working-copy directory, and Vext checks them out into subdirectories
+of a directory called ext. The ext directory should normally be
+excluded from version control (included in the .hgignore, .gitignore
+etc file).
 
 Libraries are specified by name, version control system (hg, git etc),
 repository hosting provider, and tag or revision ID. Vext knows about
 some standard hosting providers and may know (through a configuration
-in ~/.vext) the login names to use for ssh access to those providers.
+in ~/.vext.json) the login names to use for ssh access to those
+providers.
 
 A library may be listed as either pinned or unpinned. A pinned library
 has a specific tag or revision ID associated with it, and once it has

@@ -1,15 +1,19 @@
 #!/bin/sh
 
-# We need one of Poly/ML, SML/NJ, or MLton. Since we're running a
-# single-file SML program as if it were a script, our order of
-# preference is based on startup speed.
+# Disable shellcheck warnings for useless-use-of-cat. UUOC is good
+# practice, not bad: clearer, safer, less error-prone.
+# shellcheck disable=SC2002
 
 sml="$VEXT_SML"
 
-set -eu
+set -eu pipefail
 
 mydir=$(dirname "$0")
 program="$mydir/vext.sml"
+
+# We need one of Poly/ML, SML/NJ, or MLton. Since we're running a
+# single-file SML program as if it were a script, our order of
+# preference is based on startup speed.
 
 if [ -z "$sml" ]; then
     if poly -v 2>&1 | grep -q 'Poly/ML'; then
@@ -47,7 +51,7 @@ fi
 tmp_sml=$(mktemp /tmp/vext-XXXXXXXX.sml)
 tmp_out=$(mktemp /tmp/vext-XXXXXXXX.bin)
 
-trap "rm -f $tmp_sml $tmp_out" 0
+trap 'rm -f $tmp_sml $tmp_out' 0
 
 arglist=""
 for arg in "$@"; do
