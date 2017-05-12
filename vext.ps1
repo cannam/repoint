@@ -1,6 +1,40 @@
+<#
 
-# echo 'use "vext.sml"; check ();' | ..\..\PolyML-5.7-x64-windows-console\PolyML.exe -q --error-exit
-# exit
+.SYNOPSIS
+A simple manager for third-party source code dependencies.
+Run "vext help" for more documentation.
+
+#>
+
+$sml = $env:VEXT_SML
+
+$program = "$PSScriptRoot/vext.sml"
+
+# We need either Poly/ML or SML/NJ. No great preference as to which.
+
+if (!$sml) {
+    if (Get-Command "polyml" -ErrorAction SilentlyContinue) {
+       $sml = "poly"
+    } elseif (Get-Command "sml" -ErrorAction SilentlyContinue) {
+       $sml = "smlnj"
+    } else {
+       echo @"
+
+  This program needs a Standard ML compiler or interpreter.
+
+  Please ensure you have one of the following Standard ML
+  implementations installed and present in your PATH, and try again:
+
+    1. Poly/ML
+       - executable name: polyml
+
+    2. Standard ML of New Jersey
+       - executable name: sml
+
+"@
+       exit 1
+    }
+}
 
 if ($args -match "[^a-z]") {
     $arglist = '["usage"]'
@@ -8,10 +42,17 @@ if ($args -match "[^a-z]") {
     $arglist = '["' + ($args -join '","') + '"]'
 }
 
-$lines = @(Get-Content $PSScriptRoot/vext.sml)
-$lines = $lines -notmatch "val _ = main ()"
+if ($sml -eq "poly") {
 
-$intro = @"
+    $program = $program -replace "\\","\\\\"
+    echo "use ""$program""; vext $arglist" | polyml -q --error-exit | Out-Host
+
+} elseif ($sml -eq "smlnj") {
+
+    $lines = @(Get-Content $program)
+    $lines = $lines -notmatch "val _ = main ()"
+
+    $intro = @"
 val smlrun__cp = 
     let val x = !Control.Print.out in
         Control.Print.out := { say = fn _ => (), flush = fn () => () };
@@ -29,24 +70,28 @@ Control.Print.out := {
 };
 "@ -split "[\r\n]+"
 
-$outro = @"
+   $outro = @"
 val _ = vext $arglist;
 val _ = OS.Process.exit (OS.Process.success);
 "@ -split "[\r\n]+"
 
-$script = @()
-$script += $intro
-$script += $lines
-$script += $outro
+   $script = @()
+   $script += $intro
+   $script += $lines
+   $script += $outro
 
-$tmpfile = ([System.IO.Path]::GetTempFileName()) -replace "[.]tmp",".sml"
+   $tmpfile = ([System.IO.Path]::GetTempFileName()) -replace "[.]tmp",".sml"
 
-$script | Out-File -Encoding "ASCII" $tmpfile
+   $script | Out-File -Encoding "ASCII" $tmpfile
 
-$env:CM_VERBOSE="false"
+   $env:CM_VERBOSE="false"
 
-sml $tmpfile $args[1,$args.Length]
+   sml $tmpfile $args[1,$args.Length]
 
-del $tmpfile
+   del $tmpfile
 
+} else {
 
+   "Unknown SML implementation name: $sml"
+   exit 2
+}
