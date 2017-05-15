@@ -6,7 +6,7 @@
 
 sml="$VEXT_SML"
 
-set -eu pipefail
+set -eu -o pipefail
 
 mydir=$(dirname "$0")
 program="$mydir/vext.sml"
