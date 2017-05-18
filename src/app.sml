@@ -7,6 +7,9 @@ structure AnyLibControl :> LIB_CONTROL = struct
     fun check context (spec as { vcs, ... } : libspec) =
         (fn HG => H.check | GIT => G.check) vcs context spec
 
+    fun status context (spec as { vcs, ... } : libspec) =
+        (fn HG => H.status | GIT => G.status) vcs context spec
+
     fun update context (spec as { vcs, ... } : libspec) =
         (fn HG => H.update | GIT => G.update) vcs context spec
 end
@@ -110,6 +113,21 @@ fun check_project (project as { context, libs } : project) =
               | (n, (WRONG, m)) => print_for n "WRONG" m)
             outcomes
     end        
+                                             
+fun status_project (project as { context, libs } : project) =
+    let open AnyLibControl
+        val outcomes = map (fn lib => (#libname lib, status context lib)) libs
+        fun print_for libname state m = print (state ^ " " ^ libname ^
+                                               (case m of
+                                                    MODIFIED => " [* modified]"
+                                                  | UNMODIFIED => "") ^ "\n")
+    in
+        app (fn (n, (ABSENT, _)) => print_for n "ABSENT" UNMODIFIED
+              | (n, (CORRECT, m)) => print_for n "PRESENT" m
+              | (n, (SUPERSEDED, m)) => print_for n "SUPERSEDED" m
+              | (n, (WRONG, m)) => print_for n "WRONG" m)
+            outcomes
+    end        
 
 fun update_project (project as { context, libs } : project) =
     let open AnyLibControl
@@ -133,6 +151,11 @@ fun check_local_project () =
     check_project (load_local_project ())
     handle Fail err => print ("ERROR: " ^ err ^ "\n")
          | e => print ("Failed with exception: " ^ (exnMessage e) ^ "\n")
+    
+fun status_local_project () =
+    status_project (load_local_project ())
+    handle Fail err => print ("ERROR: " ^ err ^ "\n")
+         | e => print ("Failed with exception: " ^ (exnMessage e) ^ "\n")
 
 fun update_local_project () =
     update_project (load_local_project ())
@@ -150,12 +173,14 @@ fun usage () =
             ^ "    vext <command>\n\n"
             ^ "where <command> is one of:\n\n"
             ^ "    check    review configured libraries against their providers, and report\n"
+            ^ "    status   print quick report on local status only, without using network\n"
             ^ "    update   update configured libraries according to the project specs\n"
             ^ "    version  print the Vext version number and exit\n\n"))
 
 fun vext args =
     case args of
         ["check"] => check_local_project ()
+      | ["status"] => status_local_project ()
       | ["update"] => update_local_project ()
       | ["version"] => version ()
       | _ => usage ()

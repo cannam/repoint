@@ -1,8 +1,8 @@
                                          
 functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
 
-    fun check_libstate context ({ libname, source,
-                                  branch, pin, ... } : libspec) =
+    fun check context ({ libname, source,
+                         branch, pin, ... } : libspec) =
         let fun check' () =
             case pin of
                 UNPINNED =>
@@ -16,17 +16,31 @@ functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
                 else WRONG
         in
             if not (V.exists context libname)
-            then ABSENT
-            else check' ()
-        end
-
-    fun check context (spec as { libname, ... } : libspec) =
-        case check_libstate context spec of
-            ABSENT => (ABSENT, UNMODIFIED)
-          | state => (state, if V.is_locally_modified context libname
+            then (ABSENT, UNMODIFIED)
+            else (check' (), if V.is_locally_modified context libname
                              then MODIFIED
                              else UNMODIFIED)
-            
+        end
+
+    (* status is like check, except that it avoids using the network
+       and so can't report SUPERSEDED state *)
+    fun status context ({ libname, source,
+                          branch, pin, ... } : libspec) =
+        let fun status' () =
+            case pin of
+                UNPINNED => CORRECT
+              | PINNED target =>
+                if V.is_at context libname target
+                then CORRECT
+                else WRONG
+        in
+            if not (V.exists context libname)
+            then (ABSENT, UNMODIFIED)
+            else (status' (), if V.is_locally_modified context libname
+                              then MODIFIED
+                              else UNMODIFIED)
+        end
+                         
     fun update context ({ libname, source, branch, pin, ... } : libspec) =
         let fun update' () =
             case pin of
