@@ -43,7 +43,8 @@ structure GitControl :> VCS_CONTROL = struct
         let fun newest_here () =
               case FileBits.command_output
                        context libname
-                       ["git", "rev-list", "-1", branch_name branch] of
+                       ["git", "rev-list", "-1",
+                        "origin/" ^ branch_name branch] of
                   FAIL err => raise Fail err
                 | SUCCEED rev => is_at context libname rev
         in
