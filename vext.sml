@@ -1275,7 +1275,7 @@ fun check_project (project as { context, libs } : project) =
             outcomes
     end        
                                              
-fun status_project (project as { context, libs } : project) =
+fun status_of_project (project as { context, libs } : project) =
     let open AnyLibControl
         val outcomes = map (fn lib => (#libname lib, status context lib)) libs
         fun print_for libname state m = print (state ^ " " ^ libname ^
@@ -1307,21 +1307,15 @@ fun load_local_project () =
     in
         load_project userconfig rootpath
     end    
-    
-fun check_local_project () =
-    check_project (load_local_project ())
-    handle Fail err => print ("ERROR: " ^ err ^ "\n")
-         | e => print ("Failed with exception: " ^ (exnMessage e) ^ "\n")
-    
-fun status_local_project () =
-    status_project (load_local_project ())
-    handle Fail err => print ("ERROR: " ^ err ^ "\n")
-         | e => print ("Failed with exception: " ^ (exnMessage e) ^ "\n")
 
-fun update_local_project () =
-    update_project (load_local_project ())
+fun with_local_project f =
+    f (load_local_project ())
     handle Fail err => print ("ERROR: " ^ err ^ "\n")
          | e => print ("Failed with exception: " ^ (exnMessage e) ^ "\n")
+        
+fun check () = with_local_project check_project
+fun status () = with_local_project status_of_project
+fun update () = with_local_project update_project
 
 fun version () =
     print ("v" ^ vext_version ^ "\n");
@@ -1340,9 +1334,9 @@ fun usage () =
 
 fun vext args =
     case args of
-        ["check"] => check_local_project ()
-      | ["status"] => status_local_project ()
-      | ["update"] => update_local_project ()
+        ["check"] => check ()
+      | ["status"] => status ()
+      | ["update"] => update ()
       | ["version"] => version ()
       | _ => usage ()
         
