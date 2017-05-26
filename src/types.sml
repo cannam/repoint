@@ -91,7 +91,7 @@ signature VCS_CONTROL = sig
 end
 
 signature LIB_CONTROL = sig
-    val check : context -> libspec -> libstate * localstate
+    val review : context -> libspec -> libstate * localstate
     val status : context -> libspec -> libstate * localstate
     val update : context -> libspec -> result
 end

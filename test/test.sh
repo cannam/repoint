@@ -16,9 +16,9 @@ for sml in default poly smlnj mlton; do
 	VEXT_SML="$sml"
     fi
     rm -rf ext
-    ../vext check
+    ../vext review
     ../vext update
-    ../vext check
+    ../vext review
     ls -l ext
     echo
 done

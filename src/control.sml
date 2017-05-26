@@ -1,9 +1,9 @@
                                          
 functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
 
-    fun check context ({ libname, source,
+    fun review context ({ libname, source,
                          branch, pin, ... } : libspec) =
-        let fun check' () =
+        let fun review' () =
             case pin of
                 UNPINNED =>
                 if not (V.is_newest context (libname, source, branch))
@@ -17,12 +17,12 @@ functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
         in
             if not (V.exists context libname)
             then (ABSENT, UNMODIFIED)
-            else (check' (), if V.is_locally_modified context libname
+            else (review' (), if V.is_locally_modified context libname
                              then MODIFIED
                              else UNMODIFIED)
         end
 
-    (* status is like check, except that it avoids using the network
+    (* status is like review, except that it avoids using the network
        and so can't report SUPERSEDED state *)
     fun status context ({ libname, source,
                           branch, pin, ... } : libspec) =
