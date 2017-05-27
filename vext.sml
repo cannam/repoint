@@ -62,18 +62,28 @@ datatype localstate =
          MODIFIED |
          UNMODIFIED
              
-datatype result =
-         OK |
+(* If we can recover from an error, for example by reporting failure
+   for this one thing and going on to the next thing, then the error
+   should probably be reported using a result type. *)
+             
+datatype 'a result =
+         OK of 'a |
          ERROR of string
 
-datatype output =
-         SUCCEED of string |
-         FAIL of string
+(* If we can't recover from it, then it should be an exception, like
+   this one. *)
 
+exception UsageError of string
+
+(*!!! That doesn't tell us what to do about errors that occur at a
+   lower level than the function being called. For example, we call
+   is_at on a VCS_CONTROL structure, but the invocation of hg/git
+   fails. *)
+                            
 datatype branch =
          BRANCH of string |
          DEFAULT_BRANCH
-                                        
+
 type libname = string
 
 type libspec = {
@@ -122,27 +132,27 @@ signature VCS_CONTROL = sig
     val is_at : context -> libname -> string -> bool
     val is_newest : context -> libname * source * branch -> bool
     val is_locally_modified : context -> libname -> bool
-    val checkout : context -> libname * source * branch -> result
-    val update : context -> libname * source * branch -> result
-    val update_to : context -> libname * source * string -> result
+    val checkout : context -> libname * source * branch -> unit result
+    val update : context -> libname * source * branch -> unit result
+    val update_to : context -> libname * source * string -> unit result
 end
 
 signature LIB_CONTROL = sig
     val review : context -> libspec -> libstate * localstate
     val status : context -> libspec -> libstate * localstate
-    val update : context -> libspec -> result
+    val update : context -> libspec -> unit result
 end
 
 structure FileBits :> sig
     val extpath : context -> string
     val libpath : context -> libname -> string
     val subpath : context -> libname -> string -> string
-    val command_output : context -> libname -> string list -> output
-    val command : context -> libname -> string list -> result
+    val command_output : context -> libname -> string list -> string result
+    val command : context -> libname -> string list -> unit result
     val file_contents : string -> string
     val mydir : unit -> string
     val homedir : unit -> string
-    val mkpath : string -> result
+    val mkpath : string -> unit result
     val vexfile : unit -> string
     val vexpath : string -> string
 end = struct
@@ -240,7 +250,7 @@ end = struct
                            | SOME file => Process.system (cmd ^ ">" ^ file)
         in
             if Process.isSuccess status
-            then OK
+            then OK ()
             else ERROR ("Command failed: " ^ cmd ^ " (in dir " ^ dir ^ ")")
         end
         handle ex => ERROR ("Unable to run command: " ^ exnMessage ex)
@@ -256,8 +266,8 @@ end = struct
         in
             FileSys.remove tmpFile handle _ => ();
             case result of
-                OK => SUCCEED contents
-              | ERROR e => FAIL e
+                OK () => OK contents
+              | ERROR e => ERROR e
         end
 
     fun mydir () =
@@ -281,9 +291,9 @@ end = struct
 
     fun mkpath path =
         if OS.FileSys.isDir path handle _ => false
-        then OK
+        then OK ()
         else case OS.Path.fromString path of
-                 { arcs = nil, ... } => OK
+                 { arcs = nil, ... } => OK ()
                | { isAbs = false, ... } => ERROR "mkpath requires absolute path"
                | { isAbs, vol, arcs } => 
                  case mkpath (OS.Path.toString {      (* parent *)
@@ -291,9 +301,9 @@ end = struct
                                    vol = vol,
                                    arcs = rev (tl (rev arcs)) }) of
                      ERROR e => ERROR e
-                   | OK => ((OS.FileSys.mkDir path; OK)
-                            handle OS.SysErr (e, _) =>
-                                   ERROR ("Directory creation failed: " ^ e))
+                   | OK () => ((OS.FileSys.mkDir path; OK ())
+                               handle OS.SysErr (e, _) =>
+                                      ERROR ("Directory creation failed: " ^ e))
 end
                                          
 functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
@@ -344,11 +354,11 @@ functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
                 UNPINNED =>
                 if not (V.is_newest context (libname, source, branch))
                 then V.update context (libname, source, branch)
-                else OK
+                else OK ()
 
               | PINNED target =>
                 if V.is_at context libname target
-                then OK
+                then OK ()
                 else V.update_to context (libname, source, target)
         in
             if not (V.exists context libname)
@@ -1000,8 +1010,8 @@ structure HgControl :> VCS_CONTROL = struct
                                                  tags = split_tags tags }
         in        
             case hg_command_output context libname ["id"] of
-                FAIL err => raise Fail err
-              | SUCCEED out =>
+                ERROR err => raise Fail err
+              | OK out =>
                 case String.tokens (fn x => x = #" ") out of
                     [id, branch, tags] => state_for (id, branch, tags)
                   | [id, other] => if is_branch other
@@ -1027,8 +1037,8 @@ structure HgControl :> VCS_CONTROL = struct
                                ["incoming", "-l1",
                                 "-b", branch_name branch,
                                 "--template", "{node}"] of
-            FAIL err => false (* hg incoming is odd that way *)
-          | SUCCEED incoming => 
+            ERROR err => false (* hg incoming is odd that way *)
+          | OK incoming => 
             incoming <> "" andalso
             not (String.isSubstring "no changes found" incoming)
                         
@@ -1037,8 +1047,8 @@ structure HgControl :> VCS_CONTROL = struct
                                ["log", "-l1",
                                 "-b", branch_name branch,
                                 "--template", "{node}"] of
-            FAIL err => raise Fail err
-          | SUCCEED newest_in_repo => 
+            ERROR err => raise Fail err
+          | OK newest_in_repo => 
             is_at context libname newest_in_repo andalso
             not (has_incoming context (libname, source, branch))
 
@@ -1050,9 +1060,9 @@ structure HgControl :> VCS_CONTROL = struct
         let val url = remote_for context (libname, source)
         in
             case FileBits.mkpath (FileBits.extpath context) of
-                OK => hg_command context ""
-                                 ["clone", "-u", branch_name branch,
-                                  url, libname]
+                OK () => hg_command context ""
+                                    ["clone", "-u", branch_name branch,
+                                     url, libname]
               | ERROR e => ERROR e
         end
                                                     
@@ -1061,7 +1071,7 @@ structure HgControl :> VCS_CONTROL = struct
             val pull_result = hg_command context libname ["pull", url]
         in
             case hg_command context libname ["update", branch_name branch] of
-                OK => pull_result
+                OK () => pull_result
               | ERROR e => ERROR e
         end
 
@@ -1071,10 +1081,10 @@ structure HgControl :> VCS_CONTROL = struct
         let val url = remote_for context (libname, source)
         in
             case hg_command context libname ["update", "-r" ^ id] of
-                OK => OK
+                OK () => OK ()
               | ERROR _ => 
                 case hg_command context libname ["pull", url] of
-                    OK => hg_command context libname ["update", "-r" ^ id]
+                    OK () => hg_command context libname ["update", "-r" ^ id]
                   | ERROR e => ERROR e
         end
                   
@@ -1098,7 +1108,7 @@ structure GitControl :> VCS_CONTROL = struct
             val url = remote_for context (libname, provider)
         in
             case FileBits.mkpath (FileBits.extpath context) of
-                OK => command ["git", "clone", "-b", branch_name branch,
+                OK () => command ["git", "clone", "-b", branch_name branch,
                                url, libname]
               | ERROR e => ERROR e
         end
@@ -1109,14 +1119,14 @@ structure GitControl :> VCS_CONTROL = struct
     fun is_at context libname id_or_tag =
         case FileBits.command_output context libname
                                      ["git", "rev-parse", "HEAD"] of
-            FAIL err => raise Fail err
-          | SUCCEED id =>
+            ERROR err => raise Fail err
+          | OK id =>
             String.isPrefix id_or_tag id orelse
             String.isPrefix id id_or_tag orelse
             case FileBits.command_output context libname
                                          ["git", "rev-list", "-1", id_or_tag] of
-                FAIL err => raise Fail err
-              | SUCCEED tid =>
+                ERROR err => raise Fail err
+              | OK tid =>
                 tid = id andalso
                 tid <> id_or_tag (* otherwise id_or_tag was an id, not a tag *)
 
@@ -1126,21 +1136,21 @@ structure GitControl :> VCS_CONTROL = struct
                        context libname
                        ["git", "rev-list", "-1",
                         "origin/" ^ branch_name branch] of
-                  FAIL err => raise Fail err
-                | SUCCEED rev => is_at context libname rev
+                  ERROR err => raise Fail err
+                | OK rev => is_at context libname rev
         in
             if not (newest_here ())
             then false
             else case FileBits.command context libname ["git", "fetch"] of
                      ERROR err => raise Fail err
-                   | OK => newest_here ()
+                   | OK () => newest_here ()
         end
 
     fun is_locally_modified context libname =
         case FileBits.command_output context libname ["git", "status", "-s"] of
-            FAIL err => raise Fail err
-          | SUCCEED "" => false
-          | SUCCEED _ => true
+            ERROR err => raise Fail err
+          | OK "" => false
+          | OK _ => true
             
     fun update context (libname, provider, branch) =
         update_to context (libname, provider, branch_name branch)
@@ -1152,10 +1162,10 @@ structure GitControl :> VCS_CONTROL = struct
             val url = remote_for context (libname, provider)
         in
             case command ["git", "checkout", "--detach", id] of
-                OK => OK
+                OK () => OK ()
               | ERROR _ => 
                 case command ["git", "pull", url] of
-                    OK => command ["git", "checkout", "--detach", id]
+                    OK () => command ["git", "checkout", "--detach", id]
                   | ERROR e => ERROR e
         end
 end
@@ -1294,7 +1304,7 @@ fun update_project (project as { context, libs } : project) =
     let open AnyLibControl
         val outcomes = map (fn lib => (#libname lib, update context lib)) libs
     in
-        app (fn (libname, OK) =>
+        app (fn (libname, OK ()) =>
                 print ("OK " ^ libname ^ "\n")
               | (libname, ERROR e) =>
                 print ("FAILED " ^ libname ^ ": " ^ e ^ "\n"))

@@ -37,8 +37,8 @@ structure HgControl :> VCS_CONTROL = struct
                                                  tags = split_tags tags }
         in        
             case hg_command_output context libname ["id"] of
-                FAIL err => raise Fail err
-              | SUCCEED out =>
+                ERROR err => raise Fail err
+              | OK out =>
                 case String.tokens (fn x => x = #" ") out of
                     [id, branch, tags] => state_for (id, branch, tags)
                   | [id, other] => if is_branch other
@@ -64,8 +64,8 @@ structure HgControl :> VCS_CONTROL = struct
                                ["incoming", "-l1",
                                 "-b", branch_name branch,
                                 "--template", "{node}"] of
-            FAIL err => false (* hg incoming is odd that way *)
-          | SUCCEED incoming => 
+            ERROR err => false (* hg incoming is odd that way *)
+          | OK incoming => 
             incoming <> "" andalso
             not (String.isSubstring "no changes found" incoming)
                         
@@ -74,8 +74,8 @@ structure HgControl :> VCS_CONTROL = struct
                                ["log", "-l1",
                                 "-b", branch_name branch,
                                 "--template", "{node}"] of
-            FAIL err => raise Fail err
-          | SUCCEED newest_in_repo => 
+            ERROR err => raise Fail err
+          | OK newest_in_repo => 
             is_at context libname newest_in_repo andalso
             not (has_incoming context (libname, source, branch))
 
@@ -87,9 +87,9 @@ structure HgControl :> VCS_CONTROL = struct
         let val url = remote_for context (libname, source)
         in
             case FileBits.mkpath (FileBits.extpath context) of
-                OK => hg_command context ""
-                                 ["clone", "-u", branch_name branch,
-                                  url, libname]
+                OK () => hg_command context ""
+                                    ["clone", "-u", branch_name branch,
+                                     url, libname]
               | ERROR e => ERROR e
         end
                                                     
@@ -98,7 +98,7 @@ structure HgControl :> VCS_CONTROL = struct
             val pull_result = hg_command context libname ["pull", url]
         in
             case hg_command context libname ["update", branch_name branch] of
-                OK => pull_result
+                OK () => pull_result
               | ERROR e => ERROR e
         end
 
@@ -108,10 +108,10 @@ structure HgControl :> VCS_CONTROL = struct
         let val url = remote_for context (libname, source)
         in
             case hg_command context libname ["update", "-r" ^ id] of
-                OK => OK
+                OK () => OK ()
               | ERROR _ => 
                 case hg_command context libname ["pull", url] of
-                    OK => hg_command context libname ["update", "-r" ^ id]
+                    OK () => hg_command context libname ["update", "-r" ^ id]
                   | ERROR e => ERROR e
         end
                   

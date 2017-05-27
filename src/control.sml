@@ -47,11 +47,11 @@ functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
                 UNPINNED =>
                 if not (V.is_newest context (libname, source, branch))
                 then V.update context (libname, source, branch)
-                else OK
+                else OK ()
 
               | PINNED target =>
                 if V.is_at context libname target
-                then OK
+                then OK ()
                 else V.update_to context (libname, source, target)
         in
             if not (V.exists context libname)

@@ -3,12 +3,12 @@ structure FileBits :> sig
     val extpath : context -> string
     val libpath : context -> libname -> string
     val subpath : context -> libname -> string -> string
-    val command_output : context -> libname -> string list -> output
-    val command : context -> libname -> string list -> result
+    val command_output : context -> libname -> string list -> string result
+    val command : context -> libname -> string list -> unit result
     val file_contents : string -> string
     val mydir : unit -> string
     val homedir : unit -> string
-    val mkpath : string -> result
+    val mkpath : string -> unit result
     val vexfile : unit -> string
     val vexpath : string -> string
 end = struct
@@ -106,7 +106,7 @@ end = struct
                            | SOME file => Process.system (cmd ^ ">" ^ file)
         in
             if Process.isSuccess status
-            then OK
+            then OK ()
             else ERROR ("Command failed: " ^ cmd ^ " (in dir " ^ dir ^ ")")
         end
         handle ex => ERROR ("Unable to run command: " ^ exnMessage ex)
@@ -122,8 +122,8 @@ end = struct
         in
             FileSys.remove tmpFile handle _ => ();
             case result of
-                OK => SUCCEED contents
-              | ERROR e => FAIL e
+                OK () => OK contents
+              | ERROR e => ERROR e
         end
 
     fun mydir () =
@@ -147,9 +147,9 @@ end = struct
 
     fun mkpath path =
         if OS.FileSys.isDir path handle _ => false
-        then OK
+        then OK ()
         else case OS.Path.fromString path of
-                 { arcs = nil, ... } => OK
+                 { arcs = nil, ... } => OK ()
                | { isAbs = false, ... } => ERROR "mkpath requires absolute path"
                | { isAbs, vol, arcs } => 
                  case mkpath (OS.Path.toString {      (* parent *)
@@ -157,7 +157,7 @@ end = struct
                                    vol = vol,
                                    arcs = rev (tl (rev arcs)) }) of
                      ERROR e => ERROR e
-                   | OK => ((OS.FileSys.mkDir path; OK)
-                            handle OS.SysErr (e, _) =>
-                                   ERROR ("Directory creation failed: " ^ e))
+                   | OK () => ((OS.FileSys.mkDir path; OK ())
+                               handle OS.SysErr (e, _) =>
+                                      ERROR ("Directory creation failed: " ^ e))
 end

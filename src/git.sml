@@ -17,7 +17,7 @@ structure GitControl :> VCS_CONTROL = struct
             val url = remote_for context (libname, provider)
         in
             case FileBits.mkpath (FileBits.extpath context) of
-                OK => command ["git", "clone", "-b", branch_name branch,
+                OK () => command ["git", "clone", "-b", branch_name branch,
                                url, libname]
               | ERROR e => ERROR e
         end
@@ -28,14 +28,14 @@ structure GitControl :> VCS_CONTROL = struct
     fun is_at context libname id_or_tag =
         case FileBits.command_output context libname
                                      ["git", "rev-parse", "HEAD"] of
-            FAIL err => raise Fail err
-          | SUCCEED id =>
+            ERROR err => raise Fail err
+          | OK id =>
             String.isPrefix id_or_tag id orelse
             String.isPrefix id id_or_tag orelse
             case FileBits.command_output context libname
                                          ["git", "rev-list", "-1", id_or_tag] of
-                FAIL err => raise Fail err
-              | SUCCEED tid =>
+                ERROR err => raise Fail err
+              | OK tid =>
                 tid = id andalso
                 tid <> id_or_tag (* otherwise id_or_tag was an id, not a tag *)
 
@@ -45,21 +45,21 @@ structure GitControl :> VCS_CONTROL = struct
                        context libname
                        ["git", "rev-list", "-1",
                         "origin/" ^ branch_name branch] of
-                  FAIL err => raise Fail err
-                | SUCCEED rev => is_at context libname rev
+                  ERROR err => raise Fail err
+                | OK rev => is_at context libname rev
         in
             if not (newest_here ())
             then false
             else case FileBits.command context libname ["git", "fetch"] of
                      ERROR err => raise Fail err
-                   | OK => newest_here ()
+                   | OK () => newest_here ()
         end
 
     fun is_locally_modified context libname =
         case FileBits.command_output context libname ["git", "status", "-s"] of
-            FAIL err => raise Fail err
-          | SUCCEED "" => false
-          | SUCCEED _ => true
+            ERROR err => raise Fail err
+          | OK "" => false
+          | OK _ => true
             
     fun update context (libname, provider, branch) =
         update_to context (libname, provider, branch_name branch)
@@ -71,10 +71,10 @@ structure GitControl :> VCS_CONTROL = struct
             val url = remote_for context (libname, provider)
         in
             case command ["git", "checkout", "--detach", id] of
-                OK => OK
+                OK () => OK ()
               | ERROR _ => 
                 case command ["git", "pull", url] of
-                    OK => command ["git", "checkout", "--detach", id]
+                    OK () => command ["git", "checkout", "--detach", id]
                   | ERROR e => ERROR e
         end
 end

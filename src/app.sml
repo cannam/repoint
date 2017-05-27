@@ -133,7 +133,7 @@ fun update_project (project as { context, libs } : project) =
     let open AnyLibControl
         val outcomes = map (fn lib => (#libname lib, update context lib)) libs
     in
-        app (fn (libname, OK) =>
+        app (fn (libname, OK ()) =>
                 print ("OK " ^ libname ^ "\n")
               | (libname, ERROR e) =>
                 print ("FAILED " ^ libname ^ ": " ^ e ^ "\n"))
