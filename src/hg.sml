@@ -13,13 +13,13 @@ structure HgControl :> VCS_CONTROL = struct
         FileBits.command_output context libname ("hg" :: hg_args @ args)
                         
     fun exists context libname =
-        OS.FileSys.isDir (FileBits.subpath context libname ".hg")
-        handle _ => false
+        OK (OS.FileSys.isDir (FileBits.subpath context libname ".hg"))
+        handle _ => OK false
 
     fun remote_for context (libname, source) =
         Provider.remote_url context HG source libname
 
-    fun current_state context libname : vcsstate =
+    fun current_state context libname : vcsstate result =
         let fun is_branch text = text <> "" andalso #"(" = hd (explode text)
             and extract_branch b =
                 if is_branch b     (* need to remove enclosing parens *)
@@ -31,13 +31,14 @@ structure HgControl :> VCS_CONTROL = struct
                 then (implode o rev o tl o rev o explode) id
                 else id
             and split_tags tags = String.tokens (fn c => c = #"/") tags
-            and state_for (id, branch, tags) = { id = extract_id id,
-                                                 modified = is_modified id,
-                                                 branch = extract_branch branch,
-                                                 tags = split_tags tags }
+            and state_for (id, branch, tags) =
+                OK { id = extract_id id,
+                     modified = is_modified id,
+                     branch = extract_branch branch,
+                     tags = split_tags tags }
         in        
             case hg_command_output context libname ["id"] of
-                ERROR err => raise Fail err
+                ERROR e => ERROR e
               | OK out =>
                 case String.tokens (fn x => x = #" ") out of
                     [id, branch, tags] => state_for (id, branch, tags)
@@ -45,52 +46,57 @@ structure HgControl :> VCS_CONTROL = struct
                                    then state_for (id, other, "")
                                    else state_for (id, "", other)
                   | [id] => state_for (id, "", "")
-                  | _ => raise Fail ("Unexpected output from hg id: " ^ out)
+                  | _ => ERROR ("Unexpected output from hg id: " ^ out)
         end
 
     fun branch_name branch = case branch of
                                  DEFAULT_BRANCH => "default"
                                | BRANCH b => b
 
-    fun is_at context libname id_or_tag =
+    fun is_at context (libname, id_or_tag) =
         case current_state context libname of
-            { id, tags, ... } => 
-            String.isPrefix id_or_tag id orelse
-            String.isPrefix id id_or_tag orelse
-            List.exists (fn t => t = id_or_tag) tags
+            ERROR e => ERROR e
+          | OK { id, tags, ... } => 
+            OK (String.isPrefix id_or_tag id orelse
+                String.isPrefix id id_or_tag orelse
+                List.exists (fn t => t = id_or_tag) tags)
 
-    fun has_incoming context (libname, source, branch) =
+    fun has_nothing_incoming context (libname, source, branch) =
         case hg_command_output context libname
                                ["incoming", "-l1",
                                 "-b", branch_name branch,
                                 "--template", "{node}"] of
-            ERROR err => false (* hg incoming is odd that way *)
+            ERROR err => OK true (* hg incoming is odd that way *)
           | OK incoming => 
-            incoming <> "" andalso
-            not (String.isSubstring "no changes found" incoming)
-                        
+            OK (incoming = "" orelse
+                String.isSubstring "no changes found" incoming)
+
     fun is_newest context (libname, source, branch) =
         case hg_command_output context libname
                                ["log", "-l1",
                                 "-b", branch_name branch,
                                 "--template", "{node}"] of
-            ERROR err => raise Fail err
-          | OK newest_in_repo => 
-            is_at context libname newest_in_repo andalso
-            not (has_incoming context (libname, source, branch))
+            ERROR e => ERROR e
+          | OK newest_in_repo =>
+            case is_at context (libname, newest_in_repo) of
+                ERROR e => ERROR e
+              | OK false => OK false
+              | OK true => 
+                has_nothing_incoming context (libname, source, branch)
 
     fun is_locally_modified context libname =
         case current_state context libname of
-            { modified, ... } => modified
+            ERROR e => ERROR e
+          | OK { modified, ... } => OK modified
                 
     fun checkout context (libname, source, branch) =
         let val url = remote_for context (libname, source)
         in
             case FileBits.mkpath (FileBits.extpath context) of
-                OK () => hg_command context ""
-                                    ["clone", "-u", branch_name branch,
-                                     url, libname]
-              | ERROR e => ERROR e
+                ERROR e => ERROR e
+              | _ => hg_command context ""
+                                ["clone", "-u", branch_name branch,
+                                 url, libname]
         end
                                                     
     fun update context (libname, source, branch) =
@@ -98,12 +104,12 @@ structure HgControl :> VCS_CONTROL = struct
             val pull_result = hg_command context libname ["pull", url]
         in
             case hg_command context libname ["update", branch_name branch] of
-                OK () => pull_result
-              | ERROR e => ERROR e
+                ERROR e => ERROR e
+              | _ => pull_result
         end
 
     fun update_to context (libname, source, "") =
-        raise Fail "Non-empty id (tag or revision id) required for update_to"
+        ERROR "Non-empty id (tag or revision id) required for update_to"
       | update_to context (libname, source, id) = 
         let val url = remote_for context (libname, source)
         in

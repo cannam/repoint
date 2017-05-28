@@ -107,10 +107,11 @@ fun review_project (project as { context, libs } : project) =
                                                     MODIFIED => " [* modified]"
                                                   | UNMODIFIED => "") ^ "\n")
     in
-        app (fn (n, (ABSENT, _)) => print_for n "ABSENT" UNMODIFIED
-              | (n, (CORRECT, m)) => print_for n "CORRECT" m
-              | (n, (SUPERSEDED, m)) => print_for n "SUPERSEDED" m
-              | (n, (WRONG, m)) => print_for n "WRONG" m)
+        app (fn (n, OK (ABSENT, _)) => print_for n "ABSENT" UNMODIFIED
+              | (n, OK (CORRECT, m)) => print_for n "CORRECT" m
+              | (n, OK (SUPERSEDED, m)) => print_for n "SUPERSEDED" m
+              | (n, OK (WRONG, m)) => print_for n "WRONG" m
+              | (n, ERROR e) => print_for n ("ERROR: " ^ e) UNMODIFIED)
             outcomes
     end        
                                              
@@ -122,10 +123,11 @@ fun status_of_project (project as { context, libs } : project) =
                                                     MODIFIED => " [* modified]"
                                                   | UNMODIFIED => "") ^ "\n")
     in
-        app (fn (n, (ABSENT, _)) => print_for n "ABSENT" UNMODIFIED
-              | (n, (CORRECT, m)) => print_for n "PRESENT" m
-              | (n, (SUPERSEDED, m)) => print_for n "SUPERSEDED" m
-              | (n, (WRONG, m)) => print_for n "WRONG" m)
+        app (fn (n, OK (ABSENT, _)) => print_for n "ABSENT" UNMODIFIED
+              | (n, OK (CORRECT, m)) => print_for n "PRESENT" m
+              | (n, OK (SUPERSEDED, m)) => print_for n "SUPERSEDED" m
+              | (n, OK (WRONG, m)) => print_for n "WRONG" m
+              | (n, ERROR e) => print_for n ("ERROR: " ^ e) UNMODIFIED)
             outcomes
     end        
 

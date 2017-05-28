@@ -24,30 +24,23 @@ datatype libstate =
 datatype localstate =
          MODIFIED |
          UNMODIFIED
+
+datatype branch =
+         BRANCH of string |
+         DEFAULT_BRANCH
              
 (* If we can recover from an error, for example by reporting failure
    for this one thing and going on to the next thing, then the error
-   should probably be reported using a result type. *)
+   should usually be returned through a result type rather than an
+   exception. *)
              
 datatype 'a result =
          OK of 'a |
          ERROR of string
 
-(* If we can't recover from it, then it should be an exception, like
-   this one. *)
-
-exception UsageError of string
-
-(*!!! That doesn't tell us what to do about errors that occur at a
-   lower level than the function being called. For example, we call
-   is_at on a VCS_CONTROL structure, but the invocation of hg/git
-   fails. *)
-                            
-datatype branch =
-         BRANCH of string |
-         DEFAULT_BRANCH
-
 type libname = string
+
+type id_or_tag = string
 
 type libspec = {
     libname : libname,
@@ -91,17 +84,17 @@ type project = {
 }
 
 signature VCS_CONTROL = sig
-    val exists : context -> libname -> bool
-    val is_at : context -> libname -> string -> bool
-    val is_newest : context -> libname * source * branch -> bool
-    val is_locally_modified : context -> libname -> bool
+    val exists : context -> libname -> bool result
+    val is_at : context -> libname * id_or_tag -> bool result
+    val is_newest : context -> libname * source * branch -> bool result
+    val is_locally_modified : context -> libname -> bool result
     val checkout : context -> libname * source * branch -> unit result
     val update : context -> libname * source * branch -> unit result
     val update_to : context -> libname * source * string -> unit result
 end
 
 signature LIB_CONTROL = sig
-    val review : context -> libspec -> libstate * localstate
-    val status : context -> libspec -> libstate * localstate
+    val review : context -> libspec -> (libstate * localstate) result
+    val status : context -> libspec -> (libstate * localstate) result
     val update : context -> libspec -> unit result
 end

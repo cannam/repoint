@@ -61,30 +61,23 @@ datatype libstate =
 datatype localstate =
          MODIFIED |
          UNMODIFIED
+
+datatype branch =
+         BRANCH of string |
+         DEFAULT_BRANCH
              
 (* If we can recover from an error, for example by reporting failure
    for this one thing and going on to the next thing, then the error
-   should probably be reported using a result type. *)
+   should usually be returned through a result type rather than an
+   exception. *)
              
 datatype 'a result =
          OK of 'a |
          ERROR of string
 
-(* If we can't recover from it, then it should be an exception, like
-   this one. *)
-
-exception UsageError of string
-
-(*!!! That doesn't tell us what to do about errors that occur at a
-   lower level than the function being called. For example, we call
-   is_at on a VCS_CONTROL structure, but the invocation of hg/git
-   fails. *)
-                            
-datatype branch =
-         BRANCH of string |
-         DEFAULT_BRANCH
-
 type libname = string
+
+type id_or_tag = string
 
 type libspec = {
     libname : libname,
@@ -128,18 +121,18 @@ type project = {
 }
 
 signature VCS_CONTROL = sig
-    val exists : context -> libname -> bool
-    val is_at : context -> libname -> string -> bool
-    val is_newest : context -> libname * source * branch -> bool
-    val is_locally_modified : context -> libname -> bool
+    val exists : context -> libname -> bool result
+    val is_at : context -> libname * id_or_tag -> bool result
+    val is_newest : context -> libname * source * branch -> bool result
+    val is_locally_modified : context -> libname -> bool result
     val checkout : context -> libname * source * branch -> unit result
     val update : context -> libname * source * branch -> unit result
     val update_to : context -> libname * source * string -> unit result
 end
 
 signature LIB_CONTROL = sig
-    val review : context -> libspec -> libstate * localstate
-    val status : context -> libspec -> libstate * localstate
+    val review : context -> libspec -> (libstate * localstate) result
+    val status : context -> libspec -> (libstate * localstate) result
     val update : context -> libspec -> unit result
 end
 
@@ -308,62 +301,62 @@ end
                                          
 functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
 
-    fun review context ({ libname, source,
-                         branch, pin, ... } : libspec) =
-        let fun review' () =
-            case pin of
-                UNPINNED =>
-                if not (V.is_newest context (libname, source, branch))
-                then SUPERSEDED
-                else CORRECT
-
-              | PINNED target =>
-                if V.is_at context libname target
-                then CORRECT
-                else WRONG
+    fun check with_network context
+              ({ libname, source, branch, pin, ... } : libspec) =
+        let fun check_unpinned () =
+                if with_network
+                then case V.is_newest context (libname, source, branch) of
+                         ERROR e => ERROR e
+                       | OK true => OK CORRECT
+                       | OK false => OK SUPERSEDED
+                else OK CORRECT
+            fun check_pinned target =
+                case V.is_at context (libname, target) of
+                    ERROR e => ERROR e
+                  | OK true => OK CORRECT
+                  | OK false => OK WRONG
+            fun check' () =
+                case pin of
+                    UNPINNED => check_unpinned ()
+                  | PINNED target => check_pinned target
         in
-            if not (V.exists context libname)
-            then (ABSENT, UNMODIFIED)
-            else (review' (), if V.is_locally_modified context libname
-                             then MODIFIED
-                             else UNMODIFIED)
+            case V.exists context libname of
+                ERROR e => ERROR e
+              | OK false => OK (ABSENT, UNMODIFIED)
+              | OK true =>
+                case (check' (), V.is_locally_modified context libname) of
+                    (ERROR e, _) => ERROR e
+                  | (_, ERROR e) => ERROR e
+                  | (OK state, OK true) => OK (state, MODIFIED)
+                  | (OK state, OK false) => OK (state, UNMODIFIED)
         end
 
-    (* status is like review, except that it avoids using the network
-       and so can't report SUPERSEDED state *)
-    fun status context ({ libname, source,
-                          branch, pin, ... } : libspec) =
-        let fun status' () =
-            case pin of
-                UNPINNED => CORRECT
-              | PINNED target =>
-                if V.is_at context libname target
-                then CORRECT
-                else WRONG
-        in
-            if not (V.exists context libname)
-            then (ABSENT, UNMODIFIED)
-            else (status' (), if V.is_locally_modified context libname
-                              then MODIFIED
-                              else UNMODIFIED)
-        end
+    val review = check true
+    val status = check false
                          
     fun update context ({ libname, source, branch, pin, ... } : libspec) =
-        let fun update' () =
-            case pin of
-                UNPINNED =>
-                if not (V.is_newest context (libname, source, branch))
-                then V.update context (libname, source, branch)
-                else OK ()
-
-              | PINNED target =>
-                if V.is_at context libname target
-                then OK ()
-                else V.update_to context (libname, source, target)
+        let fun update_unpinned () =
+                case V.is_newest context (libname, source, branch) of
+                    ERROR e => ERROR e
+                  | OK true => OK ()
+                  | OK false => V.update context (libname, source, branch)
+            fun update_pinned target =
+                case V.is_at context (libname, target) of
+                    ERROR e => ERROR e
+                  | OK true => OK ()
+                  | OK false => V.update_to context (libname, source, target)
+            fun update' () =
+                case pin of
+                    UNPINNED => update_unpinned ()
+                  | PINNED target => update_pinned target
         in
-            if not (V.exists context libname)
-            then V.checkout context (libname, source, branch)
-            else update' ()
+            case V.exists context libname of
+                ERROR e => ERROR e
+              | OK true => update' ()
+              | OK false =>
+                case V.checkout context (libname, source, branch) of
+                    ERROR e => ERROR e
+                  | OK () => update' ()
         end
 end
 
@@ -986,13 +979,13 @@ structure HgControl :> VCS_CONTROL = struct
         FileBits.command_output context libname ("hg" :: hg_args @ args)
                         
     fun exists context libname =
-        OS.FileSys.isDir (FileBits.subpath context libname ".hg")
-        handle _ => false
+        OK (OS.FileSys.isDir (FileBits.subpath context libname ".hg"))
+        handle _ => OK false
 
     fun remote_for context (libname, source) =
         Provider.remote_url context HG source libname
 
-    fun current_state context libname : vcsstate =
+    fun current_state context libname : vcsstate result =
         let fun is_branch text = text <> "" andalso #"(" = hd (explode text)
             and extract_branch b =
                 if is_branch b     (* need to remove enclosing parens *)
@@ -1004,13 +997,14 @@ structure HgControl :> VCS_CONTROL = struct
                 then (implode o rev o tl o rev o explode) id
                 else id
             and split_tags tags = String.tokens (fn c => c = #"/") tags
-            and state_for (id, branch, tags) = { id = extract_id id,
-                                                 modified = is_modified id,
-                                                 branch = extract_branch branch,
-                                                 tags = split_tags tags }
+            and state_for (id, branch, tags) =
+                OK { id = extract_id id,
+                     modified = is_modified id,
+                     branch = extract_branch branch,
+                     tags = split_tags tags }
         in        
             case hg_command_output context libname ["id"] of
-                ERROR err => raise Fail err
+                ERROR e => ERROR e
               | OK out =>
                 case String.tokens (fn x => x = #" ") out of
                     [id, branch, tags] => state_for (id, branch, tags)
@@ -1018,52 +1012,57 @@ structure HgControl :> VCS_CONTROL = struct
                                    then state_for (id, other, "")
                                    else state_for (id, "", other)
                   | [id] => state_for (id, "", "")
-                  | _ => raise Fail ("Unexpected output from hg id: " ^ out)
+                  | _ => ERROR ("Unexpected output from hg id: " ^ out)
         end
 
     fun branch_name branch = case branch of
                                  DEFAULT_BRANCH => "default"
                                | BRANCH b => b
 
-    fun is_at context libname id_or_tag =
+    fun is_at context (libname, id_or_tag) =
         case current_state context libname of
-            { id, tags, ... } => 
-            String.isPrefix id_or_tag id orelse
-            String.isPrefix id id_or_tag orelse
-            List.exists (fn t => t = id_or_tag) tags
+            ERROR e => ERROR e
+          | OK { id, tags, ... } => 
+            OK (String.isPrefix id_or_tag id orelse
+                String.isPrefix id id_or_tag orelse
+                List.exists (fn t => t = id_or_tag) tags)
 
-    fun has_incoming context (libname, source, branch) =
+    fun has_nothing_incoming context (libname, source, branch) =
         case hg_command_output context libname
                                ["incoming", "-l1",
                                 "-b", branch_name branch,
                                 "--template", "{node}"] of
-            ERROR err => false (* hg incoming is odd that way *)
+            ERROR err => OK true (* hg incoming is odd that way *)
           | OK incoming => 
-            incoming <> "" andalso
-            not (String.isSubstring "no changes found" incoming)
-                        
+            OK (incoming = "" orelse
+                String.isSubstring "no changes found" incoming)
+
     fun is_newest context (libname, source, branch) =
         case hg_command_output context libname
                                ["log", "-l1",
                                 "-b", branch_name branch,
                                 "--template", "{node}"] of
-            ERROR err => raise Fail err
-          | OK newest_in_repo => 
-            is_at context libname newest_in_repo andalso
-            not (has_incoming context (libname, source, branch))
+            ERROR e => ERROR e
+          | OK newest_in_repo =>
+            case is_at context (libname, newest_in_repo) of
+                ERROR e => ERROR e
+              | OK false => OK false
+              | OK true => 
+                has_nothing_incoming context (libname, source, branch)
 
     fun is_locally_modified context libname =
         case current_state context libname of
-            { modified, ... } => modified
+            ERROR e => ERROR e
+          | OK { modified, ... } => OK modified
                 
     fun checkout context (libname, source, branch) =
         let val url = remote_for context (libname, source)
         in
             case FileBits.mkpath (FileBits.extpath context) of
-                OK () => hg_command context ""
-                                    ["clone", "-u", branch_name branch,
-                                     url, libname]
-              | ERROR e => ERROR e
+                ERROR e => ERROR e
+              | _ => hg_command context ""
+                                ["clone", "-u", branch_name branch,
+                                 url, libname]
         end
                                                     
     fun update context (libname, source, branch) =
@@ -1071,12 +1070,12 @@ structure HgControl :> VCS_CONTROL = struct
             val pull_result = hg_command context libname ["pull", url]
         in
             case hg_command context libname ["update", branch_name branch] of
-                OK () => pull_result
-              | ERROR e => ERROR e
+                ERROR e => ERROR e
+              | _ => pull_result
         end
 
     fun update_to context (libname, source, "") =
-        raise Fail "Non-empty id (tag or revision id) required for update_to"
+        ERROR "Non-empty id (tag or revision id) required for update_to"
       | update_to context (libname, source, id) = 
         let val url = remote_for context (libname, source)
         in
@@ -1093,8 +1092,8 @@ end
 structure GitControl :> VCS_CONTROL = struct
                             
     fun exists context libname =
-        OS.FileSys.isDir (FileBits.subpath context libname ".git")
-        handle _ => false
+        OK (OS.FileSys.isDir (FileBits.subpath context libname ".git"))
+        handle _ => OK false
 
     fun remote_for context (libname, source) =
         Provider.remote_url context GIT source libname
@@ -1116,47 +1115,52 @@ structure GitControl :> VCS_CONTROL = struct
     (* NB git rev-parse HEAD shows revision id of current checkout;
     git rev-list -1 <tag> shows revision id of revision with that tag *)
 
-    fun is_at context libname id_or_tag =
+    fun is_at context (libname, id_or_tag) =
         case FileBits.command_output context libname
                                      ["git", "rev-parse", "HEAD"] of
-            ERROR err => raise Fail err
+            ERROR e => ERROR e
           | OK id =>
-            String.isPrefix id_or_tag id orelse
-            String.isPrefix id id_or_tag orelse
-            case FileBits.command_output context libname
-                                         ["git", "rev-list", "-1", id_or_tag] of
-                ERROR err => raise Fail err
-              | OK tid =>
-                tid = id andalso
-                tid <> id_or_tag (* otherwise id_or_tag was an id, not a tag *)
-
+            if String.isPrefix id_or_tag id orelse
+               String.isPrefix id id_or_tag
+            then OK true
+            else 
+                case FileBits.command_output
+                         context libname
+                         ["git", "rev-list", "-1", id_or_tag] of
+                    ERROR e => ERROR e
+                  | OK tid =>
+                    OK (tid = id andalso
+                        tid <> id_or_tag) (* else id_or_tag was id not tag *)
+                   
     fun is_newest context (libname, provider, branch) =
         let fun newest_here () =
               case FileBits.command_output
                        context libname
                        ["git", "rev-list", "-1",
                         "origin/" ^ branch_name branch] of
-                  ERROR err => raise Fail err
-                | OK rev => is_at context libname rev
+                  ERROR e => ERROR e
+                | OK rev => is_at context (libname, rev)
         in
-            if not (newest_here ())
-            then false
-            else case FileBits.command context libname ["git", "fetch"] of
-                     ERROR err => raise Fail err
-                   | OK () => newest_here ()
+            case newest_here () of
+                ERROR e => ERROR e
+              | OK false => OK false
+              | OK true => 
+                case FileBits.command context libname ["git", "fetch"] of
+                    ERROR e => ERROR e
+                  | OK () => newest_here ()
         end
 
     fun is_locally_modified context libname =
         case FileBits.command_output context libname ["git", "status", "-s"] of
-            ERROR err => raise Fail err
-          | OK "" => false
-          | OK _ => true
+            ERROR e => ERROR e
+          | OK "" => OK false
+          | OK _ => OK true
             
     fun update context (libname, provider, branch) =
         update_to context (libname, provider, branch_name branch)
 
     and update_to context (libname, provider, "") = 
-        raise Fail "Non-empty id (tag or revision id) required for update_to"
+        ERROR "Non-empty id (tag or revision id) required for update_to"
       | update_to context (libname, provider, id) = 
         let val command = FileBits.command context libname
             val url = remote_for context (libname, provider)
@@ -1278,10 +1282,11 @@ fun review_project (project as { context, libs } : project) =
                                                     MODIFIED => " [* modified]"
                                                   | UNMODIFIED => "") ^ "\n")
     in
-        app (fn (n, (ABSENT, _)) => print_for n "ABSENT" UNMODIFIED
-              | (n, (CORRECT, m)) => print_for n "CORRECT" m
-              | (n, (SUPERSEDED, m)) => print_for n "SUPERSEDED" m
-              | (n, (WRONG, m)) => print_for n "WRONG" m)
+        app (fn (n, OK (ABSENT, _)) => print_for n "ABSENT" UNMODIFIED
+              | (n, OK (CORRECT, m)) => print_for n "CORRECT" m
+              | (n, OK (SUPERSEDED, m)) => print_for n "SUPERSEDED" m
+              | (n, OK (WRONG, m)) => print_for n "WRONG" m
+              | (n, ERROR e) => print_for n ("ERROR: " ^ e) UNMODIFIED)
             outcomes
     end        
                                              
@@ -1293,10 +1298,11 @@ fun status_of_project (project as { context, libs } : project) =
                                                     MODIFIED => " [* modified]"
                                                   | UNMODIFIED => "") ^ "\n")
     in
-        app (fn (n, (ABSENT, _)) => print_for n "ABSENT" UNMODIFIED
-              | (n, (CORRECT, m)) => print_for n "PRESENT" m
-              | (n, (SUPERSEDED, m)) => print_for n "SUPERSEDED" m
-              | (n, (WRONG, m)) => print_for n "WRONG" m)
+        app (fn (n, OK (ABSENT, _)) => print_for n "ABSENT" UNMODIFIED
+              | (n, OK (CORRECT, m)) => print_for n "PRESENT" m
+              | (n, OK (SUPERSEDED, m)) => print_for n "SUPERSEDED" m
+              | (n, OK (WRONG, m)) => print_for n "WRONG" m
+              | (n, ERROR e) => print_for n ("ERROR: " ^ e) UNMODIFIED)
             outcomes
     end        
 

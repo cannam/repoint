@@ -2,8 +2,8 @@
 structure GitControl :> VCS_CONTROL = struct
                             
     fun exists context libname =
-        OS.FileSys.isDir (FileBits.subpath context libname ".git")
-        handle _ => false
+        OK (OS.FileSys.isDir (FileBits.subpath context libname ".git"))
+        handle _ => OK false
 
     fun remote_for context (libname, source) =
         Provider.remote_url context GIT source libname
@@ -25,47 +25,52 @@ structure GitControl :> VCS_CONTROL = struct
     (* NB git rev-parse HEAD shows revision id of current checkout;
     git rev-list -1 <tag> shows revision id of revision with that tag *)
 
-    fun is_at context libname id_or_tag =
+    fun is_at context (libname, id_or_tag) =
         case FileBits.command_output context libname
                                      ["git", "rev-parse", "HEAD"] of
-            ERROR err => raise Fail err
+            ERROR e => ERROR e
           | OK id =>
-            String.isPrefix id_or_tag id orelse
-            String.isPrefix id id_or_tag orelse
-            case FileBits.command_output context libname
-                                         ["git", "rev-list", "-1", id_or_tag] of
-                ERROR err => raise Fail err
-              | OK tid =>
-                tid = id andalso
-                tid <> id_or_tag (* otherwise id_or_tag was an id, not a tag *)
-
+            if String.isPrefix id_or_tag id orelse
+               String.isPrefix id id_or_tag
+            then OK true
+            else 
+                case FileBits.command_output
+                         context libname
+                         ["git", "rev-list", "-1", id_or_tag] of
+                    ERROR e => ERROR e
+                  | OK tid =>
+                    OK (tid = id andalso
+                        tid <> id_or_tag) (* else id_or_tag was id not tag *)
+                   
     fun is_newest context (libname, provider, branch) =
         let fun newest_here () =
               case FileBits.command_output
                        context libname
                        ["git", "rev-list", "-1",
                         "origin/" ^ branch_name branch] of
-                  ERROR err => raise Fail err
-                | OK rev => is_at context libname rev
+                  ERROR e => ERROR e
+                | OK rev => is_at context (libname, rev)
         in
-            if not (newest_here ())
-            then false
-            else case FileBits.command context libname ["git", "fetch"] of
-                     ERROR err => raise Fail err
-                   | OK () => newest_here ()
+            case newest_here () of
+                ERROR e => ERROR e
+              | OK false => OK false
+              | OK true => 
+                case FileBits.command context libname ["git", "fetch"] of
+                    ERROR e => ERROR e
+                  | OK () => newest_here ()
         end
 
     fun is_locally_modified context libname =
         case FileBits.command_output context libname ["git", "status", "-s"] of
-            ERROR err => raise Fail err
-          | OK "" => false
-          | OK _ => true
+            ERROR e => ERROR e
+          | OK "" => OK false
+          | OK _ => OK true
             
     fun update context (libname, provider, branch) =
         update_to context (libname, provider, branch_name branch)
 
     and update_to context (libname, provider, "") = 
-        raise Fail "Non-empty id (tag or revision id) required for update_to"
+        ERROR "Non-empty id (tag or revision id) required for update_to"
       | update_to context (libname, provider, id) = 
         let val command = FileBits.command context libname
             val url = remote_for context (libname, provider)
