@@ -8,6 +8,9 @@ functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
                 then case V.is_newest context (libname, source, branch) of
                          ERROR e => ERROR e
                        | OK true => OK CORRECT
+                       (*!!! We can't currently tell the difference
+                             between superseded (on the same branch) and
+                             wrong branch checked out *)
                        | OK false => OK SUPERSEDED
                 else OK CORRECT
             fun check_pinned target =

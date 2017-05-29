@@ -308,6 +308,9 @@ functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
                 then case V.is_newest context (libname, source, branch) of
                          ERROR e => ERROR e
                        | OK true => OK CORRECT
+                       (*!!! We can't currently tell the difference
+                             between superseded (on the same branch) and
+                             wrong branch checked out *)
                        | OK false => OK SUPERSEDED
                 else OK CORRECT
             fun check_pinned target =
@@ -1172,23 +1175,13 @@ structure GitControl :> VCS_CONTROL = struct
     (* This function updates to the latest revision on a branch rather
        than to a specific id or tag. We can't just checkout the given
        branch, as that will succeed even if the branch isn't up to
-       date. We need to checkout the branch and then fetch and merge. *)
+       date. We could checkout the branch and then fetch and merge,
+       but it's perhaps cleaner not to maintain a local branch at all,
+       but instead checkout the remote branch as a detached head. *)
 
-    (*!!! I think this doesn't do the right thing for switching to a
-       new remote branch - but it would be better to figure out how to
-       test this properly and work backwards from there. Maybe rather
-       than trying to maintain a local branch like this, we should
-       always just checkout the remote branch in detached head state?
-       *)
-                            
     fun update context (libname, provider, branch) =
-        case git_command context libname ["checkout", branch_name branch] of
-            ERROR e => ERROR e
-          | OK () => 
-            case git_command context libname ["fetch"] of
-                ERROR e => ERROR e
-              | OK () => 
-                git_command context libname ["merge", "--ff-only"]
+        git_command context libname ["checkout",
+                                     "origin/" ^ branch_name branch]
 
     (* This function is dealing with a specific id or tag, so if we
        can successfully check it out (detached) then that's all we need
