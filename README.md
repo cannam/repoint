@@ -102,6 +102,7 @@ only when they are in Absent or Out-of-date state.
 to add:
 
  + locally modified status (+status command that doesn't go to the network)
+ + lock file mechanism (& add "install" which installs versions from lock file or falls back to "update" if lock file is absent)
  + archive command
  + note about not handling libraries having their own dependencies
  + ability to commit and/or push?

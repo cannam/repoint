@@ -1298,49 +1298,103 @@ fun load_project (userconfig : userconfig) rootpath : project =
           libs = map (load_libspec json) libnames
         }
     end
-                                             
-fun review_project (project as { context, libs } : project) =
-    let open AnyLibControl
-        val outcomes = map (fn lib => (#libname lib, review context lib)) libs
-        fun print_for libname state m = print (state ^ " " ^ libname ^
-                                               (case m of
-                                                    MODIFIED => " [* modified]"
-                                                  | UNMODIFIED => "") ^ "\n")
-    in
-        app (fn (n, OK (ABSENT, _)) => print_for n "ABSENT" UNMODIFIED
-              | (n, OK (CORRECT, m)) => print_for n "CORRECT" m
-              | (n, OK (SUPERSEDED, m)) => print_for n "SUPERSEDED" m
-              | (n, OK (WRONG, m)) => print_for n "WRONG" m
-              | (n, ERROR e) => print_for n ("ERROR: " ^ e) UNMODIFIED)
-            outcomes
-    end        
-                                             
-fun status_of_project (project as { context, libs } : project) =
-    let open AnyLibControl
-        val outcomes = map (fn lib => (#libname lib, status context lib)) libs
-        fun print_for libname state m = print (state ^ " " ^ libname ^
-                                               (case m of
-                                                    MODIFIED => " [* modified]"
-                                                  | UNMODIFIED => "") ^ "\n")
-    in
-        app (fn (n, OK (ABSENT, _)) => print_for n "ABSENT" UNMODIFIED
-              | (n, OK (CORRECT, m)) => print_for n "PRESENT" m
-              | (n, OK (SUPERSEDED, m)) => print_for n "SUPERSEDED" m
-              | (n, OK (WRONG, m)) => print_for n "WRONG" m
-              | (n, ERROR e) => print_for n ("ERROR: " ^ e) UNMODIFIED)
-            outcomes
-    end        
 
-fun update_project (project as { context, libs } : project) =
-    let open AnyLibControl
-        val outcomes = map (fn lib => (#libname lib, update context lib)) libs
+fun pad_to n str =
+    if n <= String.size str then str
+    else pad_to n (str ^ " ")
+
+fun hline_to 0 = ""
+  | hline_to n = "-" ^ hline_to (n-1)
+
+val libname_width = 20
+val libstate_width = 13
+val localstate_width = 11
+val notes_width = 10
+val divider = " | "
+
+fun print_status_header () =
+    print (pad_to libname_width "Library" ^ divider ^
+           pad_to libstate_width "State" ^ divider ^
+           pad_to localstate_width "Modified" ^ divider ^
+           "Notes" ^ "\n" ^
+           hline_to libname_width ^ "-+-" ^
+           hline_to libstate_width ^ "-+-" ^
+           hline_to localstate_width ^ "-+-" ^
+           hline_to notes_width ^ "\n")
+
+fun print_outcome_header () =
+    print (pad_to libname_width "Library" ^ divider ^
+           pad_to libstate_width "Outcome" ^ divider ^
+           "Notes" ^ "\n" ^
+           hline_to libname_width ^ "-+-" ^
+           hline_to libstate_width ^ "-+-" ^
+           hline_to notes_width ^ "\n")
+                        
+fun print_status with_network (libname, status) =
+    let val libstate_str =
+            case status of
+                OK (ABSENT, _) => "Absent"
+              | OK (CORRECT, _) => if with_network then "Correct" else "Present"
+              | OK (SUPERSEDED, _) => "Superseded"
+              | OK (WRONG, _) => "Wrong"
+              | ERROR _ => "Error"
+        val localstate_str =
+            case status of
+                OK (_, MODIFIED) => "Modified"
+              | OK (_, UNMODIFIED) => "Clean"
+              | _ => ""
+        val error_str =
+            case status of
+                ERROR e => e
+              | _ => ""
     in
-        app (fn (libname, OK ()) =>
-                print ("OK " ^ libname ^ "\n")
-              | (libname, ERROR e) =>
-                print ("FAILED " ^ libname ^ ": " ^ e ^ "\n"))
-            outcomes
-    end        
+        print (pad_to libname_width libname ^ divider ^
+               pad_to libstate_width libstate_str ^ divider ^
+               pad_to localstate_width localstate_str ^ divider ^
+               error_str ^ "\n")
+    end
+
+fun print_update_outcome (libname, outcome) =
+    let val outcome_str =
+            case outcome of
+                OK () => "Updated"
+              | ERROR e => "Failed"
+        val error_str =
+            case outcome of
+                ERROR e => " : " ^ e
+              | _ => ""
+    in
+        print (pad_to libname_width libname ^ divider ^
+               pad_to libstate_width outcome_str ^ divider ^
+               error_str ^ "\n")
+    end
+        
+fun status_of_project ({ context, libs } : project) =
+    let val statuses =
+            map (fn lib => (#libname lib, AnyLibControl.status context lib))
+                libs
+        val _ = print_status_header ()
+    in
+        app (print_status false) statuses
+    end
+                                             
+fun review_project ({ context, libs } : project) =
+    let val statuses =
+            map (fn lib => (#libname lib, AnyLibControl.review context lib))
+                libs
+        val _ = print_status_header ()
+    in
+        app (print_status true) statuses
+    end
+
+fun update_project ({ context, libs } : project) =
+    let val outcomes =
+            map (fn lib => (#libname lib, AnyLibControl.update context lib))
+                libs
+        val _ = print_outcome_header ()
+    in
+        app print_update_outcome outcomes
+    end
 
 fun load_local_project () =
     let val userconfig = load_userconfig ()
