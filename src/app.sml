@@ -109,23 +109,25 @@ fun hline_to 0 = ""
 val libname_width = 20
 val libstate_width = 13
 val localstate_width = 11
-val notes_width = 20
+val notes_width = 5
 val divider = " | "
 
 fun print_status_header () =
-    print (pad_to libname_width "Library" ^ divider ^
+    print ("\n " ^
+           pad_to libname_width "Library" ^ divider ^
            pad_to libstate_width "State" ^ divider ^
            pad_to localstate_width "Local" ^ divider ^
-           "Notes" ^ "\n" ^
+           "Notes" ^ "\n " ^
            hline_to libname_width ^ "-+-" ^
            hline_to libstate_width ^ "-+-" ^
            hline_to localstate_width ^ "-+-" ^
            hline_to notes_width ^ "\n")
 
 fun print_outcome_header () =
-    print (pad_to libname_width "Library" ^ divider ^
+    print ("\n " ^
+           pad_to libname_width "Library" ^ divider ^
            pad_to libstate_width "Outcome" ^ divider ^
-           "Notes" ^ "\n" ^
+           "Notes" ^ "\n " ^
            hline_to libname_width ^ "-+-" ^
            hline_to libstate_width ^ "-+-" ^
            hline_to notes_width ^ "\n")
@@ -148,7 +150,8 @@ fun print_status with_network (libname, status) =
                 ERROR e => e
               | _ => ""
     in
-        print (pad_to libname_width libname ^ divider ^
+        print (" " ^
+               pad_to libname_width libname ^ divider ^
                pad_to libstate_width libstate_str ^ divider ^
                pad_to localstate_width localstate_str ^ divider ^
                error_str ^ "\n")
@@ -161,10 +164,11 @@ fun print_update_outcome (libname, outcome) =
               | ERROR e => "Failed"
         val error_str =
             case outcome of
-                ERROR e => " : " ^ e
+                ERROR e => e
               | _ => ""
     in
-        print (pad_to libname_width libname ^ divider ^
+        print (" " ^
+               pad_to libname_width libname ^ divider ^
                pad_to libstate_width outcome_str ^ divider ^
                error_str ^ "\n")
     end
@@ -204,7 +208,7 @@ fun load_local_project () =
     end    
 
 fun with_local_project f =
-    f (load_local_project ())
+    (f (load_local_project ()); print "\n")
     handle Fail err => print ("ERROR: " ^ err ^ "\n")
          | e => print ("Failed with exception: " ^ (exnMessage e) ^ "\n")
         
