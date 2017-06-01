@@ -106,9 +106,9 @@ fun pad_to n str =
 fun hline_to 0 = ""
   | hline_to n = "-" ^ hline_to (n-1)
 
-val libname_width = 20
-val libstate_width = 13
-val localstate_width = 11
+val libname_width = 25
+val libstate_width = 11
+val localstate_width = 9
 val notes_width = 5
 val divider = " | "
 
