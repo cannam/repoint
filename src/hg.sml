@@ -61,28 +61,16 @@ structure HgControl :> VCS_CONTROL = struct
                 String.isPrefix id id_or_tag orelse
                 List.exists (fn t => t = id_or_tag) tags)
 
-    fun has_nothing_incoming context (libname, source, branch) =
-        case hg_command_output context libname
-                               ["incoming", "-l1",
-                                "-b", branch_name branch,
-                                "--template", "{node}"] of
-            ERROR err => OK true (* hg incoming is odd that way *)
-          | OK incoming => 
-            OK (incoming = "" orelse
-                String.isSubstring "no changes found" incoming)
-
     fun is_newest context (libname, source, branch) =
-        case hg_command_output context libname
-                               ["log", "-l1",
-                                "-b", branch_name branch,
-                                "--template", "{node}"] of
+        case hg_command context libname ["pull"] of
             ERROR e => ERROR e
-          | OK newest_in_repo =>
-            case is_at context (libname, newest_in_repo) of
+          | _ =>
+            case hg_command_output context libname
+                                   ["log", "-l1",
+                                    "-b", branch_name branch,
+                                    "--template", "{node}"] of
                 ERROR e => ERROR e
-              | OK false => OK false
-              | OK true => 
-                has_nothing_incoming context (libname, source, branch)
+              | OK newest_in_repo => is_at context (libname, newest_in_repo)
 
     fun is_locally_modified context libname =
         case current_state context libname of
@@ -100,8 +88,7 @@ structure HgControl :> VCS_CONTROL = struct
         end
                                                     
     fun update context (libname, source, branch) =
-        let val url = remote_for context (libname, source)
-            val pull_result = hg_command context libname ["pull", url]
+        let val pull_result = hg_command context libname ["pull"]
         in
             case hg_command context libname ["update", branch_name branch] of
                 ERROR e => ERROR e
