@@ -172,33 +172,25 @@ fun print_update_outcome (libname, outcome) =
                pad_to libstate_width outcome_str ^ divider ^
                error_str ^ "\n")
     end
+
+fun act_and_print action print_header print_line libs =
+    let val lines = map (fn lib => (#libname lib, action lib)) libs
+        val _ = print_header ()
+    in
+        app print_line lines
+    end
         
 fun status_of_project ({ context, libs } : project) =
-    let val statuses =
-            map (fn lib => (#libname lib, AnyLibControl.status context lib))
-                libs
-        val _ = print_status_header ()
-    in
-        app (print_status false) statuses
-    end
+    act_and_print (AnyLibControl.status context)
+                  print_status_header (print_status false) libs
                                              
 fun review_project ({ context, libs } : project) =
-    let val statuses =
-            map (fn lib => (#libname lib, AnyLibControl.review context lib))
-                libs
-        val _ = print_status_header ()
-    in
-        app (print_status true) statuses
-    end
+    act_and_print (AnyLibControl.review context)
+                  print_status_header (print_status true) libs
 
 fun update_project ({ context, libs } : project) =
-    let val outcomes =
-            map (fn lib => (#libname lib, AnyLibControl.update context lib))
-                libs
-        val _ = print_outcome_header ()
-    in
-        app print_update_outcome outcomes
-    end
+    act_and_print (AnyLibControl.update context)
+                  print_outcome_header print_update_outcome libs
 
 fun load_local_project () =
     let val userconfig = load_userconfig ()
