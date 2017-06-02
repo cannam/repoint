@@ -77,7 +77,7 @@ fun load_userconfig () : userconfig =
         }
     end
 
-fun load_project (userconfig : userconfig) rootpath : project =
+fun load_project (userconfig : userconfig) rootpath use_locks : project =
     let val spec_file = FileBits.project_spec_path rootpath
         val lock_file = FileBits.project_lock_path rootpath
         val _ = if OS.FileSys.access (spec_file, [OS.FileSys.A_READ])
@@ -89,8 +89,10 @@ fun load_project (userconfig : userconfig) rootpath : project =
                                  ".\nPlease ensure the spec file is in the " ^
                                  "project root and run this from there.")
         val spec_json = JsonBits.load_json_from spec_file
-        val lock_json = JsonBits.load_json_from lock_file
-                        handle IO.Io _ => Json.OBJECT []
+        val lock_json = if use_locks
+                        then JsonBits.load_json_from lock_file
+                             handle IO.Io _ => Json.OBJECT []
+                        else Json.OBJECT []
         val extdir = JsonBits.lookup_mandatory_string spec_json
                                                       ["config", "extdir"]
         val spec_libs = JsonBits.lookup_optional spec_json ["libs"]
@@ -235,21 +237,22 @@ fun update_project ({ context, libs } : project) =
         save_lock_file (#rootpath context) locks
     end
 
-fun load_local_project () =
+fun load_local_project use_locks =
     let val userconfig = load_userconfig ()
         val rootpath = OS.FileSys.getDir ()
     in
-        load_project userconfig rootpath
+        load_project userconfig rootpath use_locks
     end    
 
-fun with_local_project f =
-    (f (load_local_project ()); print "\n")
+fun with_local_project use_locks f =
+    (f (load_local_project use_locks); print "\n")
     handle Fail err => print ("ERROR: " ^ err ^ "\n")
          | e => print ("Failed with exception: " ^ (exnMessage e) ^ "\n")
         
-fun review () = with_local_project review_project
-fun status () = with_local_project status_of_project
-fun update () = with_local_project update_project
+fun review () = with_local_project false review_project
+fun status () = with_local_project false status_of_project
+fun update () = with_local_project false update_project
+fun install () = with_local_project true update_project
 
 fun version () =
     print ("v" ^ vext_version ^ "\n");
@@ -263,13 +266,15 @@ fun usage () =
             ^ "where <command> is one of:\n\n"
             ^ "    review   check configured libraries against their providers, and report\n"
             ^ "    status   print quick report on local status only, without using network\n"
-            ^ "    update   update configured libraries according to the project specs\n"
+            ^ "    install  update configured libraries according to project specs and lock file\n"
+            ^ "    update   update configured libraries and lock file according to project specs\n"
             ^ "    version  print the Vext version number and exit\n\n"))
 
 fun vext args =
     case args of
         ["review"] => review ()
       | ["status"] => status ()
+      | ["install"] => install ()
       | ["update"] => update ()
       | ["version"] => version ()
       | _ => usage ()
