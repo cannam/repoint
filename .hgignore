@@ -4,4 +4,6 @@ ext
 vext
 src/vext
 src/vext.mlb
-
+test/A
+test/B
+vext-lock.json

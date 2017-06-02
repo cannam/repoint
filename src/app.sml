@@ -121,8 +121,7 @@ fun save_lock_file rootpath locks =
                 ("libs", OBJECT
                              (map (fn { libname, id_or_tag } =>
                                       (libname,
-                                       OBJECT [ ("pin",
-                                                 STRING id_or_tag) ]))
+                                       OBJECT [ ("pin", STRING id_or_tag) ]))
                                   locks))
             ]
     in
