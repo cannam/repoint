@@ -113,6 +113,22 @@ fun load_project (userconfig : userconfig) rootpath : project =
         }
     end
 
+fun save_lock_file rootpath locks =
+    let val lock_file = FileBits.project_lock_path rootpath
+        open Json
+        val lock_json =
+            OBJECT [
+                ("libs", OBJECT
+                             (map (fn { libname, id_or_tag } =>
+                                      (libname,
+                                       OBJECT [ ("pin",
+                                                 STRING id_or_tag) ]))
+                                  locks))
+            ]
+    in
+        JsonBits.save_json_to lock_file lock_json
+    end
+        
 fun pad_to n str =
     if n <= String.size str then str
     else pad_to n (str ^ " ")
@@ -191,20 +207,34 @@ fun act_and_print action print_header print_line (libs : libspec list) =
     let val lines = map (fn lib => (#libname lib, action lib)) libs
         val _ = print_header ()
     in
-        app print_line lines
+        app print_line lines;
+        lines
     end
         
 fun status_of_project ({ context, libs } : project) =
-    act_and_print (AnyLibControl.status context)
-                  print_status_header (print_status false) libs
+    ignore (act_and_print (AnyLibControl.status context)
+                          print_status_header (print_status false) libs)
                                              
 fun review_project ({ context, libs } : project) =
-    act_and_print (AnyLibControl.review context)
-                  print_status_header (print_status true) libs
+    ignore (act_and_print (AnyLibControl.review context)
+                          print_status_header (print_status true) libs)
 
 fun update_project ({ context, libs } : project) =
-    act_and_print (AnyLibControl.update context)
-                  print_outcome_header print_update_outcome libs
+    let val outcomes = act_and_print
+                           (AnyLibControl.update context)
+                           print_outcome_header print_update_outcome libs
+        val locks = List.concat
+                        (map (fn (libname, result) =>
+                                 case result of
+                                     ERROR _ => []
+                                   | OK id => [{ libname = libname,
+                                                 id_or_tag = id
+                                              }]
+                             )
+                             outcomes)
+    in
+        save_lock_file (#rootpath context) locks
+    end
 
 fun load_local_project () =
     let val userconfig = load_userconfig ()

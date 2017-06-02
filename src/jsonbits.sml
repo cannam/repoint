@@ -1,6 +1,7 @@
 
 structure JsonBits :> sig
     val load_json_from : string -> Json.json (* filename -> json *)
+    val save_json_to : string -> Json.json -> unit
     val lookup_optional : Json.json -> string list -> Json.json option
     val lookup_optional_string : Json.json -> string list -> string option
     val lookup_mandatory : Json.json -> string list -> Json.json
@@ -11,6 +12,14 @@ end = struct
         case Json.parse (FileBits.file_contents filename) of
             Json.OK json => json
           | Json.ERROR e => raise Fail ("Failed to parse file: " ^ e)
+
+    fun save_json_to filename json =
+        let val jstr = Json.serialiseIndented json
+            val stream = TextIO.openOut filename
+        in
+            TextIO.output (stream, jstr);
+            TextIO.closeOut stream
+        end
                                   
     fun lookup_optional json kk =
         let fun lookup key =

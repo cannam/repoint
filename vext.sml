@@ -87,6 +87,11 @@ type libspec = {
     pin : pin
 }
 
+type lock = {
+    libname : libname,
+    id_or_tag : id_or_tag
+}
+                   
 type remote_spec = {
     anon : string option,
     auth : string option
@@ -783,6 +788,7 @@ end
 
 structure JsonBits :> sig
     val load_json_from : string -> Json.json (* filename -> json *)
+    val save_json_to : string -> Json.json -> unit
     val lookup_optional : Json.json -> string list -> Json.json option
     val lookup_optional_string : Json.json -> string list -> string option
     val lookup_mandatory : Json.json -> string list -> Json.json
@@ -793,6 +799,14 @@ end = struct
         case Json.parse (FileBits.file_contents filename) of
             Json.OK json => json
           | Json.ERROR e => raise Fail ("Failed to parse file: " ^ e)
+
+    fun save_json_to filename json =
+        let val jstr = Json.serialiseIndented json
+            val stream = TextIO.openOut filename
+        in
+            TextIO.output (stream, jstr);
+            TextIO.closeOut stream
+        end
                                   
     fun lookup_optional json kk =
         let fun lookup key =
@@ -1328,6 +1342,22 @@ fun load_project (userconfig : userconfig) rootpath : project =
         }
     end
 
+fun save_lock_file rootpath locks =
+    let val lock_file = FileBits.project_lock_path rootpath
+        open Json
+        val lock_json =
+            OBJECT [
+                ("libs", OBJECT
+                             (map (fn { libname, id_or_tag } =>
+                                      (libname,
+                                       OBJECT [ ("pin",
+                                                 STRING id_or_tag) ]))
+                                  locks))
+            ]
+    in
+        JsonBits.save_json_to lock_file lock_json
+    end
+        
 fun pad_to n str =
     if n <= String.size str then str
     else pad_to n (str ^ " ")
@@ -1406,20 +1436,34 @@ fun act_and_print action print_header print_line (libs : libspec list) =
     let val lines = map (fn lib => (#libname lib, action lib)) libs
         val _ = print_header ()
     in
-        app print_line lines
+        app print_line lines;
+        lines
     end
         
 fun status_of_project ({ context, libs } : project) =
-    act_and_print (AnyLibControl.status context)
-                  print_status_header (print_status false) libs
+    ignore (act_and_print (AnyLibControl.status context)
+                          print_status_header (print_status false) libs)
                                              
 fun review_project ({ context, libs } : project) =
-    act_and_print (AnyLibControl.review context)
-                  print_status_header (print_status true) libs
+    ignore (act_and_print (AnyLibControl.review context)
+                          print_status_header (print_status true) libs)
 
 fun update_project ({ context, libs } : project) =
-    act_and_print (AnyLibControl.update context)
-                  print_outcome_header print_update_outcome libs
+    let val outcomes = act_and_print
+                           (AnyLibControl.update context)
+                           print_outcome_header print_update_outcome libs
+        val locks = List.concat
+                        (map (fn (libname, result) =>
+                                 case result of
+                                     ERROR _ => []
+                                   | OK id => [{ libname = libname,
+                                                 id_or_tag = id
+                                              }]
+                             )
+                             outcomes)
+    in
+        save_lock_file (#rootpath context) locks
+    end
 
 fun load_local_project () =
     let val userconfig = load_userconfig ()

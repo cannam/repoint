@@ -50,6 +50,11 @@ type libspec = {
     pin : pin
 }
 
+type lock = {
+    libname : libname,
+    id_or_tag : id_or_tag
+}
+                   
 type remote_spec = {
     anon : string option,
     auth : string option
