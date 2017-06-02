@@ -31,9 +31,11 @@ structure GitControl :> VCS_CONTROL = struct
     (* NB git rev-parse HEAD shows revision id of current checkout;
        git rev-list -1 <tag> shows revision id of revision with that tag *)
 
+    fun id_of context libname =
+        git_command_output context libname ["rev-parse", "HEAD"]
+            
     fun is_at context (libname, id_or_tag) =
-        case git_command_output context libname
-                                ["rev-parse", "HEAD"] of
+        case id_of context libname of
             ERROR e => ERROR e
           | OK id =>
             if String.isPrefix id_or_tag id orelse
@@ -87,8 +89,10 @@ structure GitControl :> VCS_CONTROL = struct
        but instead checkout the remote branch as a detached head. *)
 
     fun update context (libname, provider, branch) =
-        git_command context libname ["checkout",
-                                     "origin/" ^ branch_name branch]
+        case git_command context libname ["checkout",
+                                          "origin/" ^ branch_name branch] of
+            ERROR e => ERROR e
+          | _ => id_of context libname
 
     (* This function is dealing with a specific id or tag, so if we
        can successfully check it out (detached) then that's all we need
@@ -98,10 +102,12 @@ structure GitControl :> VCS_CONTROL = struct
         ERROR "Non-empty id (tag or revision id) required for update_to"
       | update_to context (libname, provider, id) =
         case git_command context libname ["checkout", "--detach", id] of
-            OK () => OK ()
+            OK () => OK id
           | ERROR _ => 
             case git_command context libname ["fetch"] of
                 ERROR e => ERROR e
-              | OK () =>
-                git_command context libname ["checkout", "--detach", id]
+              | _ =>
+                case git_command context libname ["checkout", "--detach", id] of
+                    ERROR e => ERROR e
+                  | _ => OK id
 end

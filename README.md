@@ -34,7 +34,7 @@ managers:
  with it. This also means it doesn't care what language the source
  code is in.
 
-Libraries are listed in a vextspec.json file in the top-level
+Libraries are listed in a vext-project.json file in the top-level
 working-copy directory, and Vext checks them out into subdirectories
 of a directory called ext. The ext directory should normally be
 excluded from version control (included in the .hgignore, .gitignore
@@ -56,7 +56,7 @@ branch and is potentially updated every time Vext is run.
 Library status
 ==============
 
-Run "vext check" to print statuses of all the configured libraries.
+Run "vext review" to print statuses of all the configured libraries.
 
 A pinned library can be _absent_, _present_, _superseded_, or _wrong_.
 

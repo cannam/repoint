@@ -120,20 +120,27 @@ type project = {
     libs : libspec list
 }
 
+structure VextFilenames = struct
+    val project_file = "vext-project.json"
+    val project_lock_file = "vext-lock.json"
+    val user_config_file = ".vext.json"
+end
+                   
 signature VCS_CONTROL = sig
     val exists : context -> libname -> bool result
+    val id_of : context -> libname -> id_or_tag result
     val is_at : context -> libname * id_or_tag -> bool result
     val is_newest : context -> libname * source * branch -> bool result
     val is_locally_modified : context -> libname -> bool result
     val checkout : context -> libname * source * branch -> unit result
-    val update : context -> libname * source * branch -> unit result
-    val update_to : context -> libname * source * string -> unit result
+    val update : context -> libname * source * branch -> id_or_tag result
+    val update_to : context -> libname * source * id_or_tag -> id_or_tag result
 end
 
 signature LIB_CONTROL = sig
     val review : context -> libspec -> (libstate * localstate) result
     val status : context -> libspec -> (libstate * localstate) result
-    val update : context -> libspec -> unit result
+    val update : context -> libspec -> id_or_tag result
 end
 
 structure FileBits :> sig
@@ -146,8 +153,8 @@ structure FileBits :> sig
     val mydir : unit -> string
     val homedir : unit -> string
     val mkpath : string -> unit result
-    val vexfile : unit -> string
-    val vexpath : string -> string
+    val project_spec_path : string -> string
+    val project_lock_path : string -> string
 end = struct
 
     fun extpath ({ rootpath, extdir, ... } : context) =
@@ -175,17 +182,21 @@ end = struct
       | libpath context libname =
         subpath context libname ""
 
-    fun vexfile () = "vextspec.json"
-
-    fun vexpath rootpath =
+    fun project_file_path rootpath filename =
         let val { isAbs, vol, arcs } = OS.Path.fromString rootpath
         in OS.Path.toString {
                 isAbs = isAbs,
                 vol = vol,
-                arcs = arcs @ [ vexfile () ]
+                arcs = arcs @ [ filename ]
             }
         end
-            
+                
+    fun project_spec_path rootpath =
+        project_file_path rootpath (VextFilenames.project_file)
+
+    fun project_lock_path rootpath =
+        project_file_path rootpath (VextFilenames.project_lock_file)
+
     fun trim str =
         hd (String.fields (fn x => x = #"\n" orelse x = #"\r") str)
         
@@ -341,12 +352,12 @@ functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
         let fun update_unpinned () =
                 case V.is_newest context (libname, source, branch) of
                     ERROR e => ERROR e
-                  | OK true => OK ()
+                  | OK true => V.id_of context libname
                   | OK false => V.update context (libname, source, branch)
             fun update_pinned target =
                 case V.is_at context (libname, target) of
                     ERROR e => ERROR e
-                  | OK true => OK ()
+                  | OK true => OK target
                   | OK false => V.update_to context (libname, source, target)
             fun update' () =
                 case pin of
@@ -1022,6 +1033,11 @@ structure HgControl :> VCS_CONTROL = struct
                                  DEFAULT_BRANCH => "default"
                                | BRANCH b => b
 
+    fun id_of context libname =
+        case current_state context libname of
+            ERROR e => ERROR e
+          | OK { id, ... } => OK id
+                                                 
     fun is_at context (libname, id_or_tag) =
         case current_state context libname of
             ERROR e => ERROR e
@@ -1061,7 +1077,10 @@ structure HgControl :> VCS_CONTROL = struct
         in
             case hg_command context libname ["update", branch_name branch] of
                 ERROR e => ERROR e
-              | _ => pull_result
+              | _ =>
+                case pull_result of
+                    ERROR e => ERROR e
+                  | _ => id_of context libname
         end
 
     fun update_to context (libname, source, "") =
@@ -1070,11 +1089,14 @@ structure HgControl :> VCS_CONTROL = struct
         let val url = remote_for context (libname, source)
         in
             case hg_command context libname ["update", "-r" ^ id] of
-                OK () => OK ()
+                OK () => OK id
               | ERROR _ => 
                 case hg_command context libname ["pull", url] of
-                    OK () => hg_command context libname ["update", "-r" ^ id]
-                  | ERROR e => ERROR e
+                    ERROR e => ERROR e
+                  | _ =>
+                    case hg_command context libname ["update", "-r" ^ id] of
+                        ERROR e => ERROR e
+                      | _ => OK id
         end
                   
 end
@@ -1111,9 +1133,11 @@ structure GitControl :> VCS_CONTROL = struct
     (* NB git rev-parse HEAD shows revision id of current checkout;
        git rev-list -1 <tag> shows revision id of revision with that tag *)
 
+    fun id_of context libname =
+        git_command_output context libname ["rev-parse", "HEAD"]
+            
     fun is_at context (libname, id_or_tag) =
-        case git_command_output context libname
-                                ["rev-parse", "HEAD"] of
+        case id_of context libname of
             ERROR e => ERROR e
           | OK id =>
             if String.isPrefix id_or_tag id orelse
@@ -1167,8 +1191,10 @@ structure GitControl :> VCS_CONTROL = struct
        but instead checkout the remote branch as a detached head. *)
 
     fun update context (libname, provider, branch) =
-        git_command context libname ["checkout",
-                                     "origin/" ^ branch_name branch]
+        case git_command context libname ["checkout",
+                                          "origin/" ^ branch_name branch] of
+            ERROR e => ERROR e
+          | _ => id_of context libname
 
     (* This function is dealing with a specific id or tag, so if we
        can successfully check it out (detached) then that's all we need
@@ -1178,12 +1204,14 @@ structure GitControl :> VCS_CONTROL = struct
         ERROR "Non-empty id (tag or revision id) required for update_to"
       | update_to context (libname, provider, id) =
         case git_command context libname ["checkout", "--detach", id] of
-            OK () => OK ()
+            OK () => OK id
           | ERROR _ => 
             case git_command context libname ["fetch"] of
                 ERROR e => ERROR e
-              | OK () =>
-                git_command context libname ["checkout", "--detach", id]
+              | _ =>
+                case git_command context libname ["checkout", "--detach", id] of
+                    ERROR e => ERROR e
+                  | _ => OK id
 end
 
 structure AnyLibControl :> LIB_CONTROL = struct
@@ -1201,9 +1229,9 @@ structure AnyLibControl :> LIB_CONTROL = struct
         (fn HG => H.update | GIT => G.update) vcs context spec
 end
 
-fun load_libspec json libname : libspec =
+fun load_libspec spec_json lock_json libname : libspec =
     let open JsonBits
-        val libobj   = lookup_mandatory json ["libs", libname]
+        val libobj   = lookup_mandatory spec_json ["libs", libname]
         val vcs      = lookup_mandatory_string libobj ["vcs"]
         val retrieve = lookup_optional_string libobj
         val service  = retrieve ["service"]
@@ -1211,7 +1239,10 @@ fun load_libspec json libname : libspec =
         val repo     = retrieve ["repository"]
         val url      = retrieve ["url"]
         val branch   = retrieve ["branch"]
-        val pin      = retrieve ["pin"]
+        val user_pin = retrieve ["pin"]
+        val lock_pin = case lookup_optional lock_json ["libs", libname] of
+                           SOME ll => lookup_optional_string ll ["pin"]
+                         | NONE => NONE
     in
         {
           libname = libname,
@@ -1226,9 +1257,12 @@ fun load_libspec json libname : libspec =
                        PROVIDER { service = ss, owner = owner, repo = repo }
                      | _ => raise Fail ("Must have exactly one of service " ^
                                         "or url string"),
-          pin = case pin of
+          pin = case user_pin of
                     SOME p => PINNED p
-                  | NONE => UNPINNED,
+                  | NONE =>
+                    case lock_pin of
+                        SOME p => PINNED p
+                      | NONE => UNPINNED,
           branch = case branch of
                        SOME b => BRANCH b
                      | NONE => DEFAULT_BRANCH
@@ -1237,13 +1271,15 @@ fun load_libspec json libname : libspec =
 
 fun load_userconfig () : userconfig =
     let val home = FileBits.homedir ()
-        val json = 
+        val conf_json = 
             JsonBits.load_json_from
-                (OS.Path.joinDirFile { dir = home, file = ".vext.json" })
+                (OS.Path.joinDirFile {
+                      dir = home,
+                      file = VextFilenames.user_config_file })
             handle IO.Io _ => Json.OBJECT []
     in
         {
-          accounts = case JsonBits.lookup_optional json ["accounts"] of
+          accounts = case JsonBits.lookup_optional conf_json ["accounts"] of
                          NONE => []
                        | SOME (Json.OBJECT aa) =>
                          map (fn (k, (Json.STRING v)) =>
@@ -1252,25 +1288,31 @@ fun load_userconfig () : userconfig =
                                           "String expected for account name")
                              aa
                        | _ => raise Fail "Array expected for accounts",
-          providers = Provider.load_providers json
+          providers = Provider.load_providers conf_json
         }
     end
 
 fun load_project (userconfig : userconfig) rootpath : project =
-    let val specfile = FileBits.vexpath rootpath
-        val _ = if OS.FileSys.access (specfile, [OS.FileSys.A_READ])
+    let val spec_file = FileBits.project_spec_path rootpath
+        val lock_file = FileBits.project_lock_path rootpath
+        val _ = if OS.FileSys.access (spec_file, [OS.FileSys.A_READ])
                    handle OS.SysErr _ => false
                 then ()
-                else raise Fail ("Failed to open project spec " ^
-                                 (FileBits.vexfile ()) ^ " in " ^ rootpath ^
+                else raise Fail ("Failed to open project spec file " ^
+                                 (VextFilenames.project_file) ^ " in " ^
+                                 rootpath ^
                                  ".\nPlease ensure the spec file is in the " ^
                                  "project root and run this from there.")
-        val json = JsonBits.load_json_from specfile
-        val extdir = JsonBits.lookup_mandatory_string json ["config", "extdir"]
-        val libs = JsonBits.lookup_optional json ["libs"]
+        val spec_json = JsonBits.load_json_from spec_file
+        val lock_json = JsonBits.load_json_from lock_file
+                        handle IO.Io _ => Json.OBJECT []
+        val extdir = JsonBits.lookup_mandatory_string spec_json
+                                                      ["config", "extdir"]
+        val spec_libs = JsonBits.lookup_optional spec_json ["libs"]
+        val lock_libs = JsonBits.lookup_optional lock_json ["libs"]
         val providers = Provider.load_more_providers
-                            (#providers userconfig) json
-        val libnames = case libs of
+                            (#providers userconfig) spec_json
+        val libnames = case spec_libs of
                            NONE => []
                          | SOME (Json.OBJECT ll) => map (fn (k, v) => k) ll
                          | _ => raise Fail "Object expected for libs"
@@ -1282,7 +1324,7 @@ fun load_project (userconfig : userconfig) rootpath : project =
             providers = providers,
             accounts = #accounts userconfig
           },
-          libs = map (load_libspec json) libnames
+          libs = map (load_libspec spec_json lock_json) libnames
         }
     end
 
@@ -1347,7 +1389,7 @@ fun print_status with_network (libname, status) =
 fun print_update_outcome (libname, outcome) =
     let val outcome_str =
             case outcome of
-                OK () => "Ok"
+                OK id => "Ok"
               | ERROR e => "Failed"
         val error_str =
             case outcome of
@@ -1360,7 +1402,7 @@ fun print_update_outcome (libname, outcome) =
                error_str ^ "\n")
     end
 
-fun act_and_print action print_header print_line libs =
+fun act_and_print action print_header print_line (libs : libspec list) =
     let val lines = map (fn lib => (#libname lib, action lib)) libs
         val _ = print_header ()
     in

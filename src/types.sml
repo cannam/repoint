@@ -83,18 +83,25 @@ type project = {
     libs : libspec list
 }
 
+structure VextFilenames = struct
+    val project_file = "vext-project.json"
+    val project_lock_file = "vext-lock.json"
+    val user_config_file = ".vext.json"
+end
+                   
 signature VCS_CONTROL = sig
     val exists : context -> libname -> bool result
+    val id_of : context -> libname -> id_or_tag result
     val is_at : context -> libname * id_or_tag -> bool result
     val is_newest : context -> libname * source * branch -> bool result
     val is_locally_modified : context -> libname -> bool result
     val checkout : context -> libname * source * branch -> unit result
-    val update : context -> libname * source * branch -> unit result
-    val update_to : context -> libname * source * string -> unit result
+    val update : context -> libname * source * branch -> id_or_tag result
+    val update_to : context -> libname * source * id_or_tag -> id_or_tag result
 end
 
 signature LIB_CONTROL = sig
     val review : context -> libspec -> (libstate * localstate) result
     val status : context -> libspec -> (libstate * localstate) result
-    val update : context -> libspec -> unit result
+    val update : context -> libspec -> id_or_tag result
 end

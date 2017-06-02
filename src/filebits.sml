@@ -9,8 +9,8 @@ structure FileBits :> sig
     val mydir : unit -> string
     val homedir : unit -> string
     val mkpath : string -> unit result
-    val vexfile : unit -> string
-    val vexpath : string -> string
+    val project_spec_path : string -> string
+    val project_lock_path : string -> string
 end = struct
 
     fun extpath ({ rootpath, extdir, ... } : context) =
@@ -38,17 +38,21 @@ end = struct
       | libpath context libname =
         subpath context libname ""
 
-    fun vexfile () = "vextspec.json"
-
-    fun vexpath rootpath =
+    fun project_file_path rootpath filename =
         let val { isAbs, vol, arcs } = OS.Path.fromString rootpath
         in OS.Path.toString {
                 isAbs = isAbs,
                 vol = vol,
-                arcs = arcs @ [ vexfile () ]
+                arcs = arcs @ [ filename ]
             }
         end
-            
+                
+    fun project_spec_path rootpath =
+        project_file_path rootpath (VextFilenames.project_file)
+
+    fun project_lock_path rootpath =
+        project_file_path rootpath (VextFilenames.project_lock_file)
+
     fun trim str =
         hd (String.fields (fn x => x = #"\n" orelse x = #"\r") str)
         

@@ -53,6 +53,11 @@ structure HgControl :> VCS_CONTROL = struct
                                  DEFAULT_BRANCH => "default"
                                | BRANCH b => b
 
+    fun id_of context libname =
+        case current_state context libname of
+            ERROR e => ERROR e
+          | OK { id, ... } => OK id
+                                                 
     fun is_at context (libname, id_or_tag) =
         case current_state context libname of
             ERROR e => ERROR e
@@ -92,7 +97,10 @@ structure HgControl :> VCS_CONTROL = struct
         in
             case hg_command context libname ["update", branch_name branch] of
                 ERROR e => ERROR e
-              | _ => pull_result
+              | _ =>
+                case pull_result of
+                    ERROR e => ERROR e
+                  | _ => id_of context libname
         end
 
     fun update_to context (libname, source, "") =
@@ -101,11 +109,14 @@ structure HgControl :> VCS_CONTROL = struct
         let val url = remote_for context (libname, source)
         in
             case hg_command context libname ["update", "-r" ^ id] of
-                OK () => OK ()
+                OK () => OK id
               | ERROR _ => 
                 case hg_command context libname ["pull", url] of
-                    OK () => hg_command context libname ["update", "-r" ^ id]
-                  | ERROR e => ERROR e
+                    ERROR e => ERROR e
+                  | _ =>
+                    case hg_command context libname ["update", "-r" ^ id] of
+                        ERROR e => ERROR e
+                      | _ => OK id
         end
                   
 end

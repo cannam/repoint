@@ -14,9 +14,9 @@ structure AnyLibControl :> LIB_CONTROL = struct
         (fn HG => H.update | GIT => G.update) vcs context spec
 end
 
-fun load_libspec json libname : libspec =
+fun load_libspec spec_json lock_json libname : libspec =
     let open JsonBits
-        val libobj   = lookup_mandatory json ["libs", libname]
+        val libobj   = lookup_mandatory spec_json ["libs", libname]
         val vcs      = lookup_mandatory_string libobj ["vcs"]
         val retrieve = lookup_optional_string libobj
         val service  = retrieve ["service"]
@@ -24,7 +24,10 @@ fun load_libspec json libname : libspec =
         val repo     = retrieve ["repository"]
         val url      = retrieve ["url"]
         val branch   = retrieve ["branch"]
-        val pin      = retrieve ["pin"]
+        val user_pin = retrieve ["pin"]
+        val lock_pin = case lookup_optional lock_json ["libs", libname] of
+                           SOME ll => lookup_optional_string ll ["pin"]
+                         | NONE => NONE
     in
         {
           libname = libname,
@@ -39,9 +42,12 @@ fun load_libspec json libname : libspec =
                        PROVIDER { service = ss, owner = owner, repo = repo }
                      | _ => raise Fail ("Must have exactly one of service " ^
                                         "or url string"),
-          pin = case pin of
+          pin = case user_pin of
                     SOME p => PINNED p
-                  | NONE => UNPINNED,
+                  | NONE =>
+                    case lock_pin of
+                        SOME p => PINNED p
+                      | NONE => UNPINNED,
           branch = case branch of
                        SOME b => BRANCH b
                      | NONE => DEFAULT_BRANCH
@@ -50,13 +56,15 @@ fun load_libspec json libname : libspec =
 
 fun load_userconfig () : userconfig =
     let val home = FileBits.homedir ()
-        val json = 
+        val conf_json = 
             JsonBits.load_json_from
-                (OS.Path.joinDirFile { dir = home, file = ".vext.json" })
+                (OS.Path.joinDirFile {
+                      dir = home,
+                      file = VextFilenames.user_config_file })
             handle IO.Io _ => Json.OBJECT []
     in
         {
-          accounts = case JsonBits.lookup_optional json ["accounts"] of
+          accounts = case JsonBits.lookup_optional conf_json ["accounts"] of
                          NONE => []
                        | SOME (Json.OBJECT aa) =>
                          map (fn (k, (Json.STRING v)) =>
@@ -65,25 +73,31 @@ fun load_userconfig () : userconfig =
                                           "String expected for account name")
                              aa
                        | _ => raise Fail "Array expected for accounts",
-          providers = Provider.load_providers json
+          providers = Provider.load_providers conf_json
         }
     end
 
 fun load_project (userconfig : userconfig) rootpath : project =
-    let val specfile = FileBits.vexpath rootpath
-        val _ = if OS.FileSys.access (specfile, [OS.FileSys.A_READ])
+    let val spec_file = FileBits.project_spec_path rootpath
+        val lock_file = FileBits.project_lock_path rootpath
+        val _ = if OS.FileSys.access (spec_file, [OS.FileSys.A_READ])
                    handle OS.SysErr _ => false
                 then ()
-                else raise Fail ("Failed to open project spec " ^
-                                 (FileBits.vexfile ()) ^ " in " ^ rootpath ^
+                else raise Fail ("Failed to open project spec file " ^
+                                 (VextFilenames.project_file) ^ " in " ^
+                                 rootpath ^
                                  ".\nPlease ensure the spec file is in the " ^
                                  "project root and run this from there.")
-        val json = JsonBits.load_json_from specfile
-        val extdir = JsonBits.lookup_mandatory_string json ["config", "extdir"]
-        val libs = JsonBits.lookup_optional json ["libs"]
+        val spec_json = JsonBits.load_json_from spec_file
+        val lock_json = JsonBits.load_json_from lock_file
+                        handle IO.Io _ => Json.OBJECT []
+        val extdir = JsonBits.lookup_mandatory_string spec_json
+                                                      ["config", "extdir"]
+        val spec_libs = JsonBits.lookup_optional spec_json ["libs"]
+        val lock_libs = JsonBits.lookup_optional lock_json ["libs"]
         val providers = Provider.load_more_providers
-                            (#providers userconfig) json
-        val libnames = case libs of
+                            (#providers userconfig) spec_json
+        val libnames = case spec_libs of
                            NONE => []
                          | SOME (Json.OBJECT ll) => map (fn (k, v) => k) ll
                          | _ => raise Fail "Object expected for libs"
@@ -95,7 +109,7 @@ fun load_project (userconfig : userconfig) rootpath : project =
             providers = providers,
             accounts = #accounts userconfig
           },
-          libs = map (load_libspec json) libnames
+          libs = map (load_libspec spec_json lock_json) libnames
         }
     end
 
@@ -160,7 +174,7 @@ fun print_status with_network (libname, status) =
 fun print_update_outcome (libname, outcome) =
     let val outcome_str =
             case outcome of
-                OK () => "Ok"
+                OK id => "Ok"
               | ERROR e => "Failed"
         val error_str =
             case outcome of
@@ -173,7 +187,7 @@ fun print_update_outcome (libname, outcome) =
                error_str ^ "\n")
     end
 
-fun act_and_print action print_header print_line libs =
+fun act_and_print action print_header print_line (libs : libspec list) =
     let val lines = map (fn lib => (#libname lib, action lib)) libs
         val _ = print_header ()
     in
