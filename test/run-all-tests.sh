@@ -1,10 +1,8 @@
 #!/bin/bash
 
-mydir=$(dirname "$0")
-
 set -eu
 
-cd "$mydir"
+cd $(dirname "$0")
 
 for sml in default poly smlnj mlton; do
     echo
@@ -15,10 +13,6 @@ for sml in default poly smlnj mlton; do
     if [ "$sml" != "default" ]; then
 	VEXT_SML="$sml"
     fi
-    rm -rf ext
-    ../vext review
-    ../vext update
-    ../vext review
-    ls -l ext
+    ./run-tests.sh
     echo
 done

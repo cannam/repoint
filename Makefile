@@ -28,7 +28,7 @@ vext.sml:	$(SOURCES)
 	./vext version
 
 test:	vext.sml
-	cd test && ./test.sh
+	cd test && ./run-all-tests.sh
 
 clean:
 	rm -f vext.sml src/vext.mlb src/vext
