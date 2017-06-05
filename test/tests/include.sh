@@ -2,11 +2,15 @@
 
 set -eu
 mydir=$(dirname "$0")
+case "$mydir" in
+    /*) ;;
+    *) mydir=$(pwd)/"$mydir" ;;
+esac
+current="$mydir"/current
 
 prepare() {
-    local dir="$1"
-    mkdir -p "$dir"
-    cd "$dir"
+    mkdir -p "$current"
+    cd "$current"
     if [ ! -f ../include.sh ]; then
         echo "ERROR: Failed safety check: Path passed to prepare should be a subdir of test directory"
         exit 2
@@ -67,7 +71,7 @@ check_expected() {
 }
 EOF
     if cmp -s vext-lock.json expected-lock.json ; then
-        :
+        echo OK
     else
         echo "ERROR: Contents of vext-lock.json does not match expected"
         echo "Diff follows (vext-lock.json on left, expected on right):"
@@ -76,6 +80,6 @@ EOF
     fi
 }
 
-prepare "$mydir"/current
+prepare 
 vextdir=../../..
 

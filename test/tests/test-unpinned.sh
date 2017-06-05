@@ -14,11 +14,12 @@ libcontent=$(cat <<EOF
 EOF
           )
 
-write_project_file "$libcontent"
-
-"$vextdir"/vext update
-
-check_expected f94ae9d7e5c9 3199655c658ff337ce24f78c6d1f410f34f4c6f2
+for task in install update ; do
+    prepare
+    write_project_file "$libcontent"
+    "$vextdir"/vext $task
+    check_expected f94ae9d7e5c9 3199655c658ff337ce24f78c6d1f410f34f4c6f2
+done
 
 
 
