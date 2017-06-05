@@ -1,5 +1,8 @@
 #!/bin/bash
 
+set -eu
+mydir=$(dirname "$0")
+
 prepare() {
     local dir="$1"
     mkdir -p "$dir"
@@ -9,8 +12,8 @@ prepare() {
         exit 2
     fi
     rm -rf ext *.json
-    if [ ! -d ../testrepos/A ]; then
-        ( cd ../testrepos
+    if [ ! -d ../../testrepos/A ]; then
+        ( cd ../../testrepos
           tar xf A.tar.gz
           tar xf B.tar.gz
         )
@@ -27,7 +30,7 @@ write_project_file() {
     "providers": {
 	"testfile": {
 	    "vcs": ["hg", "git"],
-	    "anon": "file://$(pwd)/../testrepos/{repo}"
+	    "anon": "file://$(pwd)/../../testrepos/{repo}"
 	}
     },
     "libs": {
@@ -72,3 +75,7 @@ EOF
         exit 3
     fi
 }
+
+prepare "$mydir"/current
+vextdir=../../..
+

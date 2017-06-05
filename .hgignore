@@ -4,6 +4,6 @@ ext
 vext
 src/vext
 src/vext.mlb
-test/current
+test/tests/current
 test/testrepos/A
 test/testrepos/B

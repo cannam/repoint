@@ -1,10 +1,6 @@
 #!/bin/bash
 
-set -eu
-
-. include.sh
-prepare $(dirname "$0")/current
-vextdir=../..
+. $(dirname "$0")/include.sh
 
 libcontent=$(cat <<EOF
 "A": {
@@ -22,7 +18,7 @@ EOF
 
 write_project_file "$libcontent"
 
-"$vextdir"/vext install
+"$vextdir"/vext update
 
 check_expected 1379d75f0b4f 7219cf6e6d4706295246d278a3821ea923e1dfe2
 

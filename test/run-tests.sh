@@ -16,7 +16,7 @@ set -eu
 
 cd $(dirname "$0")
 
-count=$(ls -1 test-*.sh | wc -l | sed 's/[^0-9]//g')
+count=$(ls -1 tests/test-*.sh | wc -l | sed 's/[^0-9]//g')
 i=1
 passcount=0
 failcount=0
@@ -33,7 +33,7 @@ run_a_test() {
 
 if [ -z "$verbose" ]; then echo; fi
 
-for t in test-*.sh ; do
+for t in tests/test-*.sh ; do
     if [ -n "$verbose" ]; then 
         echo
         echo "Test $i/$count: $t..."
