@@ -24,6 +24,10 @@ prepare() {
     fi
 }
 
+prepare 
+vextdir=../../..
+vext="$vextdir"/vext
+
 write_project_file() {
     local libcontent=$(echo "$1" | sed 's/^/        /')
     cat > vext-project.json <<EOF
@@ -80,6 +84,33 @@ EOF
     fi
 }
 
-prepare 
-vextdir=../../..
+assert_all() {
+    local task="$1"
+    local status="$2"
+    local output=$("$vext" "$task" | grep '|' | tail -2 |
+                       awk -F'|' '{ print $2 }' |
+                       sed 's/ //g' |
+                       fmt -80)
+    local expected="$status $status"
+    if [ "$output" != "$expected" ]; then
+        echo "ERROR: output for task $task ($output) does not match expected ($expected)"
+        exit 3
+    fi
+}
+
+assert_all_wrong() {
+    assert_all "$1" "Wrong"
+}
+
+assert_all_present() {
+    assert_all "$1" "Present"
+}
+
+assert_all_correct() {
+    assert_all "$1" "Correct"
+}
+
+assert_all_superseded() {
+    assert_all "$1" "Superseded"
+}
 
