@@ -2,10 +2,9 @@
 
 set -eu
 
-cd $(dirname "$0")
-vextdir=..
-
 . include.sh
+prepare $(dirname "$0")/current
+vextdir=../..
 
 libcontent=$(cat <<EOF
 "A": {
@@ -20,12 +19,10 @@ EOF
           )
 
 write_project_file "$libcontent"
-rm -f vext-lock.spec
-rm -rf ext
 
-"$vextdir"/vext status
-"$vextdir"/vext review
 "$vextdir"/vext install
-"$vextdir"/vext status
+
+check_expected f94ae9d7e5c9 3199655c658ff337ce24f78c6d1f410f34f4c6f2
+
 
 
