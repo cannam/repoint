@@ -37,12 +37,22 @@ for t in tests/test-*.sh ; do
     if [ -n "$verbose" ]; then 
         echo
         echo "Test $i/$count: $t..."
+    else
+        echo -n "$t: "
     fi
     if run_a_test $t; then
-        echo "PASS: $t"
+        if [ -n "$verbose" ]; then
+            echo "PASS: $t"
+        else
+            echo "PASS"
+        fi
         passcount=$(($passcount+1))
     else
-        echo "FAIL: $t"
+        if [ -n "$verbose" ]; then
+            echo "FAIL: $t"
+        else
+            echo "FAIL"
+        fi
         failcount=$(($failcount+1))
         failing="$failing $t"
     fi
