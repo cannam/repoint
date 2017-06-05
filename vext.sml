@@ -1103,14 +1103,14 @@ structure HgControl :> VCS_CONTROL = struct
         let val url = remote_for context (libname, source)
         in
             case hg_command context libname ["update", "-r" ^ id] of
-                OK () => OK id
+                OK () => id_of context libname
               | ERROR _ => 
                 case hg_command context libname ["pull", url] of
                     ERROR e => ERROR e
                   | _ =>
                     case hg_command context libname ["update", "-r" ^ id] of
                         ERROR e => ERROR e
-                      | _ => OK id
+                      | _ => id_of context libname
         end
                   
 end
@@ -1218,14 +1218,14 @@ structure GitControl :> VCS_CONTROL = struct
         ERROR "Non-empty id (tag or revision id) required for update_to"
       | update_to context (libname, provider, id) =
         case git_command context libname ["checkout", "--detach", id] of
-            OK () => OK id
+            OK () => id_of context libname
           | ERROR _ => 
             case git_command context libname ["fetch"] of
                 ERROR e => ERROR e
               | _ =>
                 case git_command context libname ["checkout", "--detach", id] of
                     ERROR e => ERROR e
-                  | _ => OK id
+                  | _ => id_of context libname
 end
 
 structure AnyLibControl :> LIB_CONTROL = struct
