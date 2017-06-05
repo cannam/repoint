@@ -16,7 +16,7 @@ set -eu
 
 cd $(dirname "$0")
 
-count=$(ls -1 test-*.sh | wc -l)
+count=$(ls -1 test-*.sh | wc -l | sed 's/[^0-9]//g')
 i=1
 passcount=0
 failcount=0
