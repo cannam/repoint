@@ -5,7 +5,8 @@ if [ "$1" = "-v" ]; then
 elif [ -n "$1" ]; then
     echo
     echo " Usage: $0 [-v]"
-    echo "where -v : Show verbose output from tests"
+    echo
+    echo "        -v   Show verbose output from tests"
     echo
     exit 2
 else
