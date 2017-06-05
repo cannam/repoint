@@ -42,10 +42,10 @@ fun load_libspec spec_json lock_json libname : libspec =
                        PROVIDER { service = ss, owner = owner, repo = repo }
                      | _ => raise Fail ("Must have exactly one of service " ^
                                         "or url string"),
-          pin = case user_pin of
+          pin = case lock_pin of
                     SOME p => PINNED p
                   | NONE =>
-                    case lock_pin of
+                    case user_pin of
                         SOME p => PINNED p
                       | NONE => UNPINNED,
           branch = case branch of
