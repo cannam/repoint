@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Disable shellcheck warnings for useless-use-of-cat. UUOC is good
 # practice, not bad: clearer, safer, less error-prone.
@@ -16,7 +16,10 @@ program="$mydir/vext.sml"
 # preference is based on startup speed.
 
 if [ -z "$sml" ]; then
-    if poly -v 2>&1 | grep -q 'Poly/ML'; then
+    # I think there may be a race condition in the poly interpreter's
+    # tests for open or closed I/O streams - without the "echo" here,
+    # or with stderr redirection, this pipeline will sometimes hang
+    if echo | poly -v | grep -q 'Poly/ML'; then
 	sml="poly"
     elif sml -h 2>&1 | grep -q 'Standard ML of New Jersey'; then
 	sml="smlnj"
