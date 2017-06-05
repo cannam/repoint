@@ -27,6 +27,7 @@ vext.sml:	$(SOURCES)
 	cat $(SOURCES) >> $@
 	./vext version
 
+.PHONY:	test
 test:	vext.sml
 	cd test && ./run-all-tests.sh
 

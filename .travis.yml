@@ -23,9 +23,6 @@ before_install:
   - if [[ "$TRAVIS_OS_NAME" = "osx" ]] ; then brew install mlton smlnj polyml ; fi
       
 script:
-  - make test
   - make clean  # so we rebuild the aggregated vext.sml
   - make test
-
-
   
