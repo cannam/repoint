@@ -109,14 +109,14 @@ structure HgControl :> VCS_CONTROL = struct
         let val url = remote_for context (libname, source)
         in
             case hg_command context libname ["update", "-r" ^ id] of
-                OK () => OK id
+                OK () => id_of context libname
               | ERROR _ => 
                 case hg_command context libname ["pull", url] of
                     ERROR e => ERROR e
                   | _ =>
                     case hg_command context libname ["update", "-r" ^ id] of
                         ERROR e => ERROR e
-                      | _ => OK id
+                      | _ => id_of context libname
         end
                   
 end
