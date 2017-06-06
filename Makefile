@@ -29,7 +29,7 @@ vext.sml:	$(SOURCES)
 
 .PHONY:	test
 test:	vext.sml
-	cd test && ./run-all-tests.sh
+	if ! ./test/run-all-tests.sh ; then ./test/run-all-tests.sh -v ; fi
 
 clean:
 	rm -f vext.sml src/vext.mlb src/vext
