@@ -1,6 +1,10 @@
 
 structure GitControl :> VCS_CONTROL = struct
 
+    (* With Git repos we always operate in detached HEAD state. Even
+       the master branch is checked out using the remote reference,
+       origin/master. *)
+
     fun git_command context libname args =
         FileBits.command context libname ("git" :: args)
 
