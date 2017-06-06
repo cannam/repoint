@@ -24,13 +24,11 @@ package managers like npm or Maven:
  control repositories (like Github or Bitbucket). There is no support
  for installing pre-packaged or pre-compiled dependencies. If it's not
  in a repository, or if cloning the repository would be too expensive,
- then Vext won't help.
-
- (A corollary is that you should only use Vext for development trees
- that are themselves checked out from a hosted repo; don't distribute
- source releases or end-user packages that depend on it. If your code
- is distributed via a "proper" package manager itself, use that
- package manager for its dependencies too.)
+ then Vext won't help.  (A corollary is that you should only use Vext
+ for development trees that are themselves checked out from a hosted
+ repo; don't distribute source releases or end-user packages that
+ depend on it. If your code is distributed via a "proper" package
+ manager itself, use that package manager for its dependencies too.)
 
  2. It puts all third-party libraries into a subdirectory of the
  project directory. There is no per-user or system-wide package
