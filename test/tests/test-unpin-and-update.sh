@@ -39,11 +39,11 @@ write_project_file "$libcontent_unpinned"
 "$vextdir"/vext install # obeys lock file, so should do nothing
 check_expected 1379d75f0b4f 7219cf6e6d4706295246d278a3821ea923e1dfe2
 
-#!!! ah wait, the pinned id here is actually on a non-default branch
-#!!! so status *should* be able to tell. Let's sort out
-#!!! test-switch-to-branch and get back to this
-assert_all_present status # project unpinned, so status can't tell it's wrong
-assert_all_superseded review
+# The pinned id here is actually on a non-default branch, so status
+# should be able to tell we're now in the wrong place (not just
+# present or superseded)
+assert_all_wrong status
+assert_all_wrong review
 
 "$vextdir"/vext update
 check_expected f94ae9d7e5c9 3199655c658ff337ce24f78c6d1f410f34f4c6f2

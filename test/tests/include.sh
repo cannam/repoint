@@ -87,6 +87,7 @@ EOF
 assert_outputs() {
     local task="$1"
     local expected="$2"
+    echo "Checking $task outputs against expected values..."
     local output=$("$vext" "$task" | grep '|' | tail -2 |
                        awk -F'|' '{ print $2 }' |
                        sed 's/ //g' |
@@ -94,6 +95,24 @@ assert_outputs() {
     if [ "$output" != "$expected" ]; then
         echo "ERROR: output for task $task ($output) does not match expected ($expected)"
         exit 3
+    else
+        echo OK
+    fi
+}    
+
+assert_local_outputs() {
+    local task="$1"
+    local expected="$2"
+    echo "Checking $task local outputs against expected values..."
+    local output=$("$vext" "$task" | grep '|' | tail -2 |
+                       awk -F'|' '{ print $3 }' |
+                       sed 's/ //g' |
+                       fmt -80)
+    if [ "$output" != "$expected" ]; then
+        echo "ERROR: local output for task $task ($output) does not match expected ($expected)"
+        exit 3
+    else
+        echo OK
     fi
 }    
 

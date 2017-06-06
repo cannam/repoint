@@ -27,7 +27,7 @@ for task in install update ; do
     ( cd ext/A ; hg update -r8796fac39bdc )
     ( cd ext/B ; git checkout --detach da969d8e5b1adc776615be523045cf3d28bedc09 )
 
-    assert_all_present status
+    assert_all_superseded status
     assert_all_superseded review
 
     "$vext" $task
