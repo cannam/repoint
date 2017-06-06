@@ -57,10 +57,10 @@ having in the range of 1-20 library dependencies to a project.
 Configuration
 =============
 
-Libraries are listed in a vext-project.json file in the top-level
+Libraries are listed in a `vext-project.json` file in the top-level
 working-copy directory.
 
-An example vext-project.json:
+A complete example of `vext-project.json`:
 
 ```
 {
@@ -75,7 +75,7 @@ An example vext-project.json:
         },
         "bqvec": {
             "vcs": "hg",
-	    "service": "bitbucket",
+            "service": "bitbucket",
             "owner": "breakfastquay"
         }
     }
