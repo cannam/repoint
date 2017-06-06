@@ -55,7 +55,7 @@ having in the range of 1-20 library dependencies to a project.
 
 
 Configuration
-=============
+-------------
 
 Libraries are listed in a `vext-project.json` file in the top-level
 working-copy directory.
@@ -84,64 +84,64 @@ A complete example of `vext-project.json`:
 
 All libraries will be checked out into subdirectories of a single
 external-library directory in the project root; the name of this
-directory (typically "ext") is configured in vext-project.json. The
-ext directory should normally be excluded from your project's version
-control, i.e. added to your .hgignore, .gitignore etc file. The
-general expectation is that this directory contains only third-party
-code, and one could safely delete the entire directory and run Vext
-again to recreate it.
+directory (typically `ext`) is configured in `vext-project.json`. The
+`ext` directory should normally be excluded from your project's own
+version control, i.e. added to your `.hgignore`, `.gitignore` etc
+file. The general expectation is that this directory contains only
+third-party code, and one could safely delete the entire directory and
+run Vext again to recreate it.
 
-Libraries are listed in the "libs" object in the config file. Each
+Libraries are listed in the `libs` object in the config file. Each
 library has a key, which is the local name (a single directory or
 relative path) it will be checked out to. Properties of the library
 may include
 
- * vcs - The version control system to use. Must be one of the
-   recognised set of names, currently "hg" or "git"
+ * `vcs` - The version control system to use. Must be one of the
+   recognised set of names, currently `hg` or `git`
 
- * service - The repository hosting provider. Some providers are
-   built-in, but you can define further ones in a "providers" section
+ * `service` - The repository hosting provider. Some providers are
+   built-in, but you can define further ones in a `providers` section
 
- * owner - User name owning the repository at the provider
+ * `owner` - User name owning the repository at the provider
 
- * repository - Repository name at the provider, if it differs from
+ * `repository` - Repository name at the provider, if it differs from
    the local library name
 
- * url - Complete URL to check out (alternative to specifying
-   provider, owner, etc)
+ * `url` - Complete URL to check out (alternative to specifying
+   `provider`, `owner`, etc)
 
- * branch - Branch to check out if not the default
+ * `branch` - Branch to check out if not the default
 
- * pin - Specific revision id or tag to check out
+ * `pin` - Specific revision id or tag to check out
  
-You can also optionally have a config file ~/.vext.json in which you
+You can also optionally have a config file `~/.vext.json` in which you
 can configure things like login names to use for ssh access to
 providers.
 
-A library may be listed as either pinned (having a pin property) or
+A library may be listed as either pinned (having a `pin` property) or
 unpinned (lacking one). A pinned library has a specific tag or
 revision ID associated with it, and once it has been checked out at
 that tag, it won't be changed by Vext again unless the specification
 for it changes. An unpinned library floats on a branch and is
-potentially updated every time "vext update" is run.
+potentially updated every time `vext update` is run.
 
-Vext also creates a file called vext-lock.json, each time you update,
+Vext also creates a file called `vext-lock.json`, each time you update,
 which stores the versions actually used in the current project
-directory. This is referred to by the command "vext install" which
+directory. This is referred to by the command `vext install`, which
 installs exactly those versions. You can check this file into your
 version control system if you want to enable other users to get
-exactly the same revisions by running "vext install" themselves.
+exactly the same revisions by running `vext install` themselves.
 
 
 Querying library status
-=======================
+-----------------------
 
-Run "vext review" to check and print statuses of all the configured
+Run `vext review` to check and print statuses of all the configured
 libraries. This won't change the local working copies, but it does
-involve contacting remote repositories to find out whether they have
-been updated, so network access is required.
+fetch any pending changes from remote repositories, so network access
+is required.
 
-Run "vext status" to do the same thing but without using the
+Run `vext status` to do the same thing but without using the
 network. That's much faster but can only tell you whether something is
 in place for each library, not whether it's the newest thing
 available.
@@ -153,7 +153,7 @@ For unpinned libraries:
  * _Absent_: No repository has been checked out for the library yet
 
  * _Correct_: Library is the newest version available on the correct
-   branch. If you run "vext status" instead "vext review", this will
+   branch. If you run `vext status` instead `vext review`, this will
    appear as _Present_ instead of _Correct_, as the program can't be
    sure you have the latest version without using the network.
 
@@ -178,13 +178,13 @@ made a change to the local working copy for that library).
 Installing and updating
 =======================
 
-Run "vext install" to update all the configured libraries. If there is
-a vext-lock.json file present, "vext install" will update all
+Run `vext install` to update all the configured libraries. If there is
+a `vext-lock.json` file present, `vext install` will update all
 libraries listed in that file to the precise revisions recorded there.
 
-Run "vext update" to update all the configured libraries according to
-the vext-project.json specification, regardless of the existence of
-any vext-lock.json file, and then write out a new vext-lock.json
+Run `vext update` to update all the configured libraries according to
+the `vext-project.json` specification, regardless of the existence of
+any `vext-lock.json` file, and then write out a new `vext-lock.json`
 containing the resulting state. Pinned libraries will be updated if
 they are in Absent or Wrong state; unpinned libraries will always be
 updated, which should have an effect only when they are in Absent,
