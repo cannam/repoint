@@ -86,7 +86,10 @@ All libraries will be checked out into subdirectories of a single
 external-library directory in the project root; the name of this
 directory (typically "ext") is configured in vext-project.json. The
 ext directory should normally be excluded from your project's version
-control, i.e. added to your .hgignore, .gitignore etc file.
+control, i.e. added to your .hgignore, .gitignore etc file. The
+general expectation is that this directory contains only third-party
+code, and one could safely delete the entire directory and run Vext
+again to recreate it.
 
 Libraries are listed in the "libs" object in the config file. Each
 library has a key, which is the local name (a single directory or
