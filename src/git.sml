@@ -23,12 +23,15 @@ structure GitControl :> VCS_CONTROL = struct
                                | BRANCH "" => "master"
                                | BRANCH b => b
 
+    fun remote_branch_name branch = "origin/" ^ branch_name branch
+
     fun checkout context (libname, source, branch) =
         let val url = remote_for context (libname, source)
         in
             case FileBits.mkpath (FileBits.extpath context) of
                 OK () => git_command context ""
-                                     ["clone", "-b", branch_name branch,
+                                     ["clone", "-b",
+                                      branch_name branch,
                                       url, libname]
               | ERROR e => ERROR e
         end
@@ -57,7 +60,7 @@ structure GitControl :> VCS_CONTROL = struct
     fun branch_tip context (libname, branch) =
         git_command_output context libname
                            ["rev-list", "-1",
-                            "origin/" ^ branch_name branch]
+                            remote_branch_name branch]
                        
     fun is_newest_locally context (libname, branch) =
         case branch_tip context (libname, branch) of
@@ -74,9 +77,9 @@ structure GitControl :> VCS_CONTROL = struct
               | OK false =>
                 case git_command context libname
                                  ["merge-base", "--is-ancestor",
-                                  "HEAD", "origin/" ^ branch_name branch] of
+                                  "HEAD", remote_branch_name branch] of
                     ERROR e => OK false  (* cmd returns non-zero for no *)
-                  | OK () => OK true
+                  | _ => OK true
 
     fun is_newest context (libname, branch) =
         case is_newest_locally context (libname, branch) of
@@ -85,22 +88,13 @@ structure GitControl :> VCS_CONTROL = struct
           | OK true =>
             case git_command context libname ["fetch"] of
                 ERROR e => ERROR e
-              | OK () => is_newest_locally context (libname, branch)
+              | _ => is_newest_locally context (libname, branch)
 
     fun is_modified_locally context libname =
         case git_command_output context libname ["status", "-s"] of
             ERROR e => ERROR e
           | OK "" => OK false
           | OK _ => OK true
-
-    fun pull context (libname, branch) =
-        case git_command context libname ["fetch"] of
-            ERROR e => ERROR e
-          | OK () => 
-            case git_command context libname ["checkout", branch_name branch] of
-                ERROR e => ERROR e
-              | OK () => 
-                git_command context libname ["merge", "--ff-only"]
 
     (* This function updates to the latest revision on a branch rather
        than to a specific id or tag. We can't just checkout the given
@@ -110,10 +104,13 @@ structure GitControl :> VCS_CONTROL = struct
        but instead checkout the remote branch as a detached head. *)
 
     fun update context (libname, branch) =
-        case git_command context libname ["checkout",
-                                          "origin/" ^ branch_name branch] of
+        case git_command context libname ["fetch"] of
             ERROR e => ERROR e
-          | _ => id_of context libname
+          | _ =>
+            case git_command context libname ["checkout", "--detach",
+                                              remote_branch_name branch] of
+                ERROR e => ERROR e
+              | _ => id_of context libname
 
     (* This function is dealing with a specific id or tag, so if we
        can successfully check it out (detached) then that's all we need
