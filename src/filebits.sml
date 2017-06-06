@@ -11,7 +11,14 @@ structure FileBits :> sig
     val mkpath : string -> unit result
     val project_spec_path : string -> string
     val project_lock_path : string -> string
+    val verbose : unit -> bool
 end = struct
+
+    fun verbose () =
+        case OS.Process.getEnv "VEXT_VERBOSE" of
+            SOME "0" => false
+          | SOME _ => true
+          | NONE => false
 
     fun extpath ({ rootpath, extdir, ... } : context) =
         let val { isAbs, vol, arcs } = OS.Path.fromString rootpath
@@ -98,12 +105,30 @@ end = struct
                               (map quote
                                    (hd cmdlist :: map check (tl cmdlist)))
         end
+
+    val tick_cycle = ref 0
+    val tick_chars = Vector.fromList (map String.str (explode "|/-\\"))
+
+    fun tick name =
+        let val n = Vector.length tick_chars
+            fun pad_to n str =
+              if n <= String.size str then str
+              else pad_to n (str ^ " ")
+        in
+            print ("\r " ^
+                   Vector.sub(tick_chars, !tick_cycle) ^ " " ^
+                   pad_to 50 name);
+            tick_cycle := (if !tick_cycle = n - 1 then 0 else 1 + !tick_cycle)
+        end
             
     fun run_command context libname cmdlist redirect =
         let open OS
             val dir = libpath context libname
             val cmd = expand_commandline cmdlist
-            val _ = print ("Running: " ^ cmd ^ " (in dir " ^ dir ^ ")...\n")
+            val _ = if verbose ()
+                    then print ("Running: " ^ cmd ^
+                                " (in dir " ^ dir ^ ")...\n")
+                    else tick libname
             val _ = FileSys.chDir dir
             val status = case redirect of
                              NONE => Process.system cmd

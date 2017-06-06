@@ -32,7 +32,11 @@ run_a_test() {
     fi
 }
 
-if [ -z "$verbose" ]; then echo; fi
+if [ -n "$verbose" ]; then
+    export VEXT_VERBOSE=1
+else
+    echo
+fi
 
 for t in tests/test-*.sh ; do
     if [ -n "$verbose" ]; then 

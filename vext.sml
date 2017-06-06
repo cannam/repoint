@@ -191,7 +191,14 @@ structure FileBits :> sig
     val mkpath : string -> unit result
     val project_spec_path : string -> string
     val project_lock_path : string -> string
+    val verbose : unit -> bool
 end = struct
+
+    fun verbose () =
+        case OS.Process.getEnv "VEXT_VERBOSE" of
+            SOME "0" => false
+          | SOME _ => true
+          | NONE => false
 
     fun extpath ({ rootpath, extdir, ... } : context) =
         let val { isAbs, vol, arcs } = OS.Path.fromString rootpath
@@ -278,12 +285,30 @@ end = struct
                               (map quote
                                    (hd cmdlist :: map check (tl cmdlist)))
         end
+
+    val tick_cycle = ref 0
+    val tick_chars = Vector.fromList (map String.str (explode "|/-\\"))
+
+    fun tick name =
+        let val n = Vector.length tick_chars
+            fun pad_to n str =
+              if n <= String.size str then str
+              else pad_to n (str ^ " ")
+        in
+            print ("\r " ^
+                   Vector.sub(tick_chars, !tick_cycle) ^ " " ^
+                   pad_to 50 name);
+            tick_cycle := (if !tick_cycle = n - 1 then 0 else 1 + !tick_cycle)
+        end
             
     fun run_command context libname cmdlist redirect =
         let open OS
             val dir = libpath context libname
             val cmd = expand_commandline cmdlist
-            val _ = print ("Running: " ^ cmd ^ " (in dir " ^ dir ^ ")...\n")
+            val _ = if verbose ()
+                    then print ("Running: " ^ cmd ^
+                                " (in dir " ^ dir ^ ")...\n")
+                    else tick libname
             val _ = FileSys.chDir dir
             val status = case redirect of
                              NONE => Process.system cmd
@@ -1132,13 +1157,19 @@ structure HgControl :> VCS_CONTROL = struct
                                 "--template", "{node}"] of
             ERROR e => ERROR e
           | OK newest_in_repo => is_at context (libname, newest_in_repo)
-                                     
+
+    fun pull context libname =
+        hg_command context libname
+                   (if FileBits.verbose ()
+                    then ["pull"]
+                    else ["pull", "-q"])
+
     fun is_newest context (libname, branch) =
         case is_newest_locally context (libname, branch) of
             ERROR e => ERROR e
           | OK false => OK false
           | OK true =>
-            case hg_command context libname ["pull"] of
+            case pull context libname of
                 ERROR e => ERROR e
               | _ => is_newest_locally context (libname, branch)
 
@@ -1158,7 +1189,7 @@ structure HgControl :> VCS_CONTROL = struct
         end
                                                     
     fun update context (libname, branch) =
-        let val pull_result = hg_command context libname ["pull"]
+        let val pull_result = pull context libname
         in
             case hg_command context libname ["update", branch_name branch] of
                 ERROR e => ERROR e
@@ -1174,7 +1205,7 @@ structure HgControl :> VCS_CONTROL = struct
         case hg_command context libname ["update", "-r" ^ id] of
             OK () => id_of context libname
           | ERROR _ => 
-            case hg_command context libname ["pull"] of
+            case pull context libname of
                 ERROR e => ERROR e
               | _ =>
                 case hg_command context libname ["update", "-r" ^ id] of
@@ -1459,7 +1490,7 @@ val notes_width = 5
 val divider = " | "
 
 fun print_status_header () =
-    print ("\n " ^
+    print ("\r" ^ pad_to 80 "" ^ "\n " ^
            pad_to libname_width "Library" ^ divider ^
            pad_to libstate_width "State" ^ divider ^
            pad_to localstate_width "Local" ^ divider ^
@@ -1470,7 +1501,7 @@ fun print_status_header () =
            hline_to notes_width ^ "\n")
 
 fun print_outcome_header () =
-    print ("\n " ^
+    print ("\r" ^ pad_to 80 "" ^ "\n " ^
            pad_to libname_width "Library" ^ divider ^
            pad_to libstate_width "Outcome" ^ divider ^
            "Notes" ^ "\n " ^

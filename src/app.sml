@@ -144,7 +144,7 @@ val notes_width = 5
 val divider = " | "
 
 fun print_status_header () =
-    print ("\n " ^
+    print ("\r" ^ pad_to 80 "" ^ "\n " ^
            pad_to libname_width "Library" ^ divider ^
            pad_to libstate_width "State" ^ divider ^
            pad_to localstate_width "Local" ^ divider ^
@@ -155,7 +155,7 @@ fun print_status_header () =
            hline_to notes_width ^ "\n")
 
 fun print_outcome_header () =
-    print ("\n " ^
+    print ("\r" ^ pad_to 80 "" ^ "\n " ^
            pad_to libname_width "Library" ^ divider ^
            pad_to libstate_width "Outcome" ^ divider ^
            "Notes" ^ "\n " ^

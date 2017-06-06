@@ -79,13 +79,19 @@ structure HgControl :> VCS_CONTROL = struct
                                 "--template", "{node}"] of
             ERROR e => ERROR e
           | OK newest_in_repo => is_at context (libname, newest_in_repo)
-                                     
+
+    fun pull context libname =
+        hg_command context libname
+                   (if FileBits.verbose ()
+                    then ["pull"]
+                    else ["pull", "-q"])
+
     fun is_newest context (libname, branch) =
         case is_newest_locally context (libname, branch) of
             ERROR e => ERROR e
           | OK false => OK false
           | OK true =>
-            case hg_command context libname ["pull"] of
+            case pull context libname of
                 ERROR e => ERROR e
               | _ => is_newest_locally context (libname, branch)
 
@@ -105,7 +111,7 @@ structure HgControl :> VCS_CONTROL = struct
         end
                                                     
     fun update context (libname, branch) =
-        let val pull_result = hg_command context libname ["pull"]
+        let val pull_result = pull context libname
         in
             case hg_command context libname ["update", branch_name branch] of
                 ERROR e => ERROR e
@@ -121,7 +127,7 @@ structure HgControl :> VCS_CONTROL = struct
         case hg_command context libname ["update", "-r" ^ id] of
             OK () => id_of context libname
           | ERROR _ => 
-            case hg_command context libname ["pull"] of
+            case pull context libname of
                 ERROR e => ERROR e
               | _ =>
                 case hg_command context libname ["update", "-r" ^ id] of
