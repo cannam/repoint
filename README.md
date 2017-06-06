@@ -2,111 +2,201 @@
 Vext
 ====
 
-*NOTE* This is just an experiment.
-
 A simple manager for third-party source code dependencies.
 
-Vext is a program that maintains for you a directory of the external
-source code repositories that are needed to build your own program.
+Vext is a program that manages a single directory in your repository,
+containing checkouts of the external source code repositories that are
+needed to build your own program.
 
-You configure it with a list of libraries, their remote repository
-locations, and any revision or tag information you want a checkout to
-be associated with. This list is stored in your repository, and the
-Vext utility checks out the necessary code with the appropriate
-revision. It's like using Mercurial subrepositories or Git submodules,
-but without any version control system integration, and agnostic to
-which system you use.
+You might think of it as an alternative to Mercurial subrepositories
+or Git submodules, but with less magic and with equal support for both
+Mercurial and Git.
 
-Vext has three limitations that distinguish it from "proper" package
-managers:
+You configure Vext with a list of libraries, their remote repository
+locations, and any branch or tag information you want checkouts to
+follow. This list is stored in your repository, and when you run the
+Vext utility, it reviews the list and checks out the necessary code.
 
- 1. It only knows how to get things from version control
- repositories. There is no support for installing pre-packaged or
- pre-compiled dependencies. If it's not in a repository, or if cloning
- the repository would be too expensive, then Vext won't help.
+Vext has four limitations that distinguish it from all of the "proper"
+package managers like npm or Maven:
 
- 2. It can only bring code in to a subdirectory of the local directory
- (vendoring). There is no per-user or system-wide package installation
- location. Every local working copy gets its own copy.
+ 1. It only knows how to check out library code from hosted version
+ control repositories (like Github or Bitbucket). There is no support
+ for installing pre-packaged or pre-compiled dependencies. If it's not
+ in a repository, or if cloning the repository would be too expensive,
+ then Vext won't help.
 
- 3. It doesn't know how to build anything. It just brings in the
+ (A corollary is that you should only use Vext for development trees
+ that are themselves checked out from a hosted repo; don't distribute
+ source releases or end-user packages that depend on it. If your code
+ is distributed via a "proper" package manager itself, use that
+ package manager for its dependencies too.)
+
+ 2. It puts all third-party libraries into a subdirectory of the
+ project directory. There is no per-user or system-wide package
+ installation location. Every local working copy gets its own copy.
+
+ 3. It doesn't do dependency tracking. If an external library has its
+ own dependencies, you have to be aware of those and add them to the
+ configuration yourself.
+
+ 4. It doesn't know how to build anything. It just brings in the
  source code, and your build process is assumed to know what to do
  with it. This also means it doesn't care what language the source
  code is in.
 
-Libraries are listed in a vext-project.json file in the top-level
-working-copy directory, and Vext checks them out into subdirectories
-of a directory called ext. The ext directory should normally be
-excluded from version control (included in the .hgignore, .gitignore
-etc file).
+Besides those limitations, it has one big advantage:
 
-Libraries are specified by name, version control system (hg, git etc),
-repository hosting provider, and tag or revision ID. Vext knows about
-some standard hosting providers and may know (through a configuration
-in ~/.vext.json) the login names to use for ssh access to those
+ 1. It's equivalent to just checking out a bunch of repositories
+ yourself, but with a neater interface. That makes it unintrusive and
+ easy to understand, and suitable for situations where there isn't
+ really a package manager that will do the job.
+
+Vext was originally intended for use with projects written in C++,
+having in the range of 1-20 library dependencies to a project.
+
+
+Configuration
+=============
+
+Libraries are listed in a vext-project.json file in the top-level
+working-copy directory.
+
+An example vext-project.json:
+
+```
+{
+    "config": {
+        "extdir": "ext"
+    },
+    "libs": {
+        "vamp-plugin-sdk": {
+            "vcs": "git",
+            "service": "github",
+            "owner": "c4dm"
+        },
+        "bqvec": {
+            "vcs": "hg",
+	    "service": "bitbucket",
+            "owner": "breakfastquay"
+        }
+    }
+}
+```
+
+All libraries will be checked out into subdirectories of a single
+external-library directory in the project root; the name of this
+directory (typically "ext") is configured in vext-project.json. The
+ext directory should normally be excluded from your project's version
+control, i.e. added to your .hgignore, .gitignore etc file.
+
+Libraries are listed in the "libs" object in the config file. Each
+library has a key, which is the local name (a single directory or
+relative path) it will be checked out to. Properties of the library
+may include
+
+ * vcs - The version control system to use. Must be one of the
+   recognised set of names, currently "hg" or "git"
+
+ * service - The repository hosting provider. Some providers are
+   built-in, but you can define further ones in a "providers" section
+
+ * owner - User name owning the repository at the provider
+
+ * repository - Repository name at the provider, if it differs from
+   the local library name
+
+ * url - Complete URL to check out (alternative to specifying
+   provider, owner, etc)
+
+ * branch - Branch to check out if not the default
+
+ * pin - Specific revision id or tag to check out
+ 
+You can also optionally have a config file ~/.vext.json in which you
+can configure things like login names to use for ssh access to
 providers.
 
-A library may be listed as either pinned or unpinned. A pinned library
-has a specific tag or revision ID associated with it, and once it has
-been checked out at that tag, it won't be changed by Vext again unless
-the specification for it changes. An unpinned library floats on a
-branch and is potentially updated every time Vext is run.
+A library may be listed as either pinned (having a pin property) or
+unpinned (lacking one). A pinned library has a specific tag or
+revision ID associated with it, and once it has been checked out at
+that tag, it won't be changed by Vext again unless the specification
+for it changes. An unpinned library floats on a branch and is
+potentially updated every time "vext update" is run.
+
+Vext also creates a file called vext-lock.json, each time you update,
+which stores the versions actually used in the current project
+directory. This is referred to by the command "vext install" which
+installs exactly those versions. You can check this file into your
+version control system if you want to enable other users to get
+exactly the same revisions by running "vext install" themselves.
 
 
-Library status
-==============
+Querying library status
+=======================
 
-Run "vext review" to print statuses of all the configured libraries.
+Run "vext review" to check and print statuses of all the configured
+libraries. This won't change the local working copies, but it does
+involve contacting remote repositories to find out whether they have
+been updated, so network access is required.
 
-A pinned library can be _absent_, _present_, _superseded_, or _wrong_.
+Run "vext status" to do the same thing but without using the
+network. That's much faster but can only tell you whether something is
+in place for each library, not whether it's the newest thing
+available.
 
- * Absent: the library has not been checked out at all
- 
- * Present: the library has been checked out at the specified tag and
-   will not be changed; there is also no newer version available in the
-   remote repository
+The statuses that may be reported are:
 
- * Superseded: the library has been checked out at the specified tag
-   and will not be changed, but the version checked out is not the
-   newest version available in the remote repository
+For unpinned libraries:
 
- * Wrong: the library has been checked out, but it is not at the
-   specified tag (possibly because the library spec has changed since).
+ * _Absent_: No repository has been checked out for the library yet
 
-An unpinned library can be _absent_, _up-to-date_, or _out-of-date_.
+ * _Correct_: Library is the newest version available on the correct
+   branch. If you run "vext status" instead "vext review", this will
+   appear as _Present_ instead of _Correct_, as the program can't be
+   sure you have the latest version without using the network.
 
- * Absent: the library has not been checked out at all
+ * _Superseded_: Library exists and is on the correct branch, but
+   there is a newer revision available.
 
- * Up-to-date: the library has been checked out and there is no newer
-   version available in the remote repository
+ * _Wrong_: Library exists but is checked out on the wrong branch.
 
- * Out-of-date: the library has been checked out, but the version
-   checked out is not the newest version available in the remote
-   repository
+For pinned libraries:
 
-Additionally both pinned and unpinned libraries can be shown as
-"modified", meaning they have been changed locally.
+ * _Absent_: No repository has been checked out for the library yet
+
+ * _Correct_: Library is checked out at the pinned revision.
+
+ * _Wrong_: Library is checked out at any other revision.
+
+Also, both pinned and unpinned libraries can be shown with a local
+status either "Clean" (not changed locally) or "Modified" (someone has
+made a change to the local working copy for that library).
 
 
-Updating
-========
+Installing and updating
+=======================
 
-Run "vext update" to update all the configured libraries.
+Run "vext install" to update all the configured libraries. If there is
+a vext-lock.json file present, "vext install" will update all
+libraries listed in that file to the precise revisions recorded there.
 
-Pinned libraries will be updated if they are in Absent or Wrong state.
+Run "vext update" to update all the configured libraries according to
+the vext-project.json specification, regardless of the existence of
+any vext-lock.json file, and then write out a new vext-lock.json
+containing the resulting state. Pinned libraries will be updated if
+they are in Absent or Wrong state; unpinned libraries will always be
+updated, which should have an effect only when they are in Absent,
+Superseded, or Wrong state.
 
-Unpinned libraries will always be updated, which should have an effect
-only when they are in Absent or Out-of-date state.
+[![Build Status](https://travis-ci.org/cannam/vext.svg?branch=master)](https://travis-ci.org/cannam/vext)
 
 
 to add:
 
- + locally modified status (+status command that doesn't go to the network)
- + lock file mechanism (& add "install" which installs versions from lock file or falls back to "update" if lock file is absent)
+ + unify "service"/"provider" nomenclature above and in project file syntax
  + archive command
  + note about not handling libraries having their own dependencies
  + ability to commit and/or push?
- + dry-run option (print commands)
- 
-
-[![Build Status](https://travis-ci.org/cannam/vext.svg?branch=master)](https://travis-ci.org/cannam/vext)
+ + dry-run option (print commands)?
+ + more tests: service definitions, weird lib paths, explicit URL etc
