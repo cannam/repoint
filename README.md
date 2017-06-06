@@ -133,8 +133,8 @@ version control system if you want to enable other users to get
 exactly the same revisions by running `vext install` themselves.
 
 
-Querying library status
------------------------
+Reviewing library status
+------------------------
 
 Run `vext review` to check and print statuses of all the configured
 libraries. This won't change the local working copies, but it does
@@ -178,8 +178,8 @@ made a change to the local working copy for that library).
 Installing and updating libraries
 ---------------------------------
 
-Run `vext install` to update all the configured libraries. If there is
-a `vext-lock.json` file present, `vext install` will update all
+Run `vext install` to check out all the configured libraries. If there
+is a `vext-lock.json` file present, `vext install` will check out all
 libraries listed in that file to the precise revisions recorded there.
 
 Run `vext update` to update all the configured libraries according to
@@ -209,6 +209,9 @@ every platform Vext is intended to support.
 Vext has been tested on Linux, OSX, and Windows. CI tests currently
 cover Linux and OSX with both Mercurial and Git repositories using all
 three of the supported SML compilers.
+
+Vext is a developer tool. Don't ask end-users of your software to use
+it.
 
 [![Build Status](https://travis-ci.org/cannam/vext.svg?branch=master)](https://travis-ci.org/cannam/vext)
 
