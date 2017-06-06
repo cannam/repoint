@@ -198,15 +198,17 @@ Vext consists of four files which are normally copied
 (autotools-style) into the project root. These are `vext.sml` (the
 actual program, as Standard ML source code) and `vext`, `vext.bat` and
 `vext.ps1` (scripts which invoke the program using an SML
-interpreter). To run the program you would usually type `./vext
-update` (or whatever command) rather than just `vext update`.
-
-Vext has been tested on Linux, OSX, and Windows.
+interpreter). To run the program you would usually type e.g. `./vext
+update` rather than `vext update`.
 
 Vext does require a Standard ML compiler or interpreter to be
 installed. It supports Poly/ML, SML/NJ, or (on non-Windows platforms
 only) MLton, and it's quite easy to install at least one of these on
 every platform Vext is intended to support.
+
+Vext has been tested on Linux, OSX, and Windows. CI tests currently
+cover Linux and OSX with both Mercurial and Git repositories using all
+three of the supported SML compilers.
 
 [![Build Status](https://travis-ci.org/cannam/vext.svg?branch=master)](https://travis-ci.org/cannam/vext)
 
