@@ -24,7 +24,7 @@ structure HgControl :> VCS_CONTROL = struct
             and extract_branch b =
                 if is_branch b     (* need to remove enclosing parens *)
                 then (implode o rev o tl o rev o tl o explode) b
-                else ""
+                else "default"
             and is_modified id = id <> "" andalso #"+" = hd (rev (explode id))
             and extract_id id =
                 if is_modified id  (* need to remove trailing "+" *)
@@ -51,13 +51,14 @@ structure HgControl :> VCS_CONTROL = struct
 
     fun branch_name branch = case branch of
                                  DEFAULT_BRANCH => "default"
+                               | BRANCH "" => "default"
                                | BRANCH b => b
 
     fun id_of context libname =
         case current_state context libname of
             ERROR e => ERROR e
           | OK { id, ... } => OK id
-                                                 
+
     fun is_at context (libname, id_or_tag) =
         case current_state context libname of
             ERROR e => ERROR e
@@ -66,18 +67,29 @@ structure HgControl :> VCS_CONTROL = struct
                 String.isPrefix id id_or_tag orelse
                 List.exists (fn t => t = id_or_tag) tags)
 
-    fun is_newest context (libname, source, branch) =
-        case hg_command context libname ["pull"] of
+    fun is_on_branch context (libname, b) =
+        case current_state context libname of
             ERROR e => ERROR e
-          | _ =>
-            case hg_command_output context libname
-                                   ["log", "-l1",
-                                    "-b", branch_name branch,
-                                    "--template", "{node}"] of
+          | OK { branch, ... } => OK (branch = branch_name b)
+               
+    fun is_newest_locally context (libname, branch) =
+        case hg_command_output context libname
+                               ["log", "-l1",
+                                "-b", branch_name branch,
+                                "--template", "{node}"] of
+            ERROR e => ERROR e
+          | OK newest_in_repo => is_at context (libname, newest_in_repo)
+                                     
+    fun is_newest context (libname, branch) =
+        case is_newest_locally context (libname, branch) of
+            ERROR e => ERROR e
+          | OK false => OK false
+          | OK true =>
+            case hg_command context libname ["pull"] of
                 ERROR e => ERROR e
-              | OK newest_in_repo => is_at context (libname, newest_in_repo)
+              | _ => is_newest_locally context (libname, branch)
 
-    fun is_locally_modified context libname =
+    fun is_modified_locally context libname =
         case current_state context libname of
             ERROR e => ERROR e
           | OK { modified, ... } => OK modified
@@ -92,7 +104,7 @@ structure HgControl :> VCS_CONTROL = struct
                                  url, libname]
         end
                                                     
-    fun update context (libname, source, branch) =
+    fun update context (libname, branch) =
         let val pull_result = hg_command context libname ["pull"]
         in
             case hg_command context libname ["update", branch_name branch] of
@@ -103,20 +115,17 @@ structure HgControl :> VCS_CONTROL = struct
                   | _ => id_of context libname
         end
 
-    fun update_to context (libname, source, "") =
+    fun update_to context (libname, "") =
         ERROR "Non-empty id (tag or revision id) required for update_to"
-      | update_to context (libname, source, id) = 
-        let val url = remote_for context (libname, source)
-        in
-            case hg_command context libname ["update", "-r" ^ id] of
-                OK () => id_of context libname
-              | ERROR _ => 
-                case hg_command context libname ["pull", url] of
+      | update_to context (libname, id) = 
+        case hg_command context libname ["update", "-r" ^ id] of
+            OK () => id_of context libname
+          | ERROR _ => 
+            case hg_command context libname ["pull"] of
+                ERROR e => ERROR e
+              | _ =>
+                case hg_command context libname ["update", "-r" ^ id] of
                     ERROR e => ERROR e
-                  | _ =>
-                    case hg_command context libname ["update", "-r" ^ id] of
-                        ERROR e => ERROR e
-                      | _ => id_of context libname
-        end
+                  | _ => id_of context libname
                   
 end

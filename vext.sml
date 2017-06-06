@@ -132,14 +132,45 @@ structure VextFilenames = struct
 end
                    
 signature VCS_CONTROL = sig
+
+    (** Test whether the library is present locally at all *)
     val exists : context -> libname -> bool result
+                                            
+    (** Return the id (hash) of the current revision for the library *)
     val id_of : context -> libname -> id_or_tag result
+
+    (** Test whether the library is at the given id *)
     val is_at : context -> libname * id_or_tag -> bool result
-    val is_newest : context -> libname * source * branch -> bool result
-    val is_locally_modified : context -> libname -> bool result
+
+    (** Test whether the library is on the given branch, i.e. is at
+        the branch tip or an ancestor of it *)
+    val is_on_branch : context -> libname * branch -> bool result
+
+    (** Test whether the library is at the newest revision for the
+        given branch. False may indicate that the branch has advanced
+        or that the library is not on the branch at all. This function
+        may use the network to check for new revisions *)
+    val is_newest : context -> libname * branch -> bool result
+
+    (** Test whether the library is at the newest revision available
+        locally for the given branch. False may indicate that the
+        branch has advanced or that the library is not on the branch
+        at all. This function must not use the network *)
+    val is_newest_locally : context -> libname * branch -> bool result
+
+    (** Test whether the library has been modified in the local
+        working copy *)
+    val is_modified_locally : context -> libname -> bool result
+
+    (** Check out, i.e. clone a fresh copy of, the repo for the given
+        library on the given branch *)
     val checkout : context -> libname * source * branch -> unit result
-    val update : context -> libname * source * branch -> id_or_tag result
-    val update_to : context -> libname * source * id_or_tag -> id_or_tag result
+
+    (** Update the library to the given branch tip *)
+    val update : context -> libname * branch -> id_or_tag result
+
+    (** Update the library to the given specific id or tag *)
+    val update_to : context -> libname * id_or_tag -> id_or_tag result
 end
 
 signature LIB_CONTROL = sig
@@ -342,18 +373,21 @@ functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
        - ABSENT: Repo doesn't exist here at all.
     *)
 
-    fun check with_network context
-              ({ libname, source, branch, pin, ... } : libspec) =
+    fun check with_network context ({ libname, branch, pin, ... } : libspec) =
         let fun check_unpinned () =
-                if with_network
-                then case V.is_newest context (libname, source, branch) of
+                let val is_newest = if with_network
+                                    then V.is_newest
+                                    else V.is_newest_locally
+                in
+                    case is_newest context (libname, branch) of
                          ERROR e => ERROR e
                        | OK true => OK CORRECT
-                       (*!!! We can't currently tell the difference
-                             between superseded (on the same branch) and
-                             wrong branch checked out *)
-                       | OK false => OK SUPERSEDED
-                else OK CORRECT
+                       | OK false =>
+                         case V.is_on_branch context (libname, branch) of
+                             ERROR e => ERROR e
+                           | OK true => OK SUPERSEDED
+                           | OK false => OK WRONG
+                end
             fun check_pinned target =
                 case V.is_at context (libname, target) of
                     ERROR e => ERROR e
@@ -368,7 +402,7 @@ functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
                 ERROR e => ERROR e
               | OK false => OK (ABSENT, UNMODIFIED)
               | OK true =>
-                case (check' (), V.is_locally_modified context libname) of
+                case (check' (), V.is_modified_locally context libname) of
                     (ERROR e, _) => ERROR e
                   | (_, ERROR e) => ERROR e
                   | (OK state, OK true) => OK (state, MODIFIED)
@@ -380,15 +414,15 @@ functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
                          
     fun update context ({ libname, source, branch, pin, ... } : libspec) =
         let fun update_unpinned () =
-                case V.is_newest context (libname, source, branch) of
+                case V.is_newest context (libname, branch) of
                     ERROR e => ERROR e
                   | OK true => V.id_of context libname
-                  | OK false => V.update context (libname, source, branch)
+                  | OK false => V.update context (libname, branch)
             fun update_pinned target =
                 case V.is_at context (libname, target) of
                     ERROR e => ERROR e
                   | OK true => OK target
-                  | OK false => V.update_to context (libname, source, target)
+                  | OK false => V.update_to context (libname, target)
             fun update' () =
                 case pin of
                     UNPINNED => update_unpinned ()
@@ -1043,7 +1077,7 @@ structure HgControl :> VCS_CONTROL = struct
             and extract_branch b =
                 if is_branch b     (* need to remove enclosing parens *)
                 then (implode o rev o tl o rev o tl o explode) b
-                else ""
+                else "default"
             and is_modified id = id <> "" andalso #"+" = hd (rev (explode id))
             and extract_id id =
                 if is_modified id  (* need to remove trailing "+" *)
@@ -1070,13 +1104,14 @@ structure HgControl :> VCS_CONTROL = struct
 
     fun branch_name branch = case branch of
                                  DEFAULT_BRANCH => "default"
+                               | BRANCH "" => "default"
                                | BRANCH b => b
 
     fun id_of context libname =
         case current_state context libname of
             ERROR e => ERROR e
           | OK { id, ... } => OK id
-                                                 
+
     fun is_at context (libname, id_or_tag) =
         case current_state context libname of
             ERROR e => ERROR e
@@ -1085,18 +1120,29 @@ structure HgControl :> VCS_CONTROL = struct
                 String.isPrefix id id_or_tag orelse
                 List.exists (fn t => t = id_or_tag) tags)
 
-    fun is_newest context (libname, source, branch) =
-        case hg_command context libname ["pull"] of
+    fun is_on_branch context (libname, b) =
+        case current_state context libname of
             ERROR e => ERROR e
-          | _ =>
-            case hg_command_output context libname
-                                   ["log", "-l1",
-                                    "-b", branch_name branch,
-                                    "--template", "{node}"] of
+          | OK { branch, ... } => OK (branch = branch_name b)
+               
+    fun is_newest_locally context (libname, branch) =
+        case hg_command_output context libname
+                               ["log", "-l1",
+                                "-b", branch_name branch,
+                                "--template", "{node}"] of
+            ERROR e => ERROR e
+          | OK newest_in_repo => is_at context (libname, newest_in_repo)
+                                     
+    fun is_newest context (libname, branch) =
+        case is_newest_locally context (libname, branch) of
+            ERROR e => ERROR e
+          | OK false => OK false
+          | OK true =>
+            case hg_command context libname ["pull"] of
                 ERROR e => ERROR e
-              | OK newest_in_repo => is_at context (libname, newest_in_repo)
+              | _ => is_newest_locally context (libname, branch)
 
-    fun is_locally_modified context libname =
+    fun is_modified_locally context libname =
         case current_state context libname of
             ERROR e => ERROR e
           | OK { modified, ... } => OK modified
@@ -1111,7 +1157,7 @@ structure HgControl :> VCS_CONTROL = struct
                                  url, libname]
         end
                                                     
-    fun update context (libname, source, branch) =
+    fun update context (libname, branch) =
         let val pull_result = hg_command context libname ["pull"]
         in
             case hg_command context libname ["update", branch_name branch] of
@@ -1122,21 +1168,18 @@ structure HgControl :> VCS_CONTROL = struct
                   | _ => id_of context libname
         end
 
-    fun update_to context (libname, source, "") =
+    fun update_to context (libname, "") =
         ERROR "Non-empty id (tag or revision id) required for update_to"
-      | update_to context (libname, source, id) = 
-        let val url = remote_for context (libname, source)
-        in
-            case hg_command context libname ["update", "-r" ^ id] of
-                OK () => id_of context libname
-              | ERROR _ => 
-                case hg_command context libname ["pull", url] of
+      | update_to context (libname, id) = 
+        case hg_command context libname ["update", "-r" ^ id] of
+            OK () => id_of context libname
+          | ERROR _ => 
+            case hg_command context libname ["pull"] of
+                ERROR e => ERROR e
+              | _ =>
+                case hg_command context libname ["update", "-r" ^ id] of
                     ERROR e => ERROR e
-                  | _ =>
-                    case hg_command context libname ["update", "-r" ^ id] of
-                        ERROR e => ERROR e
-                      | _ => id_of context libname
-        end
+                  | _ => id_of context libname
                   
 end
 
@@ -1161,10 +1204,11 @@ structure GitControl :> VCS_CONTROL = struct
 
     fun branch_name branch = case branch of
                                  DEFAULT_BRANCH => "master"
+                               | BRANCH "" => "master"
                                | BRANCH b => b
 
-    fun checkout context (libname, provider, branch) =
-        let val url = remote_for context (libname, provider)
+    fun checkout context (libname, source, branch) =
+        let val url = remote_for context (libname, source)
         in
             case FileBits.mkpath (FileBits.extpath context) of
                 OK () => git_command context ""
@@ -1194,24 +1238,40 @@ structure GitControl :> VCS_CONTROL = struct
                     OK (tid = id andalso
                         tid <> id_or_tag) (* else id_or_tag was id not tag *)
 
-    fun is_newest context (libname, provider, branch) =
-        let fun newest_here () =
-              case git_command_output context libname
-                                      ["rev-list", "-1",
-                                       "origin/" ^ branch_name branch] of
-                  ERROR e => ERROR e
-                | OK rev => is_at context (libname, rev)
-        in
-            case newest_here () of
-                ERROR e => ERROR e
-              | OK false => OK false
-              | OK true =>
-                case git_command context libname ["fetch"] of
-                    ERROR e => ERROR e
-                  | OK () => newest_here ()
-        end
+    fun branch_tip context (libname, branch) =
+        git_command_output context libname
+                           ["rev-list", "-1",
+                            "origin/" ^ branch_name branch]
+                       
+    fun is_newest_locally context (libname, branch) =
+        case branch_tip context (libname, branch) of
+            ERROR e => ERROR e
+          | OK rev => is_at context (libname, rev)
 
-    fun is_locally_modified context libname =
+    fun is_on_branch context (libname, branch) =
+        case branch_tip context (libname, branch) of
+            ERROR e => ERROR e
+          | OK rev =>
+            case is_at context (libname, rev) of
+                ERROR e => ERROR e
+              | OK true => OK true
+              | OK false =>
+                case git_command context libname
+                                 ["merge-base", "--is-ancestor",
+                                  "HEAD", "origin/" ^ branch_name branch] of
+                    ERROR e => OK false  (* cmd returns non-zero for no *)
+                  | OK () => OK true
+
+    fun is_newest context (libname, branch) =
+        case is_newest_locally context (libname, branch) of
+            ERROR e => ERROR e
+          | OK false => OK false
+          | OK true =>
+            case git_command context libname ["fetch"] of
+                ERROR e => ERROR e
+              | OK () => is_newest_locally context (libname, branch)
+
+    fun is_modified_locally context libname =
         case git_command_output context libname ["status", "-s"] of
             ERROR e => ERROR e
           | OK "" => OK false
@@ -1233,7 +1293,7 @@ structure GitControl :> VCS_CONTROL = struct
        but it's perhaps cleaner not to maintain a local branch at all,
        but instead checkout the remote branch as a detached head. *)
 
-    fun update context (libname, provider, branch) =
+    fun update context (libname, branch) =
         case git_command context libname ["checkout",
                                           "origin/" ^ branch_name branch] of
             ERROR e => ERROR e
@@ -1243,9 +1303,9 @@ structure GitControl :> VCS_CONTROL = struct
        can successfully check it out (detached) then that's all we need
        to do. Otherwise we need to fetch and try again *)
 
-    fun update_to context (libname, provider, "") = 
+    fun update_to context (libname, "") = 
         ERROR "Non-empty id (tag or revision id) required for update_to"
-      | update_to context (libname, provider, id) =
+      | update_to context (libname, id) =
         case git_command context libname ["checkout", "--detach", id] of
             OK () => id_of context libname
           | ERROR _ => 

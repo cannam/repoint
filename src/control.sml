@@ -26,18 +26,21 @@ functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
        - ABSENT: Repo doesn't exist here at all.
     *)
 
-    fun check with_network context
-              ({ libname, source, branch, pin, ... } : libspec) =
+    fun check with_network context ({ libname, branch, pin, ... } : libspec) =
         let fun check_unpinned () =
-                if with_network
-                then case V.is_newest context (libname, source, branch) of
+                let val is_newest = if with_network
+                                    then V.is_newest
+                                    else V.is_newest_locally
+                in
+                    case is_newest context (libname, branch) of
                          ERROR e => ERROR e
                        | OK true => OK CORRECT
-                       (*!!! We can't currently tell the difference
-                             between superseded (on the same branch) and
-                             wrong branch checked out *)
-                       | OK false => OK SUPERSEDED
-                else OK CORRECT
+                       | OK false =>
+                         case V.is_on_branch context (libname, branch) of
+                             ERROR e => ERROR e
+                           | OK true => OK SUPERSEDED
+                           | OK false => OK WRONG
+                end
             fun check_pinned target =
                 case V.is_at context (libname, target) of
                     ERROR e => ERROR e
@@ -52,7 +55,7 @@ functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
                 ERROR e => ERROR e
               | OK false => OK (ABSENT, UNMODIFIED)
               | OK true =>
-                case (check' (), V.is_locally_modified context libname) of
+                case (check' (), V.is_modified_locally context libname) of
                     (ERROR e, _) => ERROR e
                   | (_, ERROR e) => ERROR e
                   | (OK state, OK true) => OK (state, MODIFIED)
@@ -64,15 +67,15 @@ functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
                          
     fun update context ({ libname, source, branch, pin, ... } : libspec) =
         let fun update_unpinned () =
-                case V.is_newest context (libname, source, branch) of
+                case V.is_newest context (libname, branch) of
                     ERROR e => ERROR e
                   | OK true => V.id_of context libname
-                  | OK false => V.update context (libname, source, branch)
+                  | OK false => V.update context (libname, branch)
             fun update_pinned target =
                 case V.is_at context (libname, target) of
                     ERROR e => ERROR e
                   | OK true => OK target
-                  | OK false => V.update_to context (libname, source, target)
+                  | OK false => V.update_to context (libname, target)
             fun update' () =
                 case pin of
                     UNPINNED => update_unpinned ()

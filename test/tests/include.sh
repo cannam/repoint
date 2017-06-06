@@ -84,18 +84,21 @@ EOF
     fi
 }
 
-assert_all() {
+assert_outputs() {
     local task="$1"
-    local status="$2"
+    local expected="$2"
     local output=$("$vext" "$task" | grep '|' | tail -2 |
                        awk -F'|' '{ print $2 }' |
                        sed 's/ //g' |
                        fmt -80)
-    local expected="$status $status"
     if [ "$output" != "$expected" ]; then
         echo "ERROR: output for task $task ($output) does not match expected ($expected)"
         exit 3
     fi
+}    
+
+assert_all() {
+    assert_outputs "$1" "$2 $2"
 }
 
 assert_all_wrong() {

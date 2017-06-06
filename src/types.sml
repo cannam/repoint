@@ -95,14 +95,45 @@ structure VextFilenames = struct
 end
                    
 signature VCS_CONTROL = sig
+
+    (** Test whether the library is present locally at all *)
     val exists : context -> libname -> bool result
+                                            
+    (** Return the id (hash) of the current revision for the library *)
     val id_of : context -> libname -> id_or_tag result
+
+    (** Test whether the library is at the given id *)
     val is_at : context -> libname * id_or_tag -> bool result
-    val is_newest : context -> libname * source * branch -> bool result
-    val is_locally_modified : context -> libname -> bool result
+
+    (** Test whether the library is on the given branch, i.e. is at
+        the branch tip or an ancestor of it *)
+    val is_on_branch : context -> libname * branch -> bool result
+
+    (** Test whether the library is at the newest revision for the
+        given branch. False may indicate that the branch has advanced
+        or that the library is not on the branch at all. This function
+        may use the network to check for new revisions *)
+    val is_newest : context -> libname * branch -> bool result
+
+    (** Test whether the library is at the newest revision available
+        locally for the given branch. False may indicate that the
+        branch has advanced or that the library is not on the branch
+        at all. This function must not use the network *)
+    val is_newest_locally : context -> libname * branch -> bool result
+
+    (** Test whether the library has been modified in the local
+        working copy *)
+    val is_modified_locally : context -> libname -> bool result
+
+    (** Check out, i.e. clone a fresh copy of, the repo for the given
+        library on the given branch *)
     val checkout : context -> libname * source * branch -> unit result
-    val update : context -> libname * source * branch -> id_or_tag result
-    val update_to : context -> libname * source * id_or_tag -> id_or_tag result
+
+    (** Update the library to the given branch tip *)
+    val update : context -> libname * branch -> id_or_tag result
+
+    (** Update the library to the given specific id or tag *)
+    val update_to : context -> libname * id_or_tag -> id_or_tag result
 end
 
 signature LIB_CONTROL = sig

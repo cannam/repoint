@@ -20,10 +20,11 @@ structure GitControl :> VCS_CONTROL = struct
 
     fun branch_name branch = case branch of
                                  DEFAULT_BRANCH => "master"
+                               | BRANCH "" => "master"
                                | BRANCH b => b
 
-    fun checkout context (libname, provider, branch) =
-        let val url = remote_for context (libname, provider)
+    fun checkout context (libname, source, branch) =
+        let val url = remote_for context (libname, source)
         in
             case FileBits.mkpath (FileBits.extpath context) of
                 OK () => git_command context ""
@@ -53,24 +54,40 @@ structure GitControl :> VCS_CONTROL = struct
                     OK (tid = id andalso
                         tid <> id_or_tag) (* else id_or_tag was id not tag *)
 
-    fun is_newest context (libname, provider, branch) =
-        let fun newest_here () =
-              case git_command_output context libname
-                                      ["rev-list", "-1",
-                                       "origin/" ^ branch_name branch] of
-                  ERROR e => ERROR e
-                | OK rev => is_at context (libname, rev)
-        in
-            case newest_here () of
-                ERROR e => ERROR e
-              | OK false => OK false
-              | OK true =>
-                case git_command context libname ["fetch"] of
-                    ERROR e => ERROR e
-                  | OK () => newest_here ()
-        end
+    fun branch_tip context (libname, branch) =
+        git_command_output context libname
+                           ["rev-list", "-1",
+                            "origin/" ^ branch_name branch]
+                       
+    fun is_newest_locally context (libname, branch) =
+        case branch_tip context (libname, branch) of
+            ERROR e => ERROR e
+          | OK rev => is_at context (libname, rev)
 
-    fun is_locally_modified context libname =
+    fun is_on_branch context (libname, branch) =
+        case branch_tip context (libname, branch) of
+            ERROR e => ERROR e
+          | OK rev =>
+            case is_at context (libname, rev) of
+                ERROR e => ERROR e
+              | OK true => OK true
+              | OK false =>
+                case git_command context libname
+                                 ["merge-base", "--is-ancestor",
+                                  "HEAD", "origin/" ^ branch_name branch] of
+                    ERROR e => OK false  (* cmd returns non-zero for no *)
+                  | OK () => OK true
+
+    fun is_newest context (libname, branch) =
+        case is_newest_locally context (libname, branch) of
+            ERROR e => ERROR e
+          | OK false => OK false
+          | OK true =>
+            case git_command context libname ["fetch"] of
+                ERROR e => ERROR e
+              | OK () => is_newest_locally context (libname, branch)
+
+    fun is_modified_locally context libname =
         case git_command_output context libname ["status", "-s"] of
             ERROR e => ERROR e
           | OK "" => OK false
@@ -92,7 +109,7 @@ structure GitControl :> VCS_CONTROL = struct
        but it's perhaps cleaner not to maintain a local branch at all,
        but instead checkout the remote branch as a detached head. *)
 
-    fun update context (libname, provider, branch) =
+    fun update context (libname, branch) =
         case git_command context libname ["checkout",
                                           "origin/" ^ branch_name branch] of
             ERROR e => ERROR e
@@ -102,9 +119,9 @@ structure GitControl :> VCS_CONTROL = struct
        can successfully check it out (detached) then that's all we need
        to do. Otherwise we need to fetch and try again *)
 
-    fun update_to context (libname, provider, "") = 
+    fun update_to context (libname, "") = 
         ERROR "Non-empty id (tag or revision id) required for update_to"
-      | update_to context (libname, provider, id) =
+      | update_to context (libname, id) =
         case git_command context libname ["checkout", "--detach", id] of
             OK () => id_of context libname
           | ERROR _ => 

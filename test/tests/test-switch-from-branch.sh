@@ -39,9 +39,8 @@ write_project_file "$libcontent_nobranch"
 "$vext" install # obeys lock file, so should do nothing
 check_expected 1379d75f0b4f 7219cf6e6d4706295246d278a3821ea923e1dfe2
 
-#!!! todo: what should these do? In both cases we should be able to
-#!!! tell we are on the wrong branch; this isn't like the
-#!!! pinned/unpinned case
+# We are now on the wrong branch, and both status and review should be
+# able to see that
 assert_all_wrong status
 assert_all_wrong review
 
