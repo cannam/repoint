@@ -21,10 +21,13 @@ if (!$sml) {
     } else {
        echo @"
 
-  This program needs a Standard ML compiler or interpreter.
+ERROR: No supported SML compiler or interpreter found       
 
-  Please ensure you have one of the following Standard ML
-  implementations installed and present in your PATH, and try again:
+  The Vext external source code manager needs a Standard ML (SML)
+  compiler or interpreter to run.
+
+  Please ensure you have one of the following SML implementations
+  installed and present in your PATH, and try again.
 
     1. Poly/ML
        - executable name: polyml
