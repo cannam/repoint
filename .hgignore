@@ -7,3 +7,4 @@ src/vext.mlb
 test/tests/current
 test/testrepos/A
 test/testrepos/B
+*.orig
