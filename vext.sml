@@ -1633,8 +1633,8 @@ fun usage () =
             ^ "Usage:\n\n"
             ^ "  vext <command>\n\n"
             ^ "where <command> is one of:\n\n"
-            ^ "  review   check configured libraries against their providers, and report\n"
             ^ "  status   print quick report on local status only, without using network\n"
+            ^ "  review   check configured libraries against their providers, and report\n"
             ^ "  install  update configured libraries according to project specs and lock file\n"
             ^ "  update   update configured libraries and lock file according to project specs\n"
             ^ "  version  print the Vext version number and exit\n\n");
