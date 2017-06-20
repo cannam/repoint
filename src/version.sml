@@ -30,5 +30,5 @@
     Software without prior written authorization.
 *)
 
-val vext_version = "0.0.1"
+val vext_version = "0.9.0"
 
