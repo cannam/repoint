@@ -144,41 +144,41 @@ relative path) it will be checked out to within the external-library
 directory. Properties of a library may include
 
  * `vcs` - The version control system to use. Must be one of the
-   recognised set of names, currently `hg` (Mercurial) or `git`
+   recognised set of names, currently `hg` (Mercurial) or `git`.
 
  * `service` - The repository hosting service. Some services are
    built-in, but you can define further ones in a `services` section
-   (see below)
+   (see "Further configuration" below).
 
- * `owner` - User name owning the repository at the provider
+ * `owner` - User or project name of the owner of the repository on
+   the hosting service.
 
  * `repository` - Repository name at the provider, if it differs from
-   the local library name
+   the local library name.
 
- * `url` - Complete URL to check out (as an alternative to specifying
-   `service`, `owner`, etc)
+ * `url` - Complete URL to check out, as an alternative to specifying
+   the `service`, `owner`, etc.
 
- * `branch` - Branch to check out if not the default
+ * `branch` - Branch to check out if not the default.
 
- * `pin` - Specific revision id or tag to check out
+ * `pin` - Specific revision id or tag to check out if not always the
+   latest.
  
-You can also optionally have a config file `~/.vext.json` in which you
-can configure things like login names to use for ssh access to
-providers.
+A library that has a `pin` property is pinned to a specific tag or
+revision ID, and once it has been checked out at that tag or ID, it
+won't be changed by Vext again unless the specification for it
+changes. An unpinned library floats on a branch and is potentially
+updated every time `vext update` is run.
 
-A library may be listed as either pinned (having a `pin` property) or
-unpinned (lacking one). A pinned library has a specific tag or
-revision ID associated with it, and once it has been checked out at
-that tag, it won't be changed by Vext again unless the specification
-for it changes. An unpinned library floats on a branch and is
-potentially updated every time `vext update` is run.
+Vext creates a file called `vext-lock.json` each time you update a
+project, which stores the versions actually used in the current
+project directory. This is then used by the command `vext install`,
+which installs exactly the versions listed in the lock file. You can
+check this file into your version control system to ensure that other
+users get the same revisions when running `vext install` themselves.
 
-Vext also creates a file called `vext-lock.json` each time you update
-a project, which stores the versions actually used in the current
-project directory. This is referred to by the command `vext install`,
-which installs exactly those versions. You can check this file into
-your version control system if you want to enable other users to get
-exactly the same revisions by running `vext install` themselves.
+See "Further configuration" below for more per-project and per-user
+configuration possibilities.
 
 
 Using the Vext tool
