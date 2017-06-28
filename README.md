@@ -33,8 +33,7 @@ for the project.
 Vext was written as an alternative to Mercurial subrepositories for
 cross-platform C++ projects with numerous external dependencies, so as
 to manage them in a simple way without depending on a particular
-version control system or host and without using a giant
-mono-repository.
+version control system and without using a giant mono-repository.
 
 Vext has four limitations that distinguish it from "proper" package
 managers like npm or Maven:
@@ -62,13 +61,13 @@ managers like npm or Maven:
  with it. This also means it doesn't care what language the source
  code is in or what build tool you use.
 
-Vext has one big advantage over "proper" package managers:
+In turn it has one big advantage over "proper" package managers:
 
- 1. It's equivalent to just checking out a bunch of repositories
- yourself, but with a neater interface. That makes it unintrusive,
- easy to understand, able to install libraries that aren't set up to
- be packages, and usable in other situations where there isn't a
- package manager ready to do the job.
+ 1. It is equivalent to cloning a bunch of repositories yourself, but
+ with a neater interface. That makes it unintrusive, easy to
+ understand, able to install libraries that aren't set up to be
+ packages, and usable in other situations where there isn't a package
+ manager ready to do the job.
 
 
 Installing Vext
@@ -78,23 +77,23 @@ Vext consists of four files which can be copied autotools-style into
 the project root. These are `vext`, `vext.sml`, `vext.bat` and
 `vext.ps1`. The file `vext.sml` contains the actual program, while
 `vext`, `vext.bat` and `vext.ps1` are platform-specific wrappers. In
-this configuration, you should type `./vext` to run the Vext
-tool. Alternatively the same files can be installed to the PATH like
-any other executables.
+this configuration, you should type `./vext` to run the Vext tool
+regardless of platform. Alternatively the same files can be installed
+to the PATH like any other executables.
 
-The Vext distribution includes a shell script called `implant.sh`
+The Vext distribution also includes a Bash script called `implant.sh`
 which copies the four Vext files into whichever directory you run the
 shell script from.
 
-Vext requires a Standard ML compiler or interpreter to be available
-when it is run. It supports [Poly/ML](http://polyml.org),
-[SML/NJ](http://smlnj.org), or on non-Windows platforms,
+Vext requires a Standard ML compiler to be available when it is
+run. It supports [Poly/ML](http://polyml.org),
+[SML/NJ](http://smlnj.org), or, on non-Windows platforms only,
 [MLton](http://mlton.org). It is fairly easy to install at least one
 of these on every platform Vext is intended to support.
 
 Vext has been tested on Linux, macOS, and Windows. Integration tests
-currently cover Linux and macOS with both Mercurial and Git
-repositories using all three of the supported SML compilers.
+currently cover Linux and macOS with Mercurial and Git repositories,
+using all three of the supported SML compilers.
 
 Vext is a developer tool. Don't ask end-users of your software to use
 it.
