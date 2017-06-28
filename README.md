@@ -28,6 +28,8 @@ $ ./vext install
 should be sufficient to retrieve the necessary dependencies specified
 for the project.
 
+### Rationale
+
 Vext has four limitations that distinguish it from "proper" package
 managers like npm or Maven:
 
