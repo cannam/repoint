@@ -100,70 +100,8 @@ it.
 
 [![Build Status](https://travis-ci.org/cannam/vext.svg?branch=master)](https://travis-ci.org/cannam/vext)
 
-
-Using the Vext tool
--------------------
-
-### Reviewing library status
-
-Run `vext review` to check and print statuses of all the configured
-libraries. This won't change the local working copies, but it does
-fetch any pending changes from remote repositories, so network access
-is required.
-
-Run `vext status` to do the same thing but without using the
-network. That's much faster but can only tell you whether something is
-in place for each library, not whether it's the newest thing
-available.
-
-The statuses that may be reported are:
-
-For unpinned libraries:
-
- * __Absent__: No repository has been checked out for the library yet
-
- * __Correct__: Library is the newest version available on the correct
-   branch. If you run `vext status` instead `vext review`, this will
-   appear as __Present__ instead of __Correct__, as the program can't
-   be sure you have the latest version without using the network.
-
- * __Superseded__: Library exists and is on the correct branch, but
-   there is a newer revision available.
-
- * __Wrong__: Library exists but is checked out on the wrong branch.
-
-For pinned libraries:
-
- * __Absent__: No repository has been checked out for the library yet
-
- * __Correct__: Library is checked out at the pinned revision.
-
- * __Wrong__: Library is checked out at any other revision.
-
-Also, both pinned and unpinned libraries can be shown with a local
-status either "Clean" (not changed locally) or "Modified" (someone has
-made a change to the local working copy for that library).
-
-### Installing and updating libraries
-
-Run `vext install` to install, i.e. to check out locally, all the
-configured libraries. If there is a `vext-lock.json` file present,
-`vext install` will check out all libraries listed in that file to the
-precise revisions recorded there.
-
-Run `vext update` to update all the configured libraries according to
-the `vext-project.json` specification, regardless of the existence of
-any `vext-lock.json` file, and then write out a new `vext-lock.json`
-containing the resulting state. Pinned libraries will be updated if
-they are in Absent or Wrong state; unpinned libraries will always be
-updated, which should have an effect only when they are in Absent,
-Superseded, or Wrong state.
-
-
-Configuring Vext
-----------------
-
-### Setting up a project
+Setting up a Vext project
+-------------------------
 
 List the external libraries needed for your project in a JSON file
 called `vext-project.json` in your project's top-level directory.
@@ -240,6 +178,69 @@ project directory. This is referred to by the command `vext install`,
 which installs exactly those versions. You can check this file into
 your version control system if you want to enable other users to get
 exactly the same revisions by running `vext install` themselves.
+
+
+Using the Vext tool
+-------------------
+
+### Reviewing library status
+
+Run `vext review` to check and print statuses of all the configured
+libraries. This won't change the local working copies, but it does
+fetch any pending changes from remote repositories, so network access
+is required.
+
+Run `vext status` to do the same thing but without using the
+network. That's much faster but can only tell you whether something is
+in place for each library, not whether it's the newest thing
+available.
+
+The statuses that may be reported are:
+
+For unpinned libraries:
+
+ * __Absent__: No repository has been checked out for the library yet
+
+ * __Correct__: Library is the newest version available on the correct
+   branch. If you run `vext status` instead `vext review`, this will
+   appear as __Present__ instead of __Correct__, as the program can't
+   be sure you have the latest version without using the network.
+
+ * __Superseded__: Library exists and is on the correct branch, but
+   there is a newer revision available.
+
+ * __Wrong__: Library exists but is checked out on the wrong branch.
+
+For pinned libraries:
+
+ * __Absent__: No repository has been checked out for the library yet
+
+ * __Correct__: Library is checked out at the pinned revision.
+
+ * __Wrong__: Library is checked out at any other revision.
+
+Also, both pinned and unpinned libraries can be shown with a local
+status either "Clean" (not changed locally) or "Modified" (someone has
+made a change to the local working copy for that library).
+
+### Installing and updating libraries
+
+Run `vext install` to install, i.e. to check out locally, all the
+configured libraries. If there is a `vext-lock.json` file present,
+`vext install` will check out all libraries listed in that file to the
+precise revisions recorded there.
+
+Run `vext update` to update all the configured libraries according to
+the `vext-project.json` specification, regardless of the existence of
+any `vext-lock.json` file, and then write out a new `vext-lock.json`
+containing the resulting state. Pinned libraries will be updated if
+they are in Absent or Wrong state; unpinned libraries will always be
+updated, which should have an effect only when they are in Absent,
+Superseded, or Wrong state.
+
+
+Further configuration
+---------------------
 
 ### Adding new service providers
 
