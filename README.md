@@ -66,8 +66,9 @@ Vext has one big advantage over "proper" package managers:
 
  1. It's equivalent to just checking out a bunch of repositories
  yourself, but with a neater interface. That makes it unintrusive,
- easy to understand, and suitable for situations where there isn't
- really a package manager ready to do the job.
+ easy to understand, able to install libraries that aren't set up to
+ be packages, and usable in other situations where there isn't a
+ package manager ready to do the job.
 
 
 Installing Vext
