@@ -192,11 +192,11 @@ fetch any pending changes from remote repositories, so network access
 is required.
 
 Run `vext status` to do the same thing but without using the
-network. That's much faster but can only tell you whether something is
-in place for each library, not whether it's the newest thing
-available.
+network. That's much faster but it can only tell you whether a library
+is present locally at all, not necessarily whether it's the newest
+version.
 
-The statuses that may be reported are:
+The statuses that may be reported by `review` or `status` are:
 
 For unpinned libraries:
 
@@ -220,9 +220,15 @@ For pinned libraries:
 
  * __Wrong__: Library is checked out at any other revision.
 
-Also, both pinned and unpinned libraries can be shown with a local
-status either "Clean" (not changed locally) or "Modified" (someone has
-made a change to the local working copy for that library).
+A local status will also be shown:
+
+ * __Clean__: The library has no un-committed local modifications.
+
+ * __Modified__: The library has local modifications that have not
+   been committed.
+
+Note that at present Vext cannot report local modifications that have
+been committed but not pushed.
 
 ### Installing and updating libraries
 
@@ -326,4 +332,6 @@ authenticated versions of that service's URLs.
  + archive command
  + dry-run option (print commands)?
  + more tests: service definitions, weird lib paths, explicit URL etc
- 
+ + clean/modified + unpushed
+ + fix for awkward behaviour when calling for specific revision that
+   is newer than anything in local repo
