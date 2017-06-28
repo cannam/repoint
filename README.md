@@ -62,7 +62,7 @@ managers like npm or Maven:
  with it. This also means it doesn't care what language the source
  code is in or what build tool you use.
 
-Vext has one big advantage:
+Vext has one big advantage over "proper" package managers:
 
  1. It's equivalent to just checking out a bunch of repositories
  yourself, but with a neater interface. That makes it unintrusive,
@@ -71,18 +71,17 @@ Vext has one big advantage:
 
 ### Installing Vext
 
-Vext consists of four files which are normally copied autotools-style
-into the project root. These are `vext`, `vext.sml`, `vext.bat` and
+Vext consists of four files which can be copied autotools-style into
+the project root. These are `vext`, `vext.sml`, `vext.bat` and
 `vext.ps1`. The file `vext.sml` contains the actual program, while
-`vext`, `vext.bat` and `vext.ps1` are platform-specific wrappers.
+`vext`, `vext.bat` and `vext.ps1` are platform-specific wrappers. In
+this configuration, you should type `./vext` to run the Vext
+tool. Alternatively the same files can be installed to the PATH like
+any other executables.
 
 The Vext distribution includes a shell script called `implant.sh`
 which copies the four Vext files into whichever directory you run the
 shell script from.
-
-With Vext installed to the project root, to run the program you should
-refer to it as `./vext` rather than `vext`. However, the following
-documentation refers to the program as simply `vext`.
 
 Vext requires a Standard ML compiler or interpreter to be available
 when it is run. It supports [Poly/ML](http://polyml.org),
