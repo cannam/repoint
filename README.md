@@ -31,9 +31,10 @@ for the project.
 ### Rationale
 
 Vext was written as an alternative to Mercurial subrepositories for
-C++ projects with numerous external dependencies, so that they can be
-managed in a simple way without depending on a particular version
-control system or host and without using a giant mono-repository.
+cross-platform C++ projects with numerous external dependencies, so as
+to manage them in a simple way without depending on a particular
+version control system or host and without using a giant
+mono-repository.
 
 Vext has four limitations that distinguish it from "proper" package
 managers like npm or Maven:
@@ -67,6 +68,36 @@ Vext has one big advantage:
  yourself, but with a neater interface. That makes it unintrusive,
  easy to understand, and suitable for situations where there isn't
  really a package manager ready to do the job.
+
+### Installing Vext
+
+Vext consists of four files which are normally copied autotools-style
+into the project root. These are `vext`, `vext.sml`, `vext.bat` and
+`vext.ps1`. The file `vext.sml` contains the actual program, while
+`vext`, `vext.bat` and `vext.ps1` are platform-specific wrappers.
+
+The Vext distribution includes a shell script called `implant.sh`
+which copies the four Vext files into whichever directory you run the
+shell script from.
+
+With Vext installed to the project root, to run the program you should
+refer to it as `./vext` rather than `vext`. However, the following
+documentation refers to the program as simply `vext`.
+
+Vext requires a Standard ML compiler or interpreter to be available
+when it is run. It supports [Poly/ML](http://polyml.org),
+[SML/NJ](http://smlnj.org), or on non-Windows platforms,
+[MLton](http://mlton.org). It is fairly easy to install at least one
+of these on every platform Vext is intended to support.
+
+Vext has been tested on Linux, macOS, and Windows. Integration tests
+currently cover Linux and macOS with both Mercurial and Git
+repositories using all three of the supported SML compilers.
+
+Vext is a developer tool. Don't ask end-users of your software to use
+it.
+
+[![Build Status](https://travis-ci.org/cannam/vext.svg?branch=master)](https://travis-ci.org/cannam/vext)
 
 
 Configuring Vext
@@ -284,30 +315,6 @@ containing the resulting state. Pinned libraries will be updated if
 they are in Absent or Wrong state; unpinned libraries will always be
 updated, which should have an effect only when they are in Absent,
 Superseded, or Wrong state.
-
-### Installing Vext itself
-
-Vext consists of four files which are normally copied
-(autotools-style) into the project root. These are `vext.sml` (the
-actual program, as Standard ML source code) and `vext`, `vext.bat` and
-`vext.ps1` (scripts which invoke the program using an SML
-interpreter). To run the program you would usually type e.g. `./vext
-update` rather than `vext update`.
-
-Vext requires a Standard ML compiler or interpreter to be
-available. It supports Poly/ML, SML/NJ, or (on non-Windows platforms
-only) MLton. It is fairly easy to install at least one of these on
-every platform Vext is intended to support.
-
-Vext has been tested on Linux, macOS, and Windows. Integration tests
-currently cover Linux and macOS with both Mercurial and Git
-repositories using all three of the supported SML compilers.
-
-Vext is a developer tool. Don't ask end-users of your software to use
-it.
-
-
-[![Build Status](https://travis-ci.org/cannam/vext.svg?branch=master)](https://travis-ci.org/cannam/vext)
 
 
 to add:
