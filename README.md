@@ -291,18 +291,18 @@ braces in `anon` and `auth` URLs, when constructing a checkout URL for
 a specific library:
 
  * `vcs` - the version control system being used, as found in the
-   library's `vcs` property
+   library's `vcs` property.
 
  * `owner` - the owner of the repository, as found in the library's
-   `owner` property
+   `owner` property.
 
  * `repo` - the name of the repository, either the library name or (if
-   present) the contents of the library's `repository` property
+   present) the contents of the library's `repository` property.
 
  * `account` - the user's login name for the service if known (see
-   "Per-user configuration" below)
+   "Per-user configuration" below).
 
- * `service` - the name of the service
+ * `service` - the name of the service.
 
 ### Per-user configuration
 
@@ -314,7 +314,7 @@ properties:
 
  * `accounts` - account names for this user for known service
    providers, in the form of an object mapping from service name to
-   account name
+   account name.
 
  * `services` - global definitions of service providers, in the same
    format as described in "Adding new service providers"
