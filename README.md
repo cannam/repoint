@@ -277,25 +277,25 @@ The statuses that may be reported are:
 
 For unpinned libraries:
 
- * _Absent_: No repository has been checked out for the library yet
+ * __Absent__: No repository has been checked out for the library yet
 
- * _Correct_: Library is the newest version available on the correct
+ * __Correct__: Library is the newest version available on the correct
    branch. If you run `vext status` instead `vext review`, this will
-   appear as _Present_ instead of _Correct_, as the program can't be
-   sure you have the latest version without using the network.
+   appear as __Present__ instead of __Correct__, as the program can't
+   be sure you have the latest version without using the network.
 
- * _Superseded_: Library exists and is on the correct branch, but
+ * __Superseded__: Library exists and is on the correct branch, but
    there is a newer revision available.
 
- * _Wrong_: Library exists but is checked out on the wrong branch.
+ * __Wrong__: Library exists but is checked out on the wrong branch.
 
 For pinned libraries:
 
- * _Absent_: No repository has been checked out for the library yet
+ * __Absent__: No repository has been checked out for the library yet
 
- * _Correct_: Library is checked out at the pinned revision.
+ * __Correct__: Library is checked out at the pinned revision.
 
- * _Wrong_: Library is checked out at any other revision.
+ * __Wrong__: Library is checked out at any other revision.
 
 Also, both pinned and unpinned libraries can be shown with a local
 status either "Clean" (not changed locally) or "Modified" (someone has
@@ -316,12 +316,9 @@ updated, which should have an effect only when they are in Absent,
 Superseded, or Wrong state.
 
 
-to add:
+### Developer todo / to-document notes
 
  + archive command
- + note about not handling libraries having their own dependencies
- + ability to commit and/or push?
  + dry-run option (print commands)?
  + more tests: service definitions, weird lib paths, explicit URL etc
- + implant script
  
