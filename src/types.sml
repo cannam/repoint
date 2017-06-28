@@ -4,8 +4,8 @@ datatype vcs =
          GIT
 
 datatype source =
-         URL of string |
-         PROVIDER of {
+         URL_SOURCE of string |
+         SERVICE_SOURCE of {
              service : string,
              owner : string option,
              repo : string option

@@ -25,7 +25,7 @@ package managers like npm or Maven:
  for installing pre-packaged or pre-compiled dependencies. If it's not
  in a repository, or if cloning the repository would be too expensive,
  then Vext won't help.  (A corollary is that you should only use Vext
- for development trees that are themselves checked out from a hosted
+ in development trees that are themselves checked out from a hosted
  repo; don't distribute source releases or end-user packages that
  depend on it. If your code is distributed via a "proper" package
  manager itself, use that package manager for its dependencies too.)
@@ -50,15 +50,18 @@ Besides those limitations, it has one big advantage:
  easy to understand, and suitable for situations where there isn't
  really a package manager that will do the job.
 
-Vext was originally intended for use with projects written in C++,
-having in the range of 1-20 library dependencies to a project.
+Vext was originally intended for use with projects written in C++ and
+SML, having in the range of 1-20 library dependencies to a project.
 
 
-Configuration
--------------
+Configuring Vext
+----------------
 
-Libraries are listed in a `vext-project.json` file in the top-level
-working-copy directory.
+### Setting up a project
+
+The external libraries needed for a project are listed in a
+`vext-project.json` file in the project's top-level working-copy
+directory.
 
 A complete example of `vext-project.json`:
 
@@ -97,18 +100,19 @@ relative path) it will be checked out to. Properties of the library
 may include
 
  * `vcs` - The version control system to use. Must be one of the
-   recognised set of names, currently `hg` or `git`
+   recognised set of names, currently `hg` (Mercurial) or `git`
 
- * `service` - The repository hosting provider. Some providers are
-   built-in, but you can define further ones in a `providers` section
+ * `service` - The repository hosting service. Some services are
+   built-in, but you can define further ones in a `services` section
+   (see below)
 
  * `owner` - User name owning the repository at the provider
 
  * `repository` - Repository name at the provider, if it differs from
    the local library name
 
- * `url` - Complete URL to check out (alternative to specifying
-   `provider`, `owner`, etc)
+ * `url` - Complete URL to check out (as an alternative to specifying
+   `service`, `owner`, etc)
 
  * `branch` - Branch to check out if not the default
 
@@ -133,8 +137,88 @@ version control system if you want to enable other users to get
 exactly the same revisions by running `vext install` themselves.
 
 
-Reviewing library status
-------------------------
+### Adding new service providers
+
+You can cause a library to be checked out from any version control
+system URL simply by specifying a `url` property for that library (in
+addition to `vcs` to say which version control system to use) instead
+of a `service` and its associated properties.
+
+However, if you want to refer to a service repeatedly that is not one
+of those hardcoded in the Vext program, you can add a `services`
+property to the top-level object in `vext-project.json`. For example:
+
+```
+{
+    "config": {
+        "extdir": "ext"
+    },
+    "services": {
+	"soundsoftware": {
+	    "vcs": ["hg", "git"],
+	    "anon": "https://code.soundsoftware.ac.uk/{vcs}/{repo}",
+	    "auth": "https://{account}@code.soundsoftware.ac.uk/{vcs}/{repo}"
+	}
+    },
+    "libs": {
+        [etc]
+```
+
+The above example adds a new service, local to this project, that can
+be referred to as `soundsoftware` in library definitions. This service
+supports Mercurial and Git.
+
+The `anon` property describes how to construct a check out URL for
+this service in the case where the current user has no account there,
+and the `auth` property gives an alternative that can be used if the
+user is known to have an account on the service (see "User
+configuration" below).
+
+The following variables (appearing in curly braces as in the example
+above) will be expanded in `anon` and `auth` URLs when they are used
+to construct a check out URL for a specific library:
+
+ * `vcs` - the version control system being used, as found in the
+   library's `vcs` property
+
+ * `owner` - the owner of the repository, as found in the library's
+   `owner` property
+
+ * `repo` - the name of the repository, either the library name or (if
+   present) the contents of the library's `repository` property
+
+ * `account` - the user's login name for the service if known (see
+   "User configuration" below)
+
+ * `service` - the name of the service
+
+
+### User configuration
+
+You can provide some user configuration in a file called `.vext.json`
+(with leading dot) in your home directory.
+
+This file contains a JSON object which can have the following
+properties:
+
+ * `accounts` - account names for this user for known service
+   providers, as an object mapping from service name to account name
+
+ * `services` - global definitions of service providers, in the same
+   format as described in "Adding new service providers"
+   above. Definitions here will override those both hardcoded in Vext
+   and listed in project specifications
+
+If you specify an account name for a service in your `.vext.json`
+file, Vext will assume that you have suitable keychain authentication
+for that service and will check out libraries using the authenticated
+versions of that service's URLs.
+
+
+Using the Vext tool
+-------------------
+
+### Reviewing library status
 
 Run `vext review` to check and print statuses of all the configured
 libraries. This won't change the local working copies, but it does
@@ -175,8 +259,7 @@ status either "Clean" (not changed locally) or "Modified" (someone has
 made a change to the local working copy for that library).
 
 
-Installing and updating libraries
----------------------------------
+### Installing and updating libraries
 
 Run `vext install` to check out all the configured libraries. If there
 is a `vext-lock.json` file present, `vext install` will check out all
@@ -191,8 +274,7 @@ updated, which should have an effect only when they are in Absent,
 Superseded, or Wrong state.
 
 
-Installing Vext itself
-----------------------
+### Installing Vext itself
 
 Vext consists of four files which are normally copied
 (autotools-style) into the project root. These are `vext.sml` (the
@@ -213,14 +295,16 @@ three of the supported SML compilers.
 Vext is a developer tool. Don't ask end-users of your software to use
 it.
 
+
 [![Build Status](https://travis-ci.org/cannam/vext.svg?branch=master)](https://travis-ci.org/cannam/vext)
 
 
 to add:
 
- + unify "service"/"provider" nomenclature above and in project file syntax
  + archive command
  + note about not handling libraries having their own dependencies
  + ability to commit and/or push?
  + dry-run option (print commands)?
  + more tests: service definitions, weird lib paths, explicit URL etc
+ + implant script
+ 

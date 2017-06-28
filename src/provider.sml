@@ -51,10 +51,10 @@ end = struct
                   }
                 }
             val loaded = 
-                case lookup_optional json ["providers"] of
+                case lookup_optional json ["services"] of
                     NONE => []
                   | SOME (Json.OBJECT pl) => map (fn (k, v) => load v k) pl
-                  | _ => raise Fail "Object expected for providers in config"
+                  | _ => raise Fail "Object expected for services in config"
             val newly_loaded =
                 List.filter (fn p => not (List.exists (fn pp => #service p =
                                                                 #service pp)
@@ -134,8 +134,8 @@ end = struct
                                           
     fun remote_url (context : context) vcs source libname =
         case source of
-            URL u => u
-          | PROVIDER { service, owner, repo } =>
+            URL_SOURCE u => u
+          | SERVICE_SOURCE { service, owner, repo } =>
             provider_url { vcs = vcs,
                            service = service,
                            owner = owner,

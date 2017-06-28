@@ -47,9 +47,9 @@ for t in tests/test-*.sh ; do
     fi
     if run_a_test $t; then
         if [ -n "$verbose" ]; then
-            echo "PASS: $t"
+            echo "pass: $t"
         else
-            echo "PASS"
+            echo "pass"
         fi
         passcount=$(($passcount+1))
     else

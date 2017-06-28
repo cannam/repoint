@@ -37,9 +37,9 @@ fun load_libspec spec_json lock_json libname : libspec =
                   | other => raise Fail ("Unknown version-control system \"" ^
                                          other ^ "\""),
           source = case (url, service, owner, repo) of
-                       (SOME u, NONE, _, _) => URL u
+                       (SOME u, NONE, _, _) => URL_SOURCE u
                      | (NONE, SOME ss, owner, repo) =>
-                       PROVIDER { service = ss, owner = owner, repo = repo }
+                       SERVICE_SOURCE { service = ss, owner = owner, repo = repo }
                      | _ => raise Fail ("Must have exactly one of service " ^
                                         "or url string"),
           pin = case lock_pin of

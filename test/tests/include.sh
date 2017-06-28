@@ -35,7 +35,7 @@ write_project_file() {
     "config": {
         "extdir": "ext"
     },
-    "providers": {
+    "services": {
 	"testfile": {
 	    "vcs": ["hg", "git"],
 	    "anon": "file://$(pwd)/../../testrepos/{repo}"
