@@ -30,6 +30,11 @@ for the project.
 
 ### Rationale
 
+Vext was written as an alternative to Mercurial subrepositories for
+C++ projects with numerous external dependencies, so that they can be
+managed in a simple way without depending on a particular version
+control system or host and without using a giant mono-repository.
+
 Vext has four limitations that distinguish it from "proper" package
 managers like npm or Maven:
 
@@ -62,9 +67,6 @@ Vext has one big advantage:
  yourself, but with a neater interface. That makes it unintrusive,
  easy to understand, and suitable for situations where there isn't
  really a package manager ready to do the job.
-
-Vext was originally intended for use with projects written in C++ and
-SML, having in the range of 1-20 library dependencies to a project.
 
 
 Configuring Vext
