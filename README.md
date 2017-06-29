@@ -234,15 +234,18 @@ been committed but not pushed.
 Run `vext install` to install, i.e. to check out locally, all the
 configured libraries. If there is a `vext-lock.json` file present,
 `vext install` will check out all libraries listed in that file to the
-precise revisions recorded there.
+precise revisions recorded there. Otherwise it will follow any branch
+and/or pinned id specified in the project file. Note that `vext
+install` always follows the lock file if present, even if it
+contradicts the project file.
 
 Run `vext update` to update all the configured libraries according to
-the `vext-project.json` specification, regardless of the existence of
-any `vext-lock.json` file, and then write out a new `vext-lock.json`
-containing the resulting state. Pinned libraries will be updated if
-they are in Absent or Wrong state; unpinned libraries will always be
-updated, which should have an effect only when they are in Absent,
-Superseded, or Wrong state.
+the `vext-project.json` specification, and then write out a new
+`vext-lock.json` containing the resulting state. Note that `vext
+update` always ignores the existing contents of the lock file. Pinned
+libraries will be updated if they are in Absent or Wrong state;
+unpinned libraries will always be updated, which should have an effect
+only when they are in Absent, Superseded, or Wrong state.
 
 
 Further configuration
