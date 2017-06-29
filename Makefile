@@ -29,6 +29,10 @@ vext.sml:	$(SOURCES)
 
 .PHONY:	test
 test:	vext.sml
+	if ! ./test/run-tests.sh ; then ./test/run-tests.sh -v ; fi
+
+.PHONY:	test-all
+test-all:	vext.sml
 	if ! ./test/run-all-tests.sh ; then ./test/run-all-tests.sh -v ; fi
 
 clean:
