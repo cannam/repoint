@@ -113,7 +113,7 @@ A complete example of `vext-project.json`:
     "config": {
         "extdir": "ext"
     },
-    "libs": {
+    "libraries": {
         "vamp-plugin-sdk": {
             "vcs": "git",
             "service": "github",
@@ -137,10 +137,10 @@ excluded from your project's own version control, i.e. added to your
 directory contains only third-party code, and that one could safely
 delete the entire directory and run Vext again to recreate it.
 
-Libraries are listed in the `libs` object in the config file. Each
-library has a key, which is the local name (a single directory or
-relative path) it will be checked out to within the external-library
-directory. Properties of a library may include
+Libraries are listed in the `libraries` object in the config
+file. Each library has a key, which is the local name (a single
+directory or relative path) it will be checked out to within the
+external-library directory. Properties of a library may include
 
  * `vcs` - The version control system to use. Must be one of the
    recognised set of names, currently `hg` (Mercurial) or `git`.
@@ -270,11 +270,11 @@ not one of those hardcoded in the Vext program, you can add a
     "services": {
         "soundsoftware": {
             "vcs": ["hg", "git"],
-            "anon": "https://code.soundsoftware.ac.uk/{vcs}/{repo}",
-            "auth": "https://{account}@code.soundsoftware.ac.uk/{vcs}/{repo}"
+            "anonymous": "https://code.soundsoftware.ac.uk/{vcs}/{repository}",
+            "authenticated": "https://{account}@code.soundsoftware.ac.uk/{vcs}/{repository}"
         }
     },
-    "libs": {
+    "libraries": {
         [etc]
 ```
 
@@ -282,15 +282,15 @@ The above example defines a new service, local to this project, that
 can be referred to as `soundsoftware` in library definitions. This
 service is declared to support Mercurial and Git.
 
-The `anon` property describes how to construct a checkout URL for this
-service in the case where the user has no login account there, and the
-`auth` property gives an alternative that can be used if the user is
-known to have an account on the service (see "User configuration"
-below).
+The `anonymous` property describes how to construct a checkout URL for
+this service in the case where the user has no login account there,
+and the `authenticated` property gives an alternative that can be used
+if the user is known to have an account on the service (see "User
+configuration" below).
 
 The following variables will be expanded if they appear within curly
-braces in `anon` and `auth` URLs, when constructing a checkout URL for
-a specific library:
+braces in `anonymous` and `authenticated` URLs, when constructing a
+checkout URL for a specific library:
 
  * `vcs` - the version control system being used, as found in the
    library's `vcs` property.
@@ -298,8 +298,9 @@ a specific library:
  * `owner` - the owner of the repository, as found in the library's
    `owner` property.
 
- * `repo` - the name of the repository, either the library name or (if
-   present) the contents of the library's `repository` property.
+ * `repository` - the name of the repository, either the library name
+   or (if present) the contents of the library's `repository`
+   property.
 
  * `account` - the user's login name for the service if known (see
    "Per-user configuration" below).
@@ -347,4 +348,4 @@ URL.
  + dry-run option (print commands)?
  + more tests: service definitions, weird lib paths, explicit URL etc
  + clean/modified + unpushed
- 
+ + warn on unrecognised properties in json files 

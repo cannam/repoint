@@ -10,16 +10,16 @@ end = struct
             service = "bitbucket",
             supports = [HG, GIT],
             remote_spec = {
-                anon = SOME "https://bitbucket.org/{owner}/{repo}",
-                auth = SOME "ssh://{vcs}@bitbucket.org/{owner}/{repo}"
+                anon = SOME "https://bitbucket.org/{owner}/{repository}",
+                auth = SOME "ssh://{vcs}@bitbucket.org/{owner}/{repository}"
             }
           },
           {
             service = "github",
             supports = [GIT],
             remote_spec = {
-                anon = SOME "https://github.com/{owner}/{repo}",
-                auth = SOME "ssh://{vcs}@github.com/{owner}/{repo}"
+                anon = SOME "https://github.com/{owner}/{repository}",
+                auth = SOME "ssh://{vcs}@github.com/{owner}/{repository}"
             }
           }
         ]
@@ -46,8 +46,8 @@ end = struct
                           vv
                     | _ => raise Fail "Array expected for vcs",
                   remote_spec = {
-                      anon = lookup_optional_string pjson ["anon"],
-                      auth = lookup_optional_string pjson ["auth"]
+                      anon = lookup_optional_string pjson ["anonymous"],
+                      auth = lookup_optional_string pjson ["authenticated"]
                   }
                 }
             val loaded = 
@@ -78,7 +78,7 @@ end = struct
                          SOME ostr => ostr
                        | NONE => raise Fail ("Owner not specified for service " ^
                                              service))
-                  | "repo" => repo
+                  | "repository" => repo
                   | "account" =>
                     (case login of
                          SOME acc => acc
@@ -124,8 +124,9 @@ end = struct
                     (SOME _, SOME auth, _) => expand_spec auth req login
                   | (SOME _, _, SOME anon) => expand_spec anon req NONE
                   | (NONE,   _, SOME anon) => expand_spec anon req NONE
-                  | _ => raise Fail ("No suitable anon/auth URL spec " ^
-                                     "provided for service \"" ^ service ^ "\"")
+                  | _ => raise Fail ("No suitable anonymous or authenticated " ^
+                                     "URL spec provided for service \"" ^
+                                     service ^ "\"")
 
     fun login_for ({ accounts, ... } : context) service =
         case List.find (fn a => service = #service a) accounts of

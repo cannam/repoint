@@ -14,9 +14,11 @@ structure AnyLibControl :> LIB_CONTROL = struct
         (fn HG => H.update | GIT => G.update) vcs context spec
 end
 
+val libobjname = "libraries"
+                                             
 fun load_libspec spec_json lock_json libname : libspec =
     let open JsonBits
-        val libobj   = lookup_mandatory spec_json ["libs", libname]
+        val libobj   = lookup_mandatory spec_json [libobjname, libname]
         val vcs      = lookup_mandatory_string libobj ["vcs"]
         val retrieve = lookup_optional_string libobj
         val service  = retrieve ["service"]
@@ -25,7 +27,7 @@ fun load_libspec spec_json lock_json libname : libspec =
         val url      = retrieve ["url"]
         val branch   = retrieve ["branch"]
         val user_pin = retrieve ["pin"]
-        val lock_pin = case lookup_optional lock_json ["libs", libname] of
+        val lock_pin = case lookup_optional lock_json [libobjname, libname] of
                            SOME ll => lookup_optional_string ll ["pin"]
                          | NONE => NONE
     in
@@ -95,8 +97,8 @@ fun load_project (userconfig : userconfig) rootpath use_locks : project =
                         else Json.OBJECT []
         val extdir = JsonBits.lookup_mandatory_string spec_json
                                                       ["config", "extdir"]
-        val spec_libs = JsonBits.lookup_optional spec_json ["libs"]
-        val lock_libs = JsonBits.lookup_optional lock_json ["libs"]
+        val spec_libs = JsonBits.lookup_optional spec_json [libobjname]
+        val lock_libs = JsonBits.lookup_optional lock_json [libobjname]
         val providers = Provider.load_more_providers
                             (#providers userconfig) spec_json
         val libnames = case spec_libs of
@@ -120,11 +122,11 @@ fun save_lock_file rootpath locks =
         open Json
         val lock_json =
             OBJECT [
-                ("libs", OBJECT
-                             (map (fn { libname, id_or_tag } =>
-                                      (libname,
-                                       OBJECT [ ("pin", STRING id_or_tag) ]))
-                                  locks))
+                (libobjname,
+                 OBJECT (map (fn { libname, id_or_tag } =>
+                                 (libname,
+                                  OBJECT [ ("pin", STRING id_or_tag) ]))
+                             locks))
             ]
     in
         JsonBits.save_json_to lock_file lock_json

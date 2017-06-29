@@ -38,10 +38,10 @@ write_project_file() {
     "services": {
 	"testfile": {
 	    "vcs": ["hg", "git"],
-	    "anon": "file://$(pwd)/../../testrepos/{repo}"
+	    "anonymous": "file://$(pwd)/../../testrepos/{repository}"
 	}
     },
-    "libs": {
+    "libraries": {
 $libcontent
     }
 }
@@ -64,7 +64,7 @@ check_expected() {
     fi
     cat > expected-lock.json <<EOF
 {
-  "libs": {
+  "libraries": {
     "A": {
       "pin": "$id_A"
     },
