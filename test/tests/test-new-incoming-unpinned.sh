@@ -37,7 +37,7 @@ check_expected f94ae9d7e5c9 3199655c658ff337ce24f78c6d1f410f34f4c6f2
 ( cd ../../testrepos
   cd A2
   echo 5 > file.txt
-  hg commit -m 5
+  hg commit -m 5 -u testuser
   cd ../B2
   echo 5 > file-b.txt
   git commit -a -m 5
