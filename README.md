@@ -323,10 +323,22 @@ properties:
    above. Definitions here will override both those hardcoded in Vext
    and those listed in project files.
 
-If you specify an account name for a service in your `.vext.json`
-file, Vext will assume that you have suitable keychain authentication
-set up for that service and will check out libraries using the
-authenticated versions of that service's URLs.
+As an example of `.vext.json` with an `accounts` property:
+```
+{
+    "accounts": {
+        "github": "cannam",
+        "bitbucket": "cannam"
+    }
+}
+```
+
+Vext may use a different checkout URL with services on which you have
+declared an account name, in order to take advantage of the
+possibility of using an authenticated protocol that can be pushed to
+using keychain authentication. For Github and Bitbucket providing an
+account name will cause it to switch to an ssh URL in place of the
+default https one.
 
 
 ### Developer todo / to-document notes
