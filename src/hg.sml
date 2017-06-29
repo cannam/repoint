@@ -124,14 +124,14 @@ structure HgControl :> VCS_CONTROL = struct
     fun update_to context (libname, "") =
         ERROR "Non-empty id (tag or revision id) required for update_to"
       | update_to context (libname, id) = 
-        case hg_command context libname ["update", "-r" ^ id] of
-            OK () => id_of context libname
-          | ERROR _ => 
-            case pull context libname of
-                ERROR e => ERROR e
-              | _ =>
-                case hg_command context libname ["update", "-r" ^ id] of
-                    ERROR e => ERROR e
-                  | _ => id_of context libname
+        let val pull_result = pull context libname
+        in
+            case hg_command context libname ["update", "-r", id] of
+                OK _ => id_of context libname
+              | ERROR e =>
+                case pull_result of
+                    ERROR e' => ERROR e' (* this was the ur-error *)
+                  | _ => ERROR e
+        end
                   
 end
