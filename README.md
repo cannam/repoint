@@ -336,9 +336,9 @@ As an example of `.vext.json` with an `accounts` property:
 Vext may use a different checkout URL with services on which you have
 declared an account name, in order to take advantage of the
 possibility of using an authenticated protocol that can be pushed to
-using keychain authentication. For Github and Bitbucket providing an
-account name will cause it to switch to an ssh URL in place of the
-default https one.
+using keychain authentication. For example, providing an account name
+may cause Vext to switch to an ssh URL in place of a default https
+URL.
 
 
 ### Developer todo / to-document notes
