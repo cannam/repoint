@@ -347,5 +347,4 @@ default https one.
  + dry-run option (print commands)?
  + more tests: service definitions, weird lib paths, explicit URL etc
  + clean/modified + unpushed
- + fix for awkward behaviour when calling for specific revision that
-   is newer than anything in local repo
+ 
