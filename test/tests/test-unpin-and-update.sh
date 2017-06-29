@@ -31,7 +31,7 @@ EOF
 prepare
 write_project_file "$libcontent_pinned"
 
-"$vextdir"/vext install
+"$vext" install
 check_expected 1379d75f0b4f 7219cf6e6d4706295246d278a3821ea923e1dfe2
 
 write_project_file "$libcontent_unpinned"
