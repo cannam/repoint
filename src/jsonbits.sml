@@ -14,11 +14,12 @@ end = struct
           | Json.ERROR e => raise Fail ("Failed to parse file: " ^ e)
 
     fun save_json_to filename json =
+        (* using binary I/O to avoid ever writing CR/LF line endings *)
         let val jstr = Json.serialiseIndented json
-            val stream = TextIO.openOut filename
+            val stream = BinIO.openOut filename
         in
-            TextIO.output (stream, jstr);
-            TextIO.closeOut stream
+            BinIO.output (stream, Byte.stringToBytes jstr);
+            BinIO.closeOut stream
         end
                                   
     fun lookup_optional json kk =
