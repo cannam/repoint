@@ -12,6 +12,9 @@ structure AnyLibControl :> LIB_CONTROL = struct
 
     fun update context (spec as { vcs, ... } : libspec) =
         (fn HG => H.update | GIT => G.update) vcs context spec
+
+    fun id_of context (spec as { vcs, ... } : libspec) =
+        (fn HG => H.id_of | GIT => G.id_of) vcs context spec
 end
 
 val libobjname = "libraries"
@@ -148,9 +151,10 @@ val libstate_width = 11
 val localstate_width = 9
 val notes_width = 5
 val divider = " | "
+val clear_line = "\r" ^ pad_to 80 "";
 
 fun print_status_header () =
-    print ("\r" ^ pad_to 80 "" ^ "\n " ^
+    print (clear_line ^ "\n " ^
            pad_to libname_width "Library" ^ divider ^
            pad_to libstate_width "State" ^ divider ^
            pad_to localstate_width "Local" ^ divider ^
@@ -161,7 +165,7 @@ fun print_status_header () =
            hline_to notes_width ^ "\n")
 
 fun print_outcome_header () =
-    print ("\r" ^ pad_to 80 "" ^ "\n " ^
+    print (clear_line ^ "\n " ^
            pad_to libname_width "Library" ^ divider ^
            pad_to libstate_width "Outcome" ^ divider ^
            "Notes" ^ "\n " ^
@@ -255,6 +259,26 @@ fun update_project ({ context, libs } : project) =
         return_code
     end
 
+fun lock_project ({ context, libs } : project) =
+    let val outcomes = map (fn lib =>
+                               (#libname lib, AnyLibControl.id_of context lib))
+                           libs
+        val locks =
+            List.concat
+                (map (fn (libname, result) =>
+                         case result of
+                             ERROR _ => []
+                           | OK id => [{ libname = libname, id_or_tag = id }])
+                     outcomes)
+        val return_code = return_code_for outcomes
+        val _ = print clear_line
+    in
+        if OS.Process.isSuccess return_code
+        then save_lock_file (#rootpath context) locks
+        else ();
+        return_code
+    end
+        
 fun load_local_project pintype =
     let val userconfig = load_userconfig ()
         val rootpath = OS.FileSys.getDir ()
@@ -276,6 +300,7 @@ fun with_local_project pintype f =
 fun review () = with_local_project NO_LOCKFILE review_project
 fun status () = with_local_project NO_LOCKFILE status_of_project
 fun update () = with_local_project NO_LOCKFILE update_project
+fun lock () = with_local_project NO_LOCKFILE lock_project
 fun install () = with_local_project USE_LOCKFILE update_project
 
 fun version () =
@@ -293,6 +318,7 @@ fun usage () =
             ^ "  review   check configured libraries against their providers, and report\n"
             ^ "  install  update configured libraries according to project specs and lock file\n"
             ^ "  update   update configured libraries and lock file according to project specs\n"
+            ^ "  lock     update lock file to match local library status\n"
             ^ "  version  print the Vext version number and exit\n\n");
     OS.Process.failure)
 
@@ -303,6 +329,7 @@ fun vext args =
               | ["status"] => status ()
               | ["install"] => install ()
               | ["update"] => update ()
+              | ["lock"] => lock ()
               | ["version"] => version ()
               | _ => usage ()
     in

@@ -64,7 +64,7 @@ functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
 
     val review = check true
     val status = check false
-                         
+
     fun update context ({ libname, source, branch, pin, ... } : libspec) =
         let fun update_unpinned () =
                 case V.is_newest context (libname, branch) of
@@ -89,4 +89,8 @@ functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
                     ERROR e => ERROR e
                   | OK () => update' ()
         end
+
+    fun id_of context ({ libname, ... } : libspec) =
+        V.id_of context libname
+                
 end

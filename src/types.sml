@@ -11,9 +11,11 @@ datatype source =
              repo : string option
          }
 
+type id_or_tag = string
+
 datatype pin =
          UNPINNED |
-         PINNED of string
+         PINNED of id_or_tag
 
 datatype libstate =
          ABSENT |
@@ -39,8 +41,6 @@ datatype 'a result =
          ERROR of string
 
 type libname = string
-
-type id_or_tag = string
 
 type libspec = {
     libname : libname,
@@ -140,4 +140,5 @@ signature LIB_CONTROL = sig
     val review : context -> libspec -> (libstate * localstate) result
     val status : context -> libspec -> (libstate * localstate) result
     val update : context -> libspec -> id_or_tag result
+    val id_of : context -> libspec -> id_or_tag result
 end
