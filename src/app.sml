@@ -148,7 +148,7 @@ fun hline_to 0 = ""
 
 val libname_width = 25
 val libstate_width = 11
-val localstate_width = 9
+val localstate_width = 17
 val notes_width = 5
 val divider = " | "
 val clear_line = "\r" ^ pad_to 80 "";
@@ -184,7 +184,7 @@ fun print_status with_network (libname, status) =
         val localstate_str =
             case status of
                 OK (_, MODIFIED) => "Modified"
-              | OK (_, LOCK_MISMATCHED) => "Lock Mismatched" (*!!! terrible name *)
+              | OK (_, LOCK_MISMATCHED) => "Differs from Lock"
               | OK (_, CLEAN) => "Clean"
               | ERROR _ => ""
         val error_str =
