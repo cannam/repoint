@@ -25,6 +25,14 @@ if [ -w "$mydir" ]; then
     fi
 fi
 
+if [ "$sml" = "poly" ]; then
+    # if the user asked for poly but we have an old or weird install
+    # that lacks polyc, then we need to run in non-local-install mode
+    if ! polyc --help >/dev/null ; then
+        local_install=""
+    fi
+fi
+
 if [ -n "$local_install" ]; then
     hash=$(echo "$sml" | cat "$program" - | $hasher | cut -c1-16)
     gen_sml=$mydir/.vext-$hash.sml
