@@ -33,7 +33,7 @@
     Software without prior written authorization.
 *)
 
-val vext_version = "0.9.5"
+val vext_version = "0.9.6"
 
 
 datatype vcs =
