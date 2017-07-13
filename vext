@@ -11,17 +11,22 @@ set -eu
 mydir=$(dirname "$0")
 program="$mydir/vext.sml"
 
+hasher=
 local_install=
 if [ -w "$mydir" ]; then
     if echo | sha256sum >/dev/null 2>&1 ; then
-        local_install=true;
+	hasher=sha256sum
+        local_install=true
+    elif echo | shasum >/dev/null 2>&1 ; then
+	hasher=shasum
+	local_install=true
     else
-        echo "WARNING: sha256sum program not found" 1>&2
+        echo "WARNING: sha256sum or shasum program not found" 1>&2
     fi
 fi
 
 if [ -n "$local_install" ]; then
-    hash=$(echo "$sml" | cat "$program" - | sha256sum | cut -c1-16)
+    hash=$(echo "$sml" | cat "$program" - | $hasher | cut -c1-16)
     gen_sml=$mydir/.vext-$hash.sml
     gen_out=$mydir/.vext-$hash.bin
     trap 'rm -f $gen_sml' 0
