@@ -29,10 +29,14 @@ fun load_libspec spec_json lock_json libname : libspec =
         val repo     = retrieve ["repository"]
         val url      = retrieve ["url"]
         val branch   = retrieve ["branch"]
-        val user_pin = retrieve ["pin"]
+        val project_pin = case retrieve ["pin"] of
+                              NONE => UNPINNED
+                            | SOME p => PINNED p
         val lock_pin = case lookup_optional lock_json [libobjname, libname] of
-                           SOME ll => lookup_optional_string ll ["pin"]
-                         | NONE => NONE
+                           NONE => UNPINNED
+                         | SOME ll => case lookup_optional_string ll ["pin"] of
+                                          SOME p => PINNED p
+                                        | NONE => UNPINNED
     in
         {
           libname = libname,
@@ -47,12 +51,8 @@ fun load_libspec spec_json lock_json libname : libspec =
                        SERVICE_SOURCE { service = ss, owner = owner, repo = repo }
                      | _ => raise Fail ("Must have exactly one of service " ^
                                         "or url string"),
-          pin = case lock_pin of
-                    SOME p => PINNED p
-                  | NONE =>
-                    case user_pin of
-                        SOME p => PINNED p
-                      | NONE => UNPINNED,
+          project_pin = project_pin,
+          lock_pin = lock_pin,
           branch = case branch of
                        SOME b => BRANCH b
                      | NONE => DEFAULT_BRANCH
@@ -184,8 +184,9 @@ fun print_status with_network (libname, status) =
         val localstate_str =
             case status of
                 OK (_, MODIFIED) => "Modified"
-              | OK (_, UNMODIFIED) => "Clean"
-              | _ => ""
+              | OK (_, LOCK_MISMATCHED) => "Lock Mismatched" (*!!! terrible name *)
+              | OK (_, CLEAN) => "Clean"
+              | ERROR _ => ""
         val error_str =
             case status of
                 ERROR e => e
@@ -297,8 +298,8 @@ fun with_local_project pintype f =
         return_code
     end
         
-fun review () = with_local_project NO_LOCKFILE review_project
-fun status () = with_local_project NO_LOCKFILE status_of_project
+fun review () = with_local_project USE_LOCKFILE review_project
+fun status () = with_local_project USE_LOCKFILE status_of_project
 fun update () = with_local_project NO_LOCKFILE update_project
 fun lock () = with_local_project NO_LOCKFILE lock_project
 fun install () = with_local_project USE_LOCKFILE update_project

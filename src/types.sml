@@ -25,7 +25,8 @@ datatype libstate =
 
 datatype localstate =
          MODIFIED |
-         UNMODIFIED
+         LOCK_MISMATCHED |
+         CLEAN
 
 datatype branch =
          BRANCH of string |
@@ -47,14 +48,15 @@ type libspec = {
     vcs : vcs,
     source : source,
     branch : branch,
-    pin : pin
+    project_pin : pin,
+    lock_pin : pin
 }
 
 type lock = {
     libname : libname,
     id_or_tag : id_or_tag
 }
-                   
+
 type remote_spec = {
     anon : string option,
     auth : string option
