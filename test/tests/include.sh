@@ -52,7 +52,7 @@ check_expected() {
     echo "Checking external repo IDs against expected values..."
     local id_A="$1"
     local id_B="$2"
-    local actual_id_A=$( cd ext/A ; hg id | awk '{ print $1 }' )
+    local actual_id_A=$( cd ext/A ; hg id | awk '{ print $1 }' | sed 's/\+$//' )
     if [ "$actual_id_A" != "$id_A" ]; then
         echo "ERROR: id for repo A ($actual_id_A) does not match expected ($id_A)"
         exit 3
@@ -136,3 +136,14 @@ assert_all_superseded() {
     assert_all "$1" "Superseded"
 }
 
+assert_contents() {
+    local file="$1"
+    local expected="$2"
+    local contents=$(cat "$file")
+    if [ "$contents" != "$expected" ]; then
+        echo "ERROR: contents of file $file ($contents) does not match expected ($expected)"
+        exit 3
+    else
+        echo OK
+    fi
+}
