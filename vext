@@ -25,14 +25,6 @@ if [ -w "$mydir" ]; then
     fi
 fi
 
-if [ "$sml" = "poly" ]; then
-    # if the user asked for poly but we have an old or weird install
-    # that lacks polyc, then we need to run in non-local-install mode
-    if ! polyc --help >/dev/null ; then
-        local_install=""
-    fi
-fi
-
 if [ -n "$local_install" ]; then
     hash=$(echo "$sml" | cat "$program" - | $hasher | cut -c1-16)
     gen_sml=$mydir/.vext-$hash.sml
@@ -62,7 +54,7 @@ if [ -z "$sml" ]; then
     # nasty bug that occasionally causes it to deadlock on startup.
     # That appears to be fixed in their repo, so we could promote it
     # up the order again at some point in future
-    elif polyc --help >/dev/null && ( echo | poly -v 2>/dev/null | grep -q 'Poly/ML' ); then
+    elif echo | poly -v 2>/dev/null | grep -q 'Poly/ML'; then
 	sml="poly"
     elif mlton 2>&1 | grep -q 'MLton'; then
 	sml="mlton"
@@ -107,10 +99,15 @@ done
 
 case "$sml" in
     poly)
-        if [ ! -x "$gen_out" ]; then
-            polyc -o "$gen_out" "$program"
-        fi
-	"$gen_out" "$@" ;;
+        if [ -n "$local_install" ] && polyc --help >/dev/null 2>&1 ; then
+            if [ ! -x "$gen_out" ]; then
+                polyc -o "$gen_out" "$program"
+            fi
+	    "$gen_out" "$@"
+        else
+            echo 'use "'"$program"'"; vext ['"$arglist"'];' |
+                poly -q --error-exit
+        fi ;;
     mlton)
         if [ ! -x "$gen_out" ]; then
 	    echo "val _ = main ()" | cat "$program" - > "$gen_sml"
