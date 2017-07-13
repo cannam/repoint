@@ -20,29 +20,39 @@ if [ -w "$mydir" ]; then
     fi
 fi
 
-sml_ident=
+if [ -n "$local_install" ]; then
+    hash=$(echo "$sml" | cat "$program" - | sha256sum | cut -c1-16)
+    gen_sml=$mydir/.vext-$hash.sml
+    gen_out=$mydir/.vext-$hash.bin
+    trap 'rm -f $gen_sml' 0
+else
+    gen_sml=$(mktemp /tmp/vext-XXXXXXXX.sml)
+    gen_out=$(mktemp /tmp/vext-XXXXXXXX.bin)
+    trap 'rm -f $gen_sml $gen_out' 0
+fi
+
+if [ -x "$gen_out" ]; then
+    exec "$gen_out" "$@"
+fi
 
 # We need one of Poly/ML, SML/NJ, or MLton. Since we're running a
 # single-file SML program as if it were a script, our order of
-# preference is based on startup speed.
+# preference is based on startup speed, except in the local_install
+# case where we retain a persistent binary.
 
 if [ -z "$sml" ]; then
     if [ -n "$local_install" ] && mlton 2>&1 | grep -q 'MLton'; then
 	sml="mlton"
-        sml_ident=$(mlton)
     elif sml -h 2>&1 | grep -q 'Standard ML of New Jersey'; then
 	sml="smlnj"
-        sml_ident=$(sml -h)
     # We would prefer Poly/ML to SML/NJ, except that Poly v5.7 has a
     # nasty bug that occasionally causes it to deadlock on startup.
     # That appears to be fixed in their repo, so we could promote it
     # up the order again at some point in future
     elif polyc --help >/dev/null && ( echo | poly -v 2>/dev/null | grep -q 'Poly/ML' ); then
 	sml="poly"
-        sml_ident=$(poly -v)
     elif mlton 2>&1 | grep -q 'MLton'; then
 	sml="mlton"
-        sml_ident=$(mlton)
     else cat 1>&2 <<EOF
 
 ERROR: No supported SML compiler or interpreter found       
@@ -70,16 +80,6 @@ EOF
 EOF
 	exit 2
     fi
-fi
-
-if [ -n "$local_install" ]; then
-    hash=$(sha256sum "$program" | cut -c1-16)-$(echo "$sml_ident" | sha256sum | cut -c1-16)
-    gen_sml=$mydir/.vext-$hash.sml
-    gen_out=$mydir/.vext-$hash.bin
-else
-    gen_sml=$(mktemp /tmp/vext-XXXXXXXX.sml)
-    gen_out=$(mktemp /tmp/vext-XXXXXXXX.bin)
-    trap 'rm -f $gen_sml $gen_out' 0
 fi
 
 arglist=""
