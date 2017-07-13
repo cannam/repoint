@@ -226,8 +226,15 @@ A local status will also be shown:
  * __Modified__: The library has local modifications that have not
    been committed.
 
-Note that at present Vext cannot report local modifications that have
-been committed but not pushed.
+ * __Differs from Lock__: The library is checked out at a version that
+   differs from the one listed in the `vect-lock.json` file. Either
+   the lock file needs updating (by `vext update` or `vext lock`) or
+   the wrong revision is checked out and this should be fixed (by
+   `vext install`).
+
+Note that at present Vext cannot always report local modifications
+that have been committed but not pushed, although the presence of such
+a commit is one possible cause of the __Differs from Lock__ status.
 
 ### Installing and updating libraries
 
@@ -246,6 +253,10 @@ update` always ignores the existing contents of the lock file. Pinned
 libraries will be updated if they are in Absent or Wrong state;
 unpinned libraries will always be updated, which should have an effect
 only when they are in Absent, Superseded, or Wrong state.
+
+Run `vext lock` to rewrite `vext-lock.json` according to the actual
+state of the installed libraries. (As `vext update` does, but without
+changing any of the library code.)
 
 
 Further configuration
