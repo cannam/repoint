@@ -1,0 +1,13 @@
+
+configuration:
+  - Release
+
+install:
+  - cinst --allow-empty-checksums smlnj
+
+before_build:
+  - set PATH=%PATH%;C:\Program Files (x86)\SMLNJ\bin
+
+build_script:
+  - cmd: test\simpletest.bat
+
