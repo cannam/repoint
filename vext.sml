@@ -9,7 +9,8 @@
 
     A simple manager for third-party source code dependencies
 
-    Copyright 2017 Chris Cannam.
+    Copyright 2017 Chris Cannam, Particular Programs Ltd,
+    and Queen Mary, University of London
 
     Permission is hereby granted, free of charge, to any person
     obtaining a copy of this software and associated documentation
@@ -30,10 +31,11 @@
     CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
     WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-    Except as contained in this notice, the names of Chris Cannam and
-    Particular Programs Ltd shall not be used in advertising or
-    otherwise to promote the sale, use or other dealings in this
-    Software without prior written authorization.
+    Except as contained in this notice, the names of Chris Cannam,
+    Particular Programs Ltd, and Queen Mary, University of London
+    shall not be used in advertising or otherwise to promote the sale,
+    use or other dealings in this Software without prior written
+    authorization.
 *)
 
 val vext_version = "0.9.6"
