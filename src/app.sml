@@ -280,6 +280,9 @@ fun lock_project ({ context, libs } : project) =
         return_code
     end
         
+fun archive_project ({ context, libs } : project) =
+    raise Fail "Not implemented" (*!!!*)
+    
 fun load_local_project pintype =
     let val userconfig = load_userconfig ()
         val rootpath = OS.FileSys.getDir ()
@@ -302,6 +305,7 @@ fun review () = with_local_project USE_LOCKFILE review_project
 fun status () = with_local_project USE_LOCKFILE status_of_project
 fun update () = with_local_project NO_LOCKFILE update_project
 fun lock () = with_local_project NO_LOCKFILE lock_project
+fun archive () = with_local_project NO_LOCKFILE archive_project
 fun install () = with_local_project USE_LOCKFILE update_project
 
 fun version () =
@@ -320,6 +324,7 @@ fun usage () =
             ^ "  install  update configured libraries according to project specs and lock file\n"
             ^ "  update   update configured libraries and lock file according to project specs\n"
             ^ "  lock     update lock file to match local library status\n"
+            ^ "  archive  pack up project and all libraries into an archive file\n"
             ^ "  version  print the Vext version number and exit\n\n");
     OS.Process.failure)
 
@@ -331,6 +336,7 @@ fun vext args =
               | ["install"] => install ()
               | ["update"] => update ()
               | ["lock"] => lock ()
+              | ["archive"] => archive ()
               | ["version"] => version ()
               | _ => usage ()
     in
