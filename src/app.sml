@@ -279,9 +279,6 @@ fun lock_project ({ context, libs } : project) =
         else ();
         return_code
     end
-        
-fun archive_project ({ context, libs } : project) =
-    raise Fail "Not implemented" (*!!!*)
     
 fun load_local_project pintype =
     let val userconfig = load_userconfig ()
