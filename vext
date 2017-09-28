@@ -110,6 +110,7 @@ case "$sml" in
         fi ;;
     mlton)
         if [ ! -x "$gen_out" ]; then
+	    echo "[prebuilding...]" 1>&2
 	    echo "val _ = main ()" | cat "$program" - > "$gen_sml"
 	    mlton -output "$gen_out" "$gen_sml"
         fi
