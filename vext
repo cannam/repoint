@@ -62,7 +62,7 @@ if [ -z "$sml" ]; then
 
 ERROR: No supported SML compiler or interpreter found       
 EOF
-	cat <<EOF
+	cat 1>&2 <<EOF
 
   The Vext external source code manager needs a Standard ML (SML)
   compiler or interpreter to run.
@@ -110,7 +110,7 @@ case "$sml" in
         fi ;;
     mlton)
         if [ ! -x "$gen_out" ]; then
-	    echo "[prebuilding...]" 1>&2
+	    echo "[Precompiling Vext binary...]" 1>&2
 	    echo "val _ = main ()" | cat "$program" - > "$gen_sml"
 	    mlton -output "$gen_out" "$gen_sml"
         fi
@@ -142,7 +142,7 @@ EOF
             ) > "$gen_sml"
 	CM_VERBOSE=false sml "$gen_sml" ;;
     *)
-	echo "Unknown SML implementation name: $sml";
+	echo "ERROR: Unknown SML implementation name: $sml" 1>&2;
 	exit 2 ;;
 esac
        
