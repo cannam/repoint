@@ -1482,21 +1482,30 @@ end = struct
 
     *)
 
-    fun vcs_for dir =
-        let val metadirs = [ (".hg",  HG), (".git", GIT) ]
+    fun identify_vcs dir =
+        let val metadirs = [
+                (".hg",  HG),
+                (".git", GIT)
+            ]
             fun matching (metadir, vcs) =
-                OS.FileSys.isDir
-                    (OS.Path.joinDirFile { dir = dir, file = metadir })
+                OS.FileSys.isDir (OS.Path.joinDirFile {
+                                       dir = dir,
+                                       file = metadir
+                                 })
                 handle _ => false
         in
-            foldl (fn ((metadir, vcs), acc) =>
-                      case acc of
-                          SOME vcs => SOME vcs
-                        | NONE => if matching (metadir, vcs)
-                                  then SOME vcs
-                                  else NONE)
-                  NONE
-                  metadirs
+            case 
+                foldl (fn ((metadir, vcs), acc) =>
+                          case acc of
+                              SOME vcs => SOME vcs
+                            | NONE => if matching (metadir, vcs)
+                                      then SOME vcs
+                                      else NONE)
+                      NONE
+                      metadirs
+             of
+                NONE => ERROR ("Unable to identify VCS for directory " ^ dir)
+              | SOME vcs => OK vcs
         end
 
     fun make_archive_dir context =
@@ -1554,28 +1563,56 @@ end = struct
                   (#libs project)
         end
 
-    fun make_archive archive_dir target_name =
-        (print "making archive";
-         OK ())
-            
-    fun archive target_name (project : project) =
-        let val project_vcs =
-                case vcs_for (#rootpath (#context project)) of
-                    SOME vcs => vcs
-                  | NONE => raise Fail "Can't identify VCS for project root"
-            val result = 
-                case make_archive_copy target_name project_vcs project of
-                    ERROR e => ERROR e
-                  | OK archive_dir => 
-                    case update_archive archive_dir target_name project of
-                        ERROR e => ERROR e
-                      | OK _ => make_archive archive_dir target_name
+    fun pack_archive archive_dir target_name target_path =
+        FileBits.command {
+            rootpath = archive_dir,
+            extdir = ".",
+            providers = [],
+            accounts = []
+        } "" [
+            "tar", "czf",
+            target_path,
+            "--exclude=.hg", (*!!! should come from known-vcs list *)
+            "--exclude=.git",
+            "--exclude=vext",
+            "--exclude=vext.sml",
+            "--exclude=vext.ps1",
+            "--exclude=vext.bat",
+            "--exclude=vext-project.json",
+            "--exclude=vext-lock.json",
+            target_name
+        ]
+
+    fun basename path =
+        let val filename = OS.Path.file path
+            val bits = String.tokens (fn c => c = #".") filename
         in
-            case result of
+            case bits of
+                [] => raise Fail "Target filename must not be empty"
+              | b::_ => b
+        end
+                         
+    fun archive target_path (project : project) =
+        let val name = basename target_path
+            val outcome =
+                case identify_vcs (#rootpath (#context project)) of
+                    ERROR e => ERROR e
+                  | OK vcs =>
+                    case make_archive_copy name vcs project of
+                        ERROR e => ERROR e
+                      | OK archive_dir => 
+                        case update_archive archive_dir name project of
+                            ERROR e => ERROR e
+                          | OK _ =>
+                            case pack_archive archive_dir name target_path of
+                                ERROR e => ERROR e
+                              | OK _ => OK ()
+        in
+            case outcome of
                 ERROR e => raise Fail e
               | OK () => OS.Process.success
         end
-        
+            
 end
 
 val libobjname = "libraries"
@@ -1894,7 +1931,7 @@ fun vext args =
               | ["install"] => install ()
               | ["update"] => update ()
               | ["lock"] => lock ()
-              | ["archive"] => archive "blah"
+              | ["archive", target] => archive target
               | ["version"] => version ()
               | _ => usage ()
     in

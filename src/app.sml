@@ -315,7 +315,7 @@ fun vext args =
               | ["install"] => install ()
               | ["update"] => update ()
               | ["lock"] => lock ()
-              | ["archive"] => archive "blah"
+              | ["archive", target] => archive target
               | ["version"] => version ()
               | _ => usage ()
     in
