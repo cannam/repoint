@@ -72,7 +72,7 @@ structure Archive = struct
 
     *)
 
-    fun identify_vcs dir =
+    fun vcs_for dir =
         let val metadirs = [ (".hg",  HG), (".git", GIT) ]
             fun matching (metadir, vcs) =
                 OS.FileSys.isDir
@@ -89,11 +89,32 @@ structure Archive = struct
                   metadirs
         end
 
-    fun archive_project target_filename ({ context, ... } : project) =
-        (case identify_vcs (#rootpath context) of
-             SOME HG => print "it's Mercurial!\n"
-           | SOME GIT => print "it's Git!\n"
-           | NONE => print "I don't know what it is!";
-         OS.Process.success)
+    fun make_archive_dir context =
+        let val path = OS.Path.joinDirFile {
+                    dir = #rootpath context,
+                    file = VextFilenames.archive_dir
+                }
+        in
+            case FileBits.mkpath path of
+                ERROR e => raise Fail ("Failed to create archive directory \""
+                                       ^ path ^ "\": " ^ e)
+              | OK () => path
+        end
+                                 
+    fun make_archive_copy target_name ({ context, ... } : project) =
+        let val archive_dir = make_archive_dir context
+        in
+            OS.Process.success
+        end
+            
+    fun archive_project target_name ({ context, ... } : project) =
+        let val project_vcs =
+                case vcs_for (#rootpath context) of
+                    SOME vcs => vcs
+                  | NONE => raise Fail "Can't identify VCS for project root"
+                                  
+        in
+            OS.Process.success
+        end
         
 end
