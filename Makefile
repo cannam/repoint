@@ -14,6 +14,7 @@ SOURCES	:= \
 	src/provider.sml \
 	src/hg.sml \
 	src/git.sml \
+	src/archive.sml \
 	src/app.sml
 
 vext.sml:	$(SOURCES)

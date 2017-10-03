@@ -1,5 +1,5 @@
 
-fun archive_project ({ context, ... } : project) =
+structure Archive = struct
 
     (* The idea of "archive" is to replace hg archive, which can't
        include files (such as the Vext-introduced external library
@@ -28,7 +28,8 @@ fun archive_project ({ context, ... } : project) =
          history does not
 
        Should this be done in a shell script, rather than from
-       Vext itself?
+       Vext itself? That would be easier, but it would be more
+       pleasing to have this built in.
 
        There doesn't appear to be a mkdtemp equivalent in the Basis
        library... we could put the temporary target within
@@ -60,7 +61,8 @@ fun archive_project ({ context, ... } : project) =
 
        - Call out to an archive program to archive up the now-
        updated copy of the project, running e.g.
-       tar cvzf project-release.tar.gz --exclude=.hg --exclude=.git project-release
+       tar cvzf project-release.tar.gz \
+           --exclude=.hg --exclude=.git project-release
        in the .vext-archive dir
 
        - Clean up by deleting the new copy
@@ -68,4 +70,30 @@ fun archive_project ({ context, ... } : project) =
        (What should we do if the target directory or archive name
        already exists?)
 
-     *)
+    *)
+
+    fun identify_vcs dir =
+        let val metadirs = [ (".hg",  HG), (".git", GIT) ]
+            fun matching (metadir, vcs) =
+                OS.FileSys.isDir
+                    (OS.Path.joinDirFile { dir = dir, file = metadir })
+                handle _ => false
+        in
+            foldl (fn ((metadir, vcs), acc) =>
+                      case acc of
+                          SOME vcs => SOME vcs
+                        | NONE => if matching (metadir, vcs)
+                                  then SOME vcs
+                                  else NONE)
+                  NONE
+                  metadirs
+        end
+
+    fun archive_project target_filename ({ context, ... } : project) =
+        (case identify_vcs (#rootpath context) of
+             SOME HG => print "it's Mercurial!\n"
+           | SOME GIT => print "it's Git!\n"
+           | NONE => print "I don't know what it is!";
+         OS.Process.success)
+        
+end
