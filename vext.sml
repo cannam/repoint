@@ -1386,6 +1386,25 @@ structure GitControl :> VCS_CONTROL = struct
             
 end
 
+structure AnyLibControl :> LIB_CONTROL = struct
+
+    structure H = LibControlFn(HgControl)
+    structure G = LibControlFn(GitControl)
+
+    fun review context (spec as { vcs, ... } : libspec) =
+        (fn HG => H.review | GIT => G.review) vcs context spec
+
+    fun status context (spec as { vcs, ... } : libspec) =
+        (fn HG => H.status | GIT => G.status) vcs context spec
+
+    fun update context (spec as { vcs, ... } : libspec) =
+        (fn HG => H.update | GIT => G.update) vcs context spec
+
+    fun id_of context (spec as { vcs, ... } : libspec) =
+        (fn HG => H.id_of | GIT => G.id_of) vcs context spec
+end
+
+
 structure Archive = struct
 
     (* The idea of "archive" is to replace hg archive, which can't
@@ -1488,40 +1507,39 @@ structure Archive = struct
               | OK () => path
         end
                                  
-    fun make_archive_copy target_name ({ context, ... } : project) =
+    fun make_archive_copy target_name vcs ({ context, ... } : project) =
         let val archive_dir = make_archive_dir context
+            val synthetic_context = {
+                rootpath = archive_dir,
+                extdir = ".",
+                providers = [],
+                accounts = []
+            }
+            val synthetic_library = {
+                libname = target_name,
+                vcs = vcs,
+                source = URL_SOURCE ("file://" ^ (#rootpath context)),
+                branch = DEFAULT_BRANCH, (*!!! Need current branch of project? *)
+                project_pin = UNPINNED,  (*!!! Need current id? *)
+                lock_pin = UNPINNED
+            }
         in
-            OS.Process.success
+            case AnyLibControl.update synthetic_context synthetic_library of
+                ERROR err => raise Fail ("Failed to clone original project to "
+                                         ^ archive_dir ^ "/" ^ target_name
+                                         ^ ": " ^ err)
+              | OK _ => OS.Process.success
         end
             
-    fun archive_project target_name ({ context, ... } : project) =
+    fun archive_project target_name (project : project) =
         let val project_vcs =
-                case vcs_for (#rootpath context) of
+                case vcs_for (#rootpath (#context project)) of
                     SOME vcs => vcs
                   | NONE => raise Fail "Can't identify VCS for project root"
-                                  
         in
-            OS.Process.success
+            make_archive_copy target_name project_vcs project
         end
         
-end
-
-structure AnyLibControl :> LIB_CONTROL = struct
-
-    structure H = LibControlFn(HgControl)
-    structure G = LibControlFn(GitControl)
-
-    fun review context (spec as { vcs, ... } : libspec) =
-        (fn HG => H.review | GIT => G.review) vcs context spec
-
-    fun status context (spec as { vcs, ... } : libspec) =
-        (fn HG => H.status | GIT => G.status) vcs context spec
-
-    fun update context (spec as { vcs, ... } : libspec) =
-        (fn HG => H.update | GIT => G.update) vcs context spec
-
-    fun id_of context (spec as { vcs, ... } : libspec) =
-        (fn HG => H.id_of | GIT => G.id_of) vcs context spec
 end
 
 val libobjname = "libraries"
