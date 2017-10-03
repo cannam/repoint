@@ -1,5 +1,9 @@
 
-structure Archive = struct
+structure Archive :> sig
+
+    val archive : string -> project -> OS.Process.status
+        
+end = struct
 
     (* The idea of "archive" is to replace hg archive, which can't
        include files (such as the Vext-introduced external library
@@ -119,19 +123,51 @@ structure Archive = struct
             }
         in
             case AnyLibControl.update synthetic_context synthetic_library of
-                ERROR err => raise Fail ("Failed to clone original project to "
-                                         ^ archive_dir ^ "/" ^ target_name
-                                         ^ ": " ^ err)
-              | OK _ => OS.Process.success
+                ERROR e => ERROR ("Failed to clone original project to "
+                                  ^ archive_dir ^ "/" ^ target_name
+                                  ^ ": " ^ e)
+              | OK _ => OK archive_dir
         end
+
+    fun update_archive archive_dir target_name (project as { context, ... }) =
+        let val synthetic_context = {
+                rootpath = OS.Path.joinDirFile {
+                    dir = archive_dir,
+                    file = target_name
+                },
+                extdir = #extdir context,
+                providers = #providers context,
+                accounts = #accounts context
+            }
+        in
+            foldl (fn (lib, acc) =>
+                      case acc of
+                          ERROR e => ERROR e
+                        | OK _ => AnyLibControl.update synthetic_context lib)
+                  (OK "")
+                  (#libs project)
+        end
+
+    fun make_archive archive_dir target_name =
+        (print "making archive";
+         OK ())
             
-    fun archive_project target_name (project : project) =
+    fun archive target_name (project : project) =
         let val project_vcs =
                 case vcs_for (#rootpath (#context project)) of
                     SOME vcs => vcs
                   | NONE => raise Fail "Can't identify VCS for project root"
+            val result = 
+                case make_archive_copy target_name project_vcs project of
+                    ERROR e => ERROR e
+                  | OK archive_dir => 
+                    case update_archive archive_dir target_name project of
+                        ERROR e => ERROR e
+                      | OK _ => make_archive archive_dir target_name
         in
-            make_archive_copy target_name project_vcs project
+            case result of
+                ERROR e => raise Fail e
+              | OK () => OS.Process.success
         end
         
 end

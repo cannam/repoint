@@ -284,10 +284,8 @@ fun review () = with_local_project USE_LOCKFILE review_project
 fun status () = with_local_project USE_LOCKFILE status_of_project
 fun update () = with_local_project NO_LOCKFILE update_project
 fun lock () = with_local_project NO_LOCKFILE lock_project
+fun archive target = with_local_project NO_LOCKFILE (Archive.archive target)
 fun install () = with_local_project USE_LOCKFILE update_project
-
-fun archive target =
-    with_local_project NO_LOCKFILE (Archive.archive_project target)
 
 fun version () =
     (print ("v" ^ vext_version ^ "\n");
