@@ -108,7 +108,7 @@ end = struct
                 libname = target_name,
                 vcs = vcs,
                 source = URL_SOURCE ("file://" ^ (#rootpath context)),
-                branch = DEFAULT_BRANCH, (* overridden by pinned id *)
+                branch = DEFAULT_BRANCH, (* overridden by pinned id below *)
                 project_pin = PINNED project_id,
                 lock_pin = PINNED project_id
             }
