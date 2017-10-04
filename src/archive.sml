@@ -153,6 +153,7 @@ end = struct
                 "--exclude=vext.bat",
                 "--exclude=vext-project.json",
                 "--exclude=vext-lock.json",
+                (*!!! need to be able to add exclusions (e.g. sv-dependency-builds) *)
                 target_name
             ] of
             ERROR e => ERROR e

@@ -215,11 +215,13 @@ end = struct
                 in files
                 end
             fun remove path =
-                if FileSys.isDir path
+                if FileSys.isLink path (* dangling links bother isDir *)
+                then FileSys.remove path
+                else if FileSys.isDir path
                 then (app remove (contents path); FileSys.rmDir path)
                 else FileSys.remove path
         in
             (remove path; OK ())
-            handle OS.SysErr (e, _) => ERROR ("Path removal failed: " ^ e)
+            handle SysErr (e, _) => ERROR ("Path removal failed: " ^ e)
         end
 end
