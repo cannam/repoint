@@ -1436,9 +1436,11 @@ structure AnyLibControl :> LIB_CONTROL = struct
 end
 
 
+type exclusions = string list
+              
 structure Archive :> sig
 
-    val archive : string -> project -> OS.Process.status
+    val archive : string * exclusions -> project -> OS.Process.status
         
 end = struct
 
@@ -1577,57 +1579,82 @@ end = struct
                   (#libs project)
         end
 
-    fun pack_archive archive_root target_name target_path =
+    datatype packer = TAR
+                    | TAR_GZ
+                    | TAR_BZ2
+                    | TAR_XZ
+    (* could add other packers, e.g. zip, if we knew how to
+       handle the file omissions etc properly in pack_archive *)
+                          
+    fun packer_and_basename path =
+        let val extensions = [ (".tar", TAR),
+                               (".tar.gz", TAR_GZ),
+                               (".tar.bz2", TAR_BZ2),
+                               (".tar.xz", TAR_XZ)]
+            val filename = OS.Path.file path
+        in
+            foldl (fn ((ext, packer), acc) =>
+                      if String.isSuffix ext filename
+                      then SOME (packer,
+                                 String.substring (filename, 0,
+                                                   String.size filename -
+                                                   String.size ext))
+                      else acc)
+                  NONE
+                  extensions
+        end
+            
+    fun pack_archive archive_root target_name target_path packer exclusions =
         case FileBits.command {
                 rootpath = archive_root,
                 extdir = ".",
                 providers = [],
                 accounts = []
-            } "" [
-                "tar", "czf", (*!!! shouldn't be hardcoding this *)
-                target_path,
-                "--exclude=.hg", (*!!! should come from known-vcs list *)
-                "--exclude=.git",
-                "--exclude=vext",
-                "--exclude=vext.sml",
-                "--exclude=vext.ps1",
-                "--exclude=vext.bat",
-                "--exclude=vext-project.json",
-                "--exclude=vext-lock.json",
-                (*!!! need to be able to add exclusions (e.g. sv-dependency-builds) *)
-                target_name
-            ] of
+            } "" ([
+                     "tar",
+                     case packer of
+                         TAR => "cf"
+                       | TAR_GZ => "czf"
+                       | TAR_BZ2 => "cjf"
+                       | TAR_XZ => "cJf",
+                     target_path,
+                     "--exclude=.hg",
+                     "--exclude=.git",
+                     "--exclude=vext",
+                     "--exclude=vext.sml",
+                     "--exclude=vext.ps1",
+                     "--exclude=vext.bat",
+                     "--exclude=vext-project.json",
+                     "--exclude=vext-lock.json"
+                 ] @ (map (fn e => "--exclude=" ^ e) exclusions) @
+                  [ target_name ])
+         of
             ERROR e => ERROR e
           | OK _ => FileBits.rmpath (archive_path archive_root target_name)
             
-    fun basename path =
-        (*!!! should strip known archive suffixes, so e.g. 
-              release-v1.0.tar.gz -> release-v1.0, not
-              release-v1 or release-v1.0.tar *)
-        let val filename = OS.Path.file path
-            val bits = String.tokens (fn c => c = #".") filename
-        in
-            case bits of
-                [] => raise Fail "Target filename must not be empty"
-              | b::_ => b
-        end
-            
-    fun archive target_path (project : project) =
+    fun archive (target_path, exclusions) (project : project) =
         let val _ = check_nonexistent target_path
-            val name = basename target_path
-            val outcome =
+            val (packer, name) =
+                case packer_and_basename target_path of
+                    NONE => raise Fail ("Unsupported archive file extension in "
+                                        ^ target_path)
+                  | SOME pn => pn
+            val details =
                 case project_vcs_and_id (#rootpath (#context project)) of
+                    ERROR e => raise Fail e
+                  | OK details => details
+            val archive_root =
+                case make_archive_copy name details project of
+                    ERROR e => raise Fail e
+                  | OK archive_root => archive_root
+            val outcome = 
+                case update_archive archive_root name project of
                     ERROR e => ERROR e
-                  | OK details =>
-                    case make_archive_copy name details project of
+                  | OK _ =>
+                    case pack_archive archive_root name
+                                      target_path packer exclusions of
                         ERROR e => ERROR e
-                      | OK archive_root => 
-                        case update_archive archive_root name project of
-                            ERROR e => ERROR e
-                          | OK _ =>
-                            case pack_archive archive_root name target_path of
-                                ERROR e => ERROR e
-                              | OK _ => OK ()
+                      | OK _ => OK ()
         in
             case outcome of
                 ERROR e => raise Fail e
@@ -1919,7 +1946,6 @@ fun review () = with_local_project USE_LOCKFILE review_project
 fun status () = with_local_project USE_LOCKFILE status_of_project
 fun update () = with_local_project NO_LOCKFILE update_project
 fun lock () = with_local_project NO_LOCKFILE lock_project
-fun archive target = with_local_project USE_LOCKFILE (Archive.archive target)
 fun install () = with_local_project USE_LOCKFILE update_project
 
 fun version () =
@@ -1942,6 +1968,14 @@ fun usage () =
             ^ "  version  print the Vext version number and exit\n\n");
     OS.Process.failure)
 
+fun archive target args =
+    case args of
+        [] =>
+        with_local_project USE_LOCKFILE (Archive.archive (target, []))
+      | "--exclude"::xs =>
+        with_local_project USE_LOCKFILE (Archive.archive (target, xs))
+      | _ => usage ()
+
 fun vext args =
     let val return_code = 
             case args of
@@ -1950,8 +1984,8 @@ fun vext args =
               | ["install"] => install ()
               | ["update"] => update ()
               | ["lock"] => lock ()
-              | ["archive", target] => archive target
               | ["version"] => version ()
+              | "archive"::target::args => archive target args
               | _ => usage ()
     in
         OS.Process.exit return_code;

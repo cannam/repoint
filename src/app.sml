@@ -282,7 +282,6 @@ fun review () = with_local_project USE_LOCKFILE review_project
 fun status () = with_local_project USE_LOCKFILE status_of_project
 fun update () = with_local_project NO_LOCKFILE update_project
 fun lock () = with_local_project NO_LOCKFILE lock_project
-fun archive target = with_local_project USE_LOCKFILE (Archive.archive target)
 fun install () = with_local_project USE_LOCKFILE update_project
 
 fun version () =
@@ -305,6 +304,14 @@ fun usage () =
             ^ "  version  print the Vext version number and exit\n\n");
     OS.Process.failure)
 
+fun archive target args =
+    case args of
+        [] =>
+        with_local_project USE_LOCKFILE (Archive.archive (target, []))
+      | "--exclude"::xs =>
+        with_local_project USE_LOCKFILE (Archive.archive (target, xs))
+      | _ => usage ()
+
 fun vext args =
     let val return_code = 
             case args of
@@ -313,8 +320,8 @@ fun vext args =
               | ["install"] => install ()
               | ["update"] => update ()
               | ["lock"] => lock ()
-              | ["archive", target] => archive target
               | ["version"] => version ()
+              | "archive"::target::args => archive target args
               | _ => usage ()
     in
         OS.Process.exit return_code;
