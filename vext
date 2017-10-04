@@ -90,7 +90,7 @@ fi
 arglist=""
 for arg in "$@"; do
     if [ -n "$arglist" ]; then arglist="$arglist,"; fi
-    if echo "$arg" | grep -q '[^a-z]' ; then
+    if echo "$arg" | grep -q '["'"'"']' ; then
 	arglist="$arglist\"usage\""
     else
 	arglist="$arglist\"$arg\""
