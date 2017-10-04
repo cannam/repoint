@@ -216,8 +216,8 @@ end = struct
                 end
             fun remove path =
                 if FileSys.isDir path
-                then (app remove (contents path); print ("DIR " ^ path ^ "\n"); FileSys.rmDir path)
-                else (print (path ^ "\n"); FileSys.remove path)
+                then (app remove (contents path); FileSys.rmDir path)
+                else FileSys.remove path
         in
             (remove path; OK ())
             handle OS.SysErr (e, _) => ERROR ("Path removal failed: " ^ e)

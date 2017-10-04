@@ -5,75 +5,44 @@ structure Archive :> sig
         
 end = struct
 
-    (* The idea of "archive" is to replace hg archive, which can't
-       include files (such as the Vext-introduced external library
-       files) that are not under version control at all.
+    (* The idea of "archive" is to replace hg/git archive, which won't
+       include files, like the Vext-introduced external libraries,
+       that are not under version control with the main repo.
 
-       An archive process should (probably?) go like this.
+       The process goes like this:
+
+       - Make sure we have a target filename from the user, and take
+         its basename as our archive directory name
+
+       - Make an "archive root" subdir of the project repo, named
+         typically .vext-archive
        
-       - Identify the version control system used for the *project*
-         repo (this is not something Vext has ever had to take an
-         interest in before) - bearing in mind that the vext-project
-         file might not be in the project root
+       - Identify the VCS used for the project repo
 
-       - Using that VCS, clone the project repo to a temporary
-         location
+       - Synthesise a Vext project with the archive root as its
+         root path, "." as its extdir, with one library whose
+         name is the user-supplied basename and whose explicit
+         source URL is the original project root; update that
+         project -- thus cloning the original project to a subdir
+         of the archive root
 
-       - Acting within that temporary location, run "vext install"
-         to install the correct dependent libraries
+       - Synthesise a Vext project identical to the original one for
+         this project, but with the newly-cloned copy as its root
+         path; update that project -- thus checking out clean copies
+         of the external library dirs
 
-       - Archive up the temporary location, excluding the .hg/.git
-         directories from the main directory and each of the dependent
-         libraries
+       - Call out to an archive program to archive up the new copy,
+         running e.g.
+         tar cvzf project-release.tar.gz \
+             --exclude=.hg --exclude=.git project-release
+         in the archive root dir
 
-       - Also omit the vext-project.json file and any trace of Vext?
-         After all, it can't properly be run in a directory where the
-         external project folders already exist but their repo 
-         history does not
-
-       Should this be done in a shell script, rather than from
-       Vext itself? That would be easier, but it would be more
-       pleasing to have this built in.
-
-       There doesn't appear to be a mkdtemp equivalent in the Basis
-       library... we could put the temporary target within
-       .vext-archive in the local project directory, or something.
-
-       Let's translate this into Vext actions:
-
-       - Obtain from the user a name for the target directory.
-       This will be the basename of the target archive file, and
-       the directory name that the archive unpacks to.
-
-       - Identify the version control system used for the project
-       repo - seems to be one inescapable action?
-
-       - Make a subdir of the project repo, named something like
-       .vext-archive
-
-       - Synthesise a Vext project with .vext-archive as its
-       root path, "." as its extdir, having one provider which has
-       file:///path/to/original/project/root as its anonymous URL,
-       with one library whose name is the user-supplied basename;
-       update that project (thus cloning the original project to
-       a subdir of .vext-archive)
-
-       - Synthesise a Vext project identical to the original one
-       for this project, but with that newly-cloned copy as its
-       root path; update that project (thus checking out clean
-       copies of its external library dirs)
-
-       - Call out to an archive program to archive up the now-
-       updated copy of the project, running e.g.
-       tar cvzf project-release.tar.gz \
-           --exclude=.hg --exclude=.git project-release
-       in the .vext-archive dir
+       - (We also omit the vext-project.json file and any trace of
+         Vext. It can't properly be run in a directory where the
+         external project folders already exist but their repo history
+         does not. End users shouldn't get to see Vext)
 
        - Clean up by deleting the new copy
-
-       (What should we do if the target directory or archive name
-       already exists?)
-
     *)
 
     fun identify_vcs dir =
@@ -119,6 +88,11 @@ end = struct
             dir = archive_dir,
             file = target_name
         }
+
+    fun check_nonexistent path =
+        case SOME (OS.FileSys.fileSize path) handle OS.SysErr _ => NONE of
+            NONE => ()
+          | _ => raise Fail ("Path " ^ path ^ " exists, not overwriting")
             
     fun make_archive_copy target_name vcs ({ context, ... } : project) =
         let val archive_root = make_archive_root context
@@ -138,6 +112,7 @@ end = struct
             }
             val path = archive_path archive_root target_name
             val _ = print ("Cloning original project to " ^ path ^ "...\n");
+            val _ = check_nonexistent path
         in
             case AnyLibControl.update synthetic_context synthetic_library of
                 ERROR e => ERROR ("Failed to clone original project to "
@@ -184,6 +159,9 @@ end = struct
           | OK _ => FileBits.rmpath (archive_path archive_root target_name)
             
     fun basename path =
+        (*!!! should strip known archive suffixes, so e.g. 
+              release-v1.0.tar.gz -> release-v1.0, not
+              release-v1 or release-v1.0.tar *)
         let val filename = OS.Path.file path
             val bits = String.tokens (fn c => c = #".") filename
         in
@@ -191,11 +169,6 @@ end = struct
                 [] => raise Fail "Target filename must not be empty"
               | b::_ => b
         end
-
-    fun check_nonexistent path =
-        case SOME (OS.FileSys.fileSize path) handle OS.SysErr _ => NONE of
-            NONE => ()
-          | _ => raise Fail ("File " ^ path ^ " exists, not overwriting")
             
     fun archive target_path (project : project) =
         let val _ = check_nonexistent target_path
