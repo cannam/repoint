@@ -56,19 +56,17 @@ end = struct
                 accounts = []
             }
             val vcs_maybe = 
-                case (HgControl.exists context ".",
-                      GitControl.exists context ".") of
-                    (OK true, OK false) => OK HG
-                  | (OK false, OK true) => OK GIT
+                case [HgControl.exists context ".",
+                      GitControl.exists context "."] of
+                    [OK true, OK false] => OK HG
+                  | [OK false, OK true] => OK GIT
                   | _ => ERROR ("Unable to identify VCS for directory " ^ dir)
-            val id_queryer = if vcs_maybe = OK HG
-                             then HgControl.id_of
-                             else GitControl.id_of
         in
             case vcs_maybe of
                 ERROR e => ERROR e
               | OK vcs =>
-                case id_queryer context "." of
+                case (fn HG => HgControl.id_of | GIT => GitControl.id_of)
+                         vcs context "." of
                     ERROR e => ERROR ("Unable to obtain id of project repo: "
                                       ^ e)
                   | OK id => OK (vcs, id)
