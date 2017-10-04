@@ -17,7 +17,10 @@ end = struct
        - Make an "archive root" subdir of the project repo, named
          typically .vext-archive
        
-       - Identify the VCS used for the project repo
+       - Identify the VCS used for the project repo. Note that any
+         explicit references to VCS type in this structure are to
+         the VCS used for the project (something Vext doesn't 
+         otherwise care about), not for an individual library
 
        - Synthesise a Vext project with the archive root as its
          root path, "." as its extdir, with one library whose
@@ -46,31 +49,34 @@ end = struct
     *)
 
     fun identify_vcs dir =
-        let val metadirs = [
-                (".hg",  HG),
-                (".git", GIT)
-            ]
-            fun matching (metadir, vcs) =
-                OS.FileSys.isDir (OS.Path.joinDirFile {
-                                       dir = dir,
-                                       file = metadir
-                                 })
-                handle _ => false
+        let val synthetic_context = {
+                rootpath = dir,
+                extdir = ".",
+                providers = [],
+                accounts = []
+            }
         in
-            case 
-                foldl (fn ((metadir, vcs), acc) =>
-                          case acc of
-                              SOME vcs => SOME vcs
-                            | NONE => if matching (metadir, vcs)
-                                      then SOME vcs
-                                      else NONE)
-                      NONE
-                      metadirs
-             of
-                NONE => ERROR ("Unable to identify VCS for directory " ^ dir)
-              | SOME vcs => OK vcs
+            case HgControl.exists synthetic_context "." of
+                OK true => OK HG
+              | _ =>
+                case GitControl.exists synthetic_context "." of
+                    OK true => OK GIT
+                  | _ => ERROR ("Unable to identify VCS for directory " ^ dir)
         end
 
+    fun id_of dir vcs =
+        let val synthetic_context = {
+                rootpath = dir,
+                extdir = ".",
+                providers = [],
+                accounts = []
+            }
+        in
+            case vcs of
+                HG => HgControl.id_of synthetic_context "."
+              | GIT => GitControl.id_of synthetic_context "."
+        end
+            
     fun make_archive_root context =
         let val path = OS.Path.joinDirFile {
                     dir = #rootpath context,
@@ -102,16 +108,21 @@ end = struct
                 providers = [],
                 accounts = []
             }
+            val project_id =
+                case id_of (#rootpath context) vcs of
+                    OK id => id
+                  | ERROR e => raise Fail "Unable to obtain id of project repo"
             val synthetic_library = {
                 libname = target_name,
                 vcs = vcs,
                 source = URL_SOURCE ("file://" ^ (#rootpath context)),
-                branch = DEFAULT_BRANCH, (*!!! Need current branch of project? *)
-                project_pin = UNPINNED,  (*!!! Need current id? *)
-                lock_pin = UNPINNED
+                branch = DEFAULT_BRANCH, (* overridden by pinned id *)
+                project_pin = PINNED project_id,
+                lock_pin = PINNED project_id
             }
             val path = archive_path archive_root target_name
-            val _ = print ("Cloning original project to " ^ path ^ "...\n");
+            val _ = print ("Cloning original project to " ^ path
+                           ^ " at revision " ^ project_id ^ "...\n");
             val _ = check_nonexistent path
         in
             case AnyLibControl.update synthetic_context synthetic_library of
