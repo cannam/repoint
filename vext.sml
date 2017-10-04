@@ -1485,33 +1485,30 @@ end = struct
        - Clean up by deleting the new copy
     *)
 
-    fun identify_vcs dir =
-        let val synthetic_context = {
+    fun project_vcs_and_id dir =
+        let val context = {
                 rootpath = dir,
                 extdir = ".",
                 providers = [],
                 accounts = []
             }
-        in
-            case HgControl.exists synthetic_context "." of
-                OK true => OK HG
-              | _ =>
-                case GitControl.exists synthetic_context "." of
-                    OK true => OK GIT
+            val vcs_maybe = 
+                case (HgControl.exists context ".",
+                      GitControl.exists context ".") of
+                    (OK true, OK false) => OK HG
+                  | (OK false, OK true) => OK GIT
                   | _ => ERROR ("Unable to identify VCS for directory " ^ dir)
-        end
-
-    fun id_of dir vcs =
-        let val synthetic_context = {
-                rootpath = dir,
-                extdir = ".",
-                providers = [],
-                accounts = []
-            }
+            val id_queryer = if vcs_maybe = OK HG
+                             then HgControl.id_of
+                             else GitControl.id_of
         in
-            case vcs of
-                HG => HgControl.id_of synthetic_context "."
-              | GIT => GitControl.id_of synthetic_context "."
+            case vcs_maybe of
+                ERROR e => ERROR e
+              | OK vcs =>
+                case id_queryer context "." of
+                    ERROR e => ERROR ("Unable to obtain id of project repo: "
+                                      ^ e)
+                  | OK id => OK (vcs, id)
         end
             
     fun make_archive_root (context : context) =
@@ -1537,7 +1534,8 @@ end = struct
             NONE => ()
           | _ => raise Fail ("Path " ^ path ^ " exists, not overwriting")
             
-    fun make_archive_copy target_name vcs ({ context, ... } : project) =
+    fun make_archive_copy target_name (vcs, project_id)
+                          ({ context, ... } : project) =
         let val archive_root = make_archive_root context
             val synthetic_context = {
                 rootpath = archive_root,
@@ -1545,10 +1543,6 @@ end = struct
                 providers = [],
                 accounts = []
             }
-            val project_id =
-                case id_of (#rootpath context) vcs of
-                    OK id => id
-                  | ERROR e => raise Fail "Unable to obtain id of project repo"
             val synthetic_library = {
                 libname = target_name,
                 vcs = vcs,
@@ -1624,10 +1618,10 @@ end = struct
         let val _ = check_nonexistent target_path
             val name = basename target_path
             val outcome =
-                case identify_vcs (#rootpath (#context project)) of
+                case project_vcs_and_id (#rootpath (#context project)) of
                     ERROR e => ERROR e
-                  | OK vcs =>
-                    case make_archive_copy name vcs project of
+                  | OK details =>
+                    case make_archive_copy name details project of
                         ERROR e => ERROR e
                       | OK archive_root => 
                         case update_archive archive_root name project of
