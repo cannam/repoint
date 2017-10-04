@@ -38,7 +38,7 @@
     authorization.
 *)
 
-val vext_version = "0.9.7"
+val vext_version = "0.9.8"
 
 
 datatype vcs =
@@ -1570,7 +1570,7 @@ end = struct
             providers = [],
             accounts = []
         } "" [
-            "tar", "czf",
+            "tar", "czf", (*!!! shouldn't be hardcoding this *)
             target_path,
             "--exclude=.hg", (*!!! should come from known-vcs list *)
             "--exclude=.git",
@@ -1591,9 +1591,15 @@ end = struct
                 [] => raise Fail "Target filename must not be empty"
               | b::_ => b
         end
-                         
+
+    fun check_nonexistent path =
+        case SOME (OS.FileSys.fileSize path) handle OS.SysErr _ => NONE of
+            NONE => ()
+          | _ => raise Fail ("File " ^ path ^ " exists, not overwriting")
+            
     fun archive target_path (project : project) =
-        let val name = basename target_path
+        let val _ = check_nonexistent target_path
+            val name = basename target_path
             val outcome =
                 case identify_vcs (#rootpath (#context project)) of
                     ERROR e => ERROR e
@@ -1887,10 +1893,8 @@ fun load_local_project pintype =
 
 fun with_local_project pintype f =
     let val return_code = f (load_local_project pintype)
-                          handle e =>
-                                 (print ("Failed with exception: " ^
-                                         (exnMessage e) ^ "\n");
-                                  OS.Process.failure)
+                          handle e => (print ("Error: " ^ exnMessage e);
+                                       OS.Process.failure)
         val _ = print "\n";
     in
         return_code

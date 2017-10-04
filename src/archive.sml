@@ -164,7 +164,7 @@ end = struct
             providers = [],
             accounts = []
         } "" [
-            "tar", "czf",
+            "tar", "czf", (*!!! shouldn't be hardcoding this *)
             target_path,
             "--exclude=.hg", (*!!! should come from known-vcs list *)
             "--exclude=.git",
@@ -185,9 +185,15 @@ end = struct
                 [] => raise Fail "Target filename must not be empty"
               | b::_ => b
         end
-                         
+
+    fun check_nonexistent path =
+        case SOME (OS.FileSys.fileSize path) handle OS.SysErr _ => NONE of
+            NONE => ()
+          | _ => raise Fail ("File " ^ path ^ " exists, not overwriting")
+            
     fun archive target_path (project : project) =
-        let val name = basename target_path
+        let val _ = check_nonexistent target_path
+            val name = basename target_path
             val outcome =
                 case identify_vcs (#rootpath (#context project)) of
                     ERROR e => ERROR e

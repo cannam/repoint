@@ -271,10 +271,8 @@ fun load_local_project pintype =
 
 fun with_local_project pintype f =
     let val return_code = f (load_local_project pintype)
-                          handle e =>
-                                 (print ("Failed with exception: " ^
-                                         (exnMessage e) ^ "\n");
-                                  OS.Process.failure)
+                          handle e => (print ("Error: " ^ exnMessage e);
+                                       OS.Process.failure)
         val _ = print "\n";
     in
         return_code
