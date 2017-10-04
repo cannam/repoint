@@ -1965,6 +1965,7 @@ fun usage () =
             ^ "  update   update configured libraries and lock file according to project specs\n"
             ^ "  lock     update lock file to match local library status\n"
             ^ "  archive  pack up project and all libraries into an archive file\n"
+            ^ "           (invoke as 'vext archive target-file.tar.gz')\n"
             ^ "  version  print the Vext version number and exit\n\n");
     OS.Process.failure)
 
