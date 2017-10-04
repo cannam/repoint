@@ -102,7 +102,7 @@ end = struct
               | SOME vcs => OK vcs
         end
 
-    fun make_archive_dir context =
+    fun make_archive_root context =
         let val path = OS.Path.joinDirFile {
                     dir = #rootpath context,
                     file = VextFilenames.archive_dir
@@ -113,11 +113,17 @@ end = struct
                                        ^ path ^ "\": " ^ e)
               | OK () => path
         end
-                                 
+
+    fun archive_path archive_dir target_name =
+        OS.Path.joinDirFile {
+            dir = archive_dir,
+            file = target_name
+        }
+            
     fun make_archive_copy target_name vcs ({ context, ... } : project) =
-        let val archive_dir = make_archive_dir context
+        let val archive_root = make_archive_root context
             val synthetic_context = {
-                rootpath = archive_dir,
+                rootpath = archive_root,
                 extdir = ".",
                 providers = [],
                 accounts = []
@@ -130,20 +136,18 @@ end = struct
                 project_pin = UNPINNED,  (*!!! Need current id? *)
                 lock_pin = UNPINNED
             }
+            val path = archive_path archive_root target_name
+            val _ = print ("Cloning original project to " ^ path ^ "...\n");
         in
             case AnyLibControl.update synthetic_context synthetic_library of
                 ERROR e => ERROR ("Failed to clone original project to "
-                                  ^ archive_dir ^ "/" ^ target_name
-                                  ^ ": " ^ e)
-              | OK _ => OK archive_dir
+                                  ^ path ^ ": " ^ e)
+              | OK _ => OK archive_root
         end
 
-    fun update_archive archive_dir target_name (project as { context, ... }) =
+    fun update_archive archive_root target_name (project as { context, ... }) =
         let val synthetic_context = {
-                rootpath = OS.Path.joinDirFile {
-                    dir = archive_dir,
-                    file = target_name
-                },
+                rootpath = archive_path archive_root target_name,
                 extdir = #extdir context,
                 providers = #providers context,
                 accounts = #accounts context
@@ -157,26 +161,28 @@ end = struct
                   (#libs project)
         end
 
-    fun pack_archive archive_dir target_name target_path =
-        FileBits.command {
-            rootpath = archive_dir,
-            extdir = ".",
-            providers = [],
-            accounts = []
-        } "" [
-            "tar", "czf", (*!!! shouldn't be hardcoding this *)
-            target_path,
-            "--exclude=.hg", (*!!! should come from known-vcs list *)
-            "--exclude=.git",
-            "--exclude=vext",
-            "--exclude=vext.sml",
-            "--exclude=vext.ps1",
-            "--exclude=vext.bat",
-            "--exclude=vext-project.json",
-            "--exclude=vext-lock.json",
-            target_name
-        ]
-
+    fun pack_archive archive_root target_name target_path =
+        case FileBits.command {
+                rootpath = archive_root,
+                extdir = ".",
+                providers = [],
+                accounts = []
+            } "" [
+                "tar", "czf", (*!!! shouldn't be hardcoding this *)
+                target_path,
+                "--exclude=.hg", (*!!! should come from known-vcs list *)
+                "--exclude=.git",
+                "--exclude=vext",
+                "--exclude=vext.sml",
+                "--exclude=vext.ps1",
+                "--exclude=vext.bat",
+                "--exclude=vext-project.json",
+                "--exclude=vext-lock.json",
+                target_name
+            ] of
+            ERROR e => ERROR e
+          | OK _ => FileBits.rmpath (archive_path archive_root target_name)
+            
     fun basename path =
         let val filename = OS.Path.file path
             val bits = String.tokens (fn c => c = #".") filename
@@ -200,11 +206,11 @@ end = struct
                   | OK vcs =>
                     case make_archive_copy name vcs project of
                         ERROR e => ERROR e
-                      | OK archive_dir => 
-                        case update_archive archive_dir name project of
+                      | OK archive_root => 
+                        case update_archive archive_root name project of
                             ERROR e => ERROR e
                           | OK _ =>
-                            case pack_archive archive_dir name target_path of
+                            case pack_archive archive_root name target_path of
                                 ERROR e => ERROR e
                               | OK _ => OK ()
         in
