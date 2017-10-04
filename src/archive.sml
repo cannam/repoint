@@ -77,7 +77,7 @@ end = struct
               | GIT => GitControl.id_of synthetic_context "."
         end
             
-    fun make_archive_root context =
+    fun make_archive_root (context : context) =
         let val path = OS.Path.joinDirFile {
                     dir = #rootpath context,
                     file = VextFilenames.archive_dir
@@ -131,7 +131,8 @@ end = struct
               | OK _ => OK archive_root
         end
 
-    fun update_archive archive_root target_name (project as { context, ... }) =
+    fun update_archive archive_root target_name
+                       (project as { context, ... } : project) =
         let val synthetic_context = {
                 rootpath = archive_path archive_root target_name,
                 extdir = #extdir context,
