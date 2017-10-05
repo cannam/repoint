@@ -371,11 +371,3 @@ using keychain authentication. For example, providing an account name
 may cause Vext to switch to an ssh URL in place of a default https
 URL.
 
-
-### Developer todo / to-document notes
-
- + archive command
- + dry-run option (print commands)?
- + more tests: service definitions, weird lib paths, explicit URL etc
- + clean/modified + unpushed
- + warn on unrecognised properties in json files 
