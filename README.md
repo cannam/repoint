@@ -275,7 +275,7 @@ Vext expects the archive target filename to have one of a small set of
 recognised suffixes (.tar, .tar.gz, .tar.bz2, .tar.xz) and requires
 that GNU tar be available in the current PATH. You can explicitly
 exclude some files from the archive by adding one or more options of
-the form "--exclude <path>" after the target filename.
+the form `--exclude <path>` after the target filename.
 
 
 Further configuration
