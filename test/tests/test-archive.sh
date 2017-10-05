@@ -60,7 +60,7 @@ for project_vcs in hg git ; do
     
     touch newfile
     $project_vcs add newfile
-    $project_vcs commit -m "Add new file"
+    $project_vcs commit -m "Add new file" "$author_flag" "Other Test Person <other@example.com>"
 
     rm -f "$archive_file"
     "$vext" archive "$archive_file"
