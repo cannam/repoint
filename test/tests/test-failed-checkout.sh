@@ -26,7 +26,7 @@ for dir in A B; do
         echo "ERROR: vext install to non-empty local dir was expected to fail"
         exit 3
     else
-        :
+        echo "(The prior command was expected to print an error, continuing)"
     fi
 done
 

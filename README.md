@@ -85,20 +85,24 @@ The Vext distribution also includes a Bash script called `implant.sh`
 which copies the four Vext files into whichever directory you run the
 shell script from.
 
+### Platform support
+
+Vext has been tested on Linux, macOS, and Windows. It has
+continuous-integration testing across all three platforms, though it
+is much less thoroughly tested on Windows than the other two
+platforms.
+
 Vext requires a Standard ML compiler to be available when it is
 run. It supports [Poly/ML](http://polyml.org),
 [SML/NJ](http://smlnj.org), or, on non-Windows platforms only,
 [MLton](http://mlton.org). It is fairly easy to install at least one
 of these on every platform Vext is intended to support.
 
-Vext has been tested on Linux, macOS, and Windows. Integration tests
-currently cover Linux and macOS with Mercurial and Git repositories,
-using all three of the supported SML compilers.
-
 Vext is a developer tool. Don't ask end-users of your software to use
 it.
 
-[![Build Status](https://travis-ci.org/cannam/vext.svg?branch=master)](https://travis-ci.org/cannam/vext)
+* Linux and macOS CI build: [![Build Status](https://travis-ci.org/cannam/vext.svg?branch=master)](https://travis-ci.org/cannam/vext)
+* Windows CI build: [![Build status](https://ci.appveyor.com/api/projects/status/99esb700opqmyea8?svg=true)](https://ci.appveyor.com/project/cannam/vext)
 
 Setting up a Vext project
 -------------------------
@@ -262,12 +266,16 @@ changing any of the library code.)
 
 To pack up a project and all its configured libraries into an archive
 file, run `vext archive` with the target filename as argument,
-e.g. `vext archive /home/user/myproject-v1.0.tar.gz`. Vext expects the
-filename to have one of a small set of recognised suffixes (.tar,
-.tar.gz, .tar.bz2, .tar.xz) and requires that GNU tar be available in
-the current PATH. You can explicitly exclude some files from the
-archive by adding one or more options of the form "--exclude <path>"
-after the target filename.
+e.g. `vext archive /home/user/myproject-v1.0.tar.gz`. This works by
+checking out a temporary clean copy of the project's own repository,
+so it requires that the project itself is version-controlled using one
+of the same version-control systems as Vext supports for libraries.
+
+Vext expects the archive target filename to have one of a small set of
+recognised suffixes (.tar, .tar.gz, .tar.bz2, .tar.xz) and requires
+that GNU tar be available in the current PATH. You can explicitly
+exclude some files from the archive by adding one or more options of
+the form "--exclude <path>" after the target filename.
 
 
 Further configuration
