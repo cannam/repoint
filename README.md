@@ -258,6 +258,17 @@ Run `vext lock` to rewrite `vext-lock.json` according to the actual
 state of the installed libraries. (As `vext update` does, but without
 changing any of the library code.)
 
+### Creating an archive file
+
+To pack up a project and all its configured libraries into an archive
+file, run `vext archive` with the target filename as argument,
+e.g. `vext archive /home/user/myproject-v1.0.tar.gz`. Vext expects the
+filename to have one of a small set of recognised suffixes (.tar,
+.tar.gz, .tar.bz2, .tar.xz) and requires that GNU tar be available in
+the current PATH. You can explicitly exclude some files from the
+archive by adding one or more options of the form "--exclude <path>"
+after the target filename.
+
 
 Further configuration
 ---------------------
