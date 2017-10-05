@@ -21,6 +21,11 @@ archive_file="/tmp/vext-test-$$.tar.gz"
 
 for project_vcs in hg git ; do
 
+    author_flag=$(case "$project_vcs" in
+                      hg) echo "--user";;
+                      git) echo "--author";;
+                  esac)
+    
     rm -rf "$current"
     
     prepare
@@ -31,7 +36,7 @@ for project_vcs in hg git ; do
     
     $project_vcs init
     $project_vcs add vext-project.json
-    $project_vcs commit -m "Commit vext-project file"
+    $project_vcs commit -m "Commit vext-project file" "$author_flag" "Test Person <test@example.com>"
 
     rm -f "$archive_file"
     "$vext" archive "$archive_file"
