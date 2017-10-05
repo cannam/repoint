@@ -94,6 +94,7 @@ structure VextFilenames = struct
     val project_file = "vext-project.json"
     val project_lock_file = "vext-lock.json"
     val user_config_file = ".vext.json"
+    val archive_dir = ".vext-archive"
 end
                    
 signature VCS_CONTROL = sig

@@ -1,22 +1,4 @@
 
-structure AnyLibControl :> LIB_CONTROL = struct
-
-    structure H = LibControlFn(HgControl)
-    structure G = LibControlFn(GitControl)
-
-    fun review context (spec as { vcs, ... } : libspec) =
-        (fn HG => H.review | GIT => G.review) vcs context spec
-
-    fun status context (spec as { vcs, ... } : libspec) =
-        (fn HG => H.status | GIT => G.status) vcs context spec
-
-    fun update context (spec as { vcs, ... } : libspec) =
-        (fn HG => H.update | GIT => G.update) vcs context spec
-
-    fun id_of context (spec as { vcs, ... } : libspec) =
-        (fn HG => H.id_of | GIT => G.id_of) vcs context spec
-end
-
 val libobjname = "libraries"
                                              
 fun load_libspec spec_json lock_json libname : libspec =
@@ -279,7 +261,7 @@ fun lock_project ({ context, libs } : project) =
         else ();
         return_code
     end
-        
+    
 fun load_local_project pintype =
     let val userconfig = load_userconfig ()
         val rootpath = OS.FileSys.getDir ()
@@ -289,10 +271,8 @@ fun load_local_project pintype =
 
 fun with_local_project pintype f =
     let val return_code = f (load_local_project pintype)
-                          handle e =>
-                                 (print ("Failed with exception: " ^
-                                         (exnMessage e) ^ "\n");
-                                  OS.Process.failure)
+                          handle e => (print ("Error: " ^ exnMessage e);
+                                       OS.Process.failure)
         val _ = print "\n";
     in
         return_code
@@ -320,8 +300,18 @@ fun usage () =
             ^ "  install  update configured libraries according to project specs and lock file\n"
             ^ "  update   update configured libraries and lock file according to project specs\n"
             ^ "  lock     update lock file to match local library status\n"
+            ^ "  archive  pack up project and all libraries into an archive file\n"
+            ^ "           (invoke as 'vext archive target-file.tar.gz')\n"
             ^ "  version  print the Vext version number and exit\n\n");
     OS.Process.failure)
+
+fun archive target args =
+    case args of
+        [] =>
+        with_local_project USE_LOCKFILE (Archive.archive (target, []))
+      | "--exclude"::xs =>
+        with_local_project USE_LOCKFILE (Archive.archive (target, xs))
+      | _ => usage ()
 
 fun vext args =
     let val return_code = 
@@ -332,6 +322,7 @@ fun vext args =
               | ["update"] => update ()
               | ["lock"] => lock ()
               | ["version"] => version ()
+              | "archive"::target::args => archive target args
               | _ => usage ()
     in
         OS.Process.exit return_code;

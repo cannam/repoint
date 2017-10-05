@@ -9,6 +9,7 @@ structure FileBits :> sig
     val mydir : unit -> string
     val homedir : unit -> string
     val mkpath : string -> unit result
+    val rmpath : string -> unit result
     val project_spec_path : string -> string
     val project_lock_path : string -> string
     val verbose : unit -> bool
@@ -193,4 +194,34 @@ end = struct
                    | OK () => ((OS.FileSys.mkDir path; OK ())
                                handle OS.SysErr (e, _) =>
                                       ERROR ("Directory creation failed: " ^ e))
+
+    fun rmpath path =
+        let open OS
+            fun files_from dirstream =
+                case FileSys.readDir dirstream of
+                    NONE => []
+                  | SOME file =>
+                    (* readDir is supposed to filter these, 
+                       but let's be extra cautious: *)
+                    if file = Path.parentArc orelse file = Path.currentArc
+                    then files_from dirstream
+                    else file :: files_from dirstream
+            fun contents dir =
+                let val stream = FileSys.openDir dir
+                    val files = map (fn f => Path.joinDirFile
+                                                 { dir = dir, file = f })
+                                    (files_from stream)
+                    val _ = FileSys.closeDir stream
+                in files
+                end
+            fun remove path =
+                if FileSys.isLink path (* dangling links bother isDir *)
+                then FileSys.remove path
+                else if FileSys.isDir path
+                then (app remove (contents path); FileSys.rmDir path)
+                else FileSys.remove path
+        in
+            (remove path; OK ())
+            handle SysErr (e, _) => ERROR ("Path removal failed: " ^ e)
+        end
 end
