@@ -21,10 +21,10 @@ archive_file="/tmp/vext-test-$$.tar.gz"
 
 for project_vcs in hg git ; do
 
-    author_flag=$(case "$project_vcs" in
-                      hg) echo "--user";;
-                      git) echo "--author";;
-                  esac)
+    author_flag="--author"
+    if [ "$project_vcs" = "hg" ]; then
+	author_flag="--user"
+    fi
     
     rm -rf "$current"
     
@@ -53,10 +53,12 @@ for project_vcs in hg git ; do
     # check the archive is back to the original (i.e. we are archiving
     # the current revision, not the tip)
 
-    id=$(case "$project_vcs" in
-             hg)  hg id | awk '{ print $1 }';;
-             git) git rev-parse HEAD;;
-         esac)
+    id=""
+    if [ "$project_vcs" = "hg" ]; then
+	id=$(hg id | awk '{ print $1 }')
+    else
+	id=$(git rev-parse HEAD)
+    fi
     
     touch newfile
     $project_vcs add newfile
