@@ -43,7 +43,7 @@ ERROR: No supported SML compiler or interpreter found
     }
 }
 
-if ($args -match "[^a-z]") {
+if ($args -match "'""") {
     $arglist = '["usage"]'
 } else {
     $arglist = '["' + ($args -join '","') + '"]'

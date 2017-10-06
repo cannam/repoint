@@ -272,10 +272,12 @@ so it requires that the project itself is version-controlled using one
 of the same version-control systems as Vext supports for libraries.
 
 Vext expects the archive target filename to have one of a small set of
-recognised suffixes (.tar, .tar.gz, .tar.bz2, .tar.xz) and requires
-that GNU tar be available in the current PATH. You can explicitly
-exclude some files from the archive by adding one or more options of
-the form `--exclude <path>` after the target filename.
+recognised suffixes: .tar, .tar.gz, .tar.bz2, .tar.xz, and it requires
+that GNU tar or a compatible program be available in the current
+PATH. (This is unlikely to be straightforward on Windows.) Zip
+archives are not yet supported. You can explicitly exclude some files
+from the archive by adding one or more options of the form `--exclude
+<path>` after the target filename.
 
 
 Further configuration

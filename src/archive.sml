@@ -97,6 +97,18 @@ end = struct
             NONE => ()
           | _ => raise Fail ("Path " ^ path ^ " exists, not overwriting")
             
+    fun file_url path =
+        let val forward_path = 
+                String.translate (fn #"\\" => "/" |
+                                     c => Char.toString c) path
+        in
+            (* Path is expected to be absolute already, but if it
+                starts with a drive letter, we'll need an extra slash *)
+            case explode forward_path of
+                #"/"::rest => "file:///" ^ implode rest
+              | _ => "file:///" ^ forward_path
+        end
+            
     fun make_archive_copy target_name (vcs, project_id)
                           ({ context, ... } : project) =
         let val archive_root = make_archive_root context
@@ -109,7 +121,7 @@ end = struct
             val synthetic_library = {
                 libname = target_name,
                 vcs = vcs,
-                source = URL_SOURCE ("file://" ^ (#rootpath context)),
+                source = URL_SOURCE (file_url (#rootpath context)),
                 branch = DEFAULT_BRANCH, (* overridden by pinned id below *)
                 project_pin = PINNED project_id,
                 lock_pin = PINNED project_id
