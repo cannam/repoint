@@ -1533,7 +1533,7 @@ end = struct
         case SOME (OS.FileSys.fileSize path) handle OS.SysErr _ => NONE of
             NONE => ()
           | _ => raise Fail ("Path " ^ path ^ " exists, not overwriting")
-
+            
     fun file_url path =
         let val forward_path = 
                 String.translate (fn #"\\" => "/" |
@@ -1545,7 +1545,7 @@ end = struct
                 #"/"::rest => "file:///" ^ implode rest
               | _ => "file:///" ^ forward_path
         end
-                       
+            
     fun make_archive_copy target_name (vcs, project_id)
                           ({ context, ... } : project) =
         let val archive_root = make_archive_root context
