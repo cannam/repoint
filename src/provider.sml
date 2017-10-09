@@ -132,7 +132,12 @@ end = struct
         case List.find (fn a => service = #service a) accounts of
             SOME { login, ... } => SOME login
           | NONE => NONE
-                                          
+
+    fun reponame_for path =
+        case String.tokens (fn c => c = #"/") path of
+            [] => raise Fail "Non-empty library path required"
+          | toks => hd (rev toks)
+                        
     fun remote_url (context : context) vcs source libname =
         case source of
             URL_SOURCE u => u
@@ -142,7 +147,7 @@ end = struct
                            owner = owner,
                            repo = case repo of
                                       SOME r => r
-                                    | NONE => libname }
+                                    | NONE => reponame_for libname }
                          (login_for context service)
                          (#providers context)
 end

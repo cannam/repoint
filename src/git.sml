@@ -28,7 +28,10 @@ structure GitControl :> VCS_CONTROL = struct
     fun checkout context (libname, source, branch) =
         let val url = remote_for context (libname, source)
         in
-            case FileBits.mkpath (FileBits.extpath context) of
+            (* make the lib dir rather than just the ext dir, since
+               the lib dir might be nested and git will happily check
+               out into an existing empty dir anyway *)
+            case FileBits.mkpath (FileBits.libpath context libname) of
                 OK () => git_command context ""
                                      ["clone", "-b",
                                       branch_name branch,

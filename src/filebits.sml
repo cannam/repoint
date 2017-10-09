@@ -179,21 +179,27 @@ end = struct
           | (NONE, NONE) =>
             raise Fail "Failed to look up home directory from environment"
 
-    fun mkpath path =
+    fun mkpath' path =
         if OS.FileSys.isDir path handle _ => false
         then OK ()
         else case OS.Path.fromString path of
                  { arcs = nil, ... } => OK ()
                | { isAbs = false, ... } => ERROR "mkpath requires absolute path"
                | { isAbs, vol, arcs } => 
-                 case mkpath (OS.Path.toString {      (* parent *)
-                                   isAbs = isAbs,
-                                   vol = vol,
-                                   arcs = rev (tl (rev arcs)) }) of
+                 case mkpath' (OS.Path.toString {      (* parent *)
+                                    isAbs = isAbs,
+                                    vol = vol,
+                                    arcs = rev (tl (rev arcs)) }) of
                      ERROR e => ERROR e
                    | OK () => ((OS.FileSys.mkDir path; OK ())
                                handle OS.SysErr (e, _) =>
                                       ERROR ("Directory creation failed: " ^ e))
+
+    fun mkpath path =
+        (* strip any trailing '/', something isDir doesn't always handle *)
+        case rev (explode path) of
+            #"/"::rest => mkpath (implode (rev rest))
+          | _ => mkpath' path
 
     fun rmpath path =
         let open OS
