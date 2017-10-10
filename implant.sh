@@ -41,7 +41,7 @@ if [ -n "$vcs" ]; then
     read answer
     case "$answer" in
 	Y|y) ( cd "$target" ; $vcscmd $vextfiles ) ; echo "Done" ;;
-	*) echo "Skipping" ;;
+	*) echo "Not adding to repo" ;;
     esac
 fi
 
