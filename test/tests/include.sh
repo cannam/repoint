@@ -28,12 +28,13 @@ prepare
 vextdir=../../..
 vext="$vextdir"/vext
 
-write_project_file() {
-    local libcontent=$(echo "$1" | sed 's/^/        /')
+write_project_file_with_extpath() {
+    local extpath="$1"
+    local libcontent=$(echo "$2" | sed 's/^/        /')
     cat > vext-project.json <<EOF
 {
     "config": {
-        "extdir": "ext"
+        "extdir": "$extpath"
     },
     "services": {
 	"testfile": {
@@ -48,16 +49,21 @@ $libcontent
 EOF
 }
 
-check_expected() {
+write_project_file() {
+    write_project_file_with_extpath "ext" "$@"
+}
+
+check_expected_with_extpath() {
     echo "Checking external repo IDs against expected values..."
-    local id_A="$1"
-    local id_B="$2"
-    local actual_id_A=$( cd ext/A ; hg id | awk '{ print $1 }' | sed 's/\+$//' )
+    local extpath="$1"
+    local id_A="$2"
+    local id_B="$3"
+    local actual_id_A=$( cd "$extpath"/A ; hg id | awk '{ print $1 }' | sed 's/\+$//' )
     if [ "$actual_id_A" != "$id_A" ]; then
         echo "ERROR: id for repo A ($actual_id_A) does not match expected ($id_A)"
         exit 3
     fi
-    local actual_id_B=$( cd ext/B ; git rev-parse HEAD )
+    local actual_id_B=$( cd "$extpath"/B ; git rev-parse HEAD )
     if [ "$actual_id_B" != "$id_B" ]; then
         echo "ERROR: id for repo B ($actual_id_B) does not match expected ($id_B)"
         exit 3
@@ -82,6 +88,10 @@ EOF
         sdiff -w120 vext-lock.json expected-lock.json
         exit 3
     fi
+}
+
+check_expected() {
+    check_expected_with_extpath "ext" "$@"
 }
 
 assert_outputs() {

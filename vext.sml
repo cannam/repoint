@@ -210,23 +210,31 @@ end = struct
           | SOME _ => true
           | NONE => false
 
+    fun split_relative path desc =
+        case OS.Path.fromString path of
+            { isAbs = true, ... } => raise Fail (desc ^ " may not be absolute")
+          | { arcs, ... } => arcs
+                        
     fun extpath ({ rootpath, extdir, ... } : context) =
         let val { isAbs, vol, arcs } = OS.Path.fromString rootpath
         in OS.Path.toString {
                 isAbs = isAbs,
                 vol = vol,
-                arcs = arcs @ [ extdir ]
+                arcs = arcs @
+                       split_relative extdir "extdir"
             }
         end
     
     fun subpath ({ rootpath, extdir, ... } : context) libname remainder =
         (* NB libname is allowed to be a path fragment, e.g. foo/bar *)
         let val { isAbs, vol, arcs } = OS.Path.fromString rootpath
-            val split = String.fields (fn c => c = #"/")
         in OS.Path.toString {
                 isAbs = isAbs,
                 vol = vol,
-                arcs = arcs @ [ extdir ] @ split libname @ split remainder
+                arcs = arcs @
+                       split_relative extdir "extdir" @
+                       split_relative libname "library path" @
+                       split_relative remainder "subpath"
             }
         end
 
@@ -385,12 +393,9 @@ end = struct
                                       ERROR ("Directory creation failed: " ^ e))
 
     fun mkpath path =
-        (* strip any trailing '/', something isDir doesn't always handle *)
-        case rev (explode path) of
-            #"/"::rest => mkpath (implode (rev rest))
-          | _ => mkpath' path
+        mkpath' (OS.Path.mkCanonical path)
 
-    fun rmpath path =
+    fun rmpath' path =
         let open OS
             fun files_from dirstream =
                 case FileSys.readDir dirstream of
@@ -419,6 +424,10 @@ end = struct
             (remove path; OK ())
             handle SysErr (e, _) => ERROR ("Path removal failed: " ^ e)
         end
+
+    fun rmpath path =
+        rmpath' (OS.Path.mkCanonical path)
+
 end
                                          
 functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
