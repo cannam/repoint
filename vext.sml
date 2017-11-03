@@ -1169,7 +1169,7 @@ structure HgControl :> VCS_CONTROL = struct
     type vcsstate = { id: string, modified: bool,
                       branch: string, tags: string list }
 
-    val hg_args = [ "--config", "ui.interactive=true" ]
+    val hg_args = [ "--config", "ui.interactive=true", "--config", "ui.merge=:merge" ]
                         
     fun hg_command context libname args =
         FileBits.command context libname ("hg" :: hg_args @ args)
