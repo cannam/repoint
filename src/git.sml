@@ -2,8 +2,11 @@
 structure GitControl :> VCS_CONTROL = struct
 
     (* With Git repos we always operate in detached HEAD state. Even
-       the master branch is checked out using the remote reference,
-       origin/master. *)
+       the master branch is checked out using a remote reference
+       (vext/master). The remote we use is always named vext, and we
+       update it to the expected URL each time we fetch, in order to
+       ensure we update properly if the location given in the project
+       file changes. The origin remote is unused. *)
 
     fun git_command context libname args =
         FileBits.command context libname ("git" :: args)
@@ -23,7 +26,9 @@ structure GitControl :> VCS_CONTROL = struct
                                | BRANCH "" => "master"
                                | BRANCH b => b
 
-    fun remote_branch_name branch = "origin/" ^ branch_name branch
+    val our_remote = "vext"
+                                                 
+    fun remote_branch_name branch = our_remote ^ "/" ^ branch_name branch
 
     fun checkout context (libname, source, branch) =
         let val url = remote_for context (libname, source)
@@ -33,10 +38,25 @@ structure GitControl :> VCS_CONTROL = struct
                out into an existing empty dir anyway *)
             case FileBits.mkpath (FileBits.libpath context libname) of
                 OK () => git_command context ""
-                                     ["clone", "-b",
-                                      branch_name branch,
+                                     ["clone", "--origin", our_remote,
+                                      "--branch", branch_name branch,
                                       url, libname]
               | ERROR e => ERROR e
+        end
+
+    fun add_our_remote context (libname, source) =
+        (* When we do the checkout ourselves (above), we add the
+           remote at the same time. But if the repo was cloned by
+           someone else, we'll need to do it after the fact. Git
+           doesn't seem to have a means to add a remote or change its
+           url if it already exists; seems we have to do this: *)
+        let val url = remote_for context (libname, source)
+        in
+            case git_command context libname
+                             ["remote", "set-url", our_remote, url] of
+                OK () => OK ()
+              | ERROR e => git_command context libname
+                                       ["remote", "add", "-f", our_remote, url]
         end
 
     (* NB git rev-parse HEAD shows revision id of current checkout;
@@ -47,7 +67,7 @@ structure GitControl :> VCS_CONTROL = struct
             
     fun is_at context (libname, id_or_tag) =
         case id_of context libname of
-            ERROR e => ERROR e
+            ERROR e => OK false (* HEAD nonexistent, expected in empty repo *)
           | OK id =>
             if String.isPrefix id_or_tag id orelse
                String.isPrefix id id_or_tag
@@ -55,24 +75,32 @@ structure GitControl :> VCS_CONTROL = struct
             else 
                 case git_command_output context libname
                                         ["show-ref",
-                                         "refs/tags/" ^ id_or_tag] of
+                                         "refs/tags/" ^ id_or_tag,
+                                         "--"] of
                     OK "" => OK false
                   | ERROR _ => OK false
                   | OK s => OK (id = hd (String.tokens (fn c => c = #" ") s))
 
     fun branch_tip context (libname, branch) =
+        (* We don't have access to the source info or the network
+           here, as this is used by status (e.g. via is_on_branch) as
+           well as review. It's possible the remote branch won't exist,
+           e.g. if the repo was checked out by something other than
+           Vext, and if that's the case, we can't add it here; we'll
+           just have to fail, since checking against local branches
+           instead could produce the wrong result. *)
         git_command_output context libname
                            ["rev-list", "-1",
-                            remote_branch_name branch]
+                            remote_branch_name branch, "--"]
                        
     fun is_newest_locally context (libname, branch) =
         case branch_tip context (libname, branch) of
-            ERROR e => ERROR e
+            ERROR e => OK false
           | OK rev => is_at context (libname, rev)
 
     fun is_on_branch context (libname, branch) =
         case branch_tip context (libname, branch) of
-            ERROR e => ERROR e
+            ERROR e => OK false
           | OK rev =>
             case is_at context (libname, rev) of
                 ERROR e => ERROR e
@@ -84,14 +112,22 @@ structure GitControl :> VCS_CONTROL = struct
                     ERROR e => OK false  (* cmd returns non-zero for no *)
                   | _ => OK true
 
-    fun is_newest context (libname, branch) =
-        case is_newest_locally context (libname, branch) of
+    fun fetch context (libname, source) =
+        case add_our_remote context (libname, source) of
             ERROR e => ERROR e
-          | OK false => OK false
-          | OK true =>
-            case git_command context libname ["fetch"] of
+          | _ => git_command context libname ["fetch", our_remote]
+                            
+    fun is_newest context (libname, source, branch) =
+        case add_our_remote context (libname, source) of
+            ERROR e => ERROR e
+          | OK () => 
+            case is_newest_locally context (libname, branch) of
                 ERROR e => ERROR e
-              | _ => is_newest_locally context (libname, branch)
+              | OK false => OK false
+              | OK true =>
+                case fetch context (libname, source) of
+                    ERROR e => ERROR e
+                  | _ => is_newest_locally context (libname, branch)
 
     fun is_modified_locally context libname =
         case git_command_output context libname ["status", "--porcelain"] of
@@ -106,8 +142,8 @@ structure GitControl :> VCS_CONTROL = struct
        but it's perhaps cleaner not to maintain a local branch at all,
        but instead checkout the remote branch as a detached head. *)
 
-    fun update context (libname, branch) =
-        case git_command context libname ["fetch"] of
+    fun update context (libname, source, branch) =
+        case fetch context (libname, source) of
             ERROR e => ERROR e
           | _ =>
             case git_command context libname ["checkout", "--detach",
@@ -123,10 +159,10 @@ structure GitControl :> VCS_CONTROL = struct
        update to a new pin (from the lock file) that hasn't been
        fetched yet. *)
 
-    fun update_to context (libname, "") = 
+    fun update_to context (libname, _, "") = 
         ERROR "Non-empty id (tag or revision id) required for update_to"
-      | update_to context (libname, id) =
-        let val fetch_result = git_command context libname ["fetch"]
+      | update_to context (libname, source, id) =
+        let val fetch_result = fetch context (libname, source)
         in
             case git_command context libname ["checkout", "--detach", id] of
                 OK _ => id_of context libname

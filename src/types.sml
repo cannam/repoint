@@ -116,7 +116,7 @@ signature VCS_CONTROL = sig
         given branch. False may indicate that the branch has advanced
         or that the library is not on the branch at all. This function
         may use the network to check for new revisions *)
-    val is_newest : context -> libname * branch -> bool result
+    val is_newest : context -> libname * source * branch -> bool result
 
     (** Test whether the library is at the newest revision available
         locally for the given branch. False may indicate that the
@@ -133,10 +133,10 @@ signature VCS_CONTROL = sig
     val checkout : context -> libname * source * branch -> unit result
 
     (** Update the library to the given branch tip *)
-    val update : context -> libname * branch -> id_or_tag result
+    val update : context -> libname * source * branch -> id_or_tag result
 
     (** Update the library to the given specific id or tag *)
-    val update_to : context -> libname * id_or_tag -> id_or_tag result
+    val update_to : context -> libname * source * id_or_tag -> id_or_tag result
 end
 
 signature LIB_CONTROL = sig
