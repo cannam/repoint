@@ -81,7 +81,7 @@ structure HgControl :> VCS_CONTROL = struct
                                ["log", "-l1",
                                 "-b", branch_name branch,
                                 "--template", "{node}"] of
-            ERROR e => ERROR e
+            ERROR e => OK false (* desired branch does not exist *)
           | OK newest_in_repo => is_at context (libname, newest_in_repo)
 
     fun pull context (libname, source) =

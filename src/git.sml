@@ -44,6 +44,21 @@ structure GitControl :> VCS_CONTROL = struct
               | ERROR e => ERROR e
         end
 
+    fun add_our_remote context (libname, source) =
+        (* When we do the checkout ourselves (above), we add the
+           remote at the same time. But if the repo was cloned by
+           someone else, we'll need to do it after the fact. Git
+           doesn't seem to have a means to add a remote or change its
+           url if it already exists; seems we have to do this: *)
+        let val url = remote_for context (libname, source)
+        in
+            case git_command context libname
+                             ["remote", "set-url", our_remote, url] of
+                OK () => OK ()
+              | ERROR e => git_command context libname
+                                       ["remote", "add", "-f", our_remote, url]
+        end
+
     (* NB git rev-parse HEAD shows revision id of current checkout;
        git rev-list -1 <tag> shows revision id of revision with that tag *)
 
@@ -52,7 +67,7 @@ structure GitControl :> VCS_CONTROL = struct
             
     fun is_at context (libname, id_or_tag) =
         case id_of context libname of
-            ERROR e => ERROR e
+            ERROR e => OK false (* HEAD nonexistent, expected in empty repo *)
           | OK id =>
             if String.isPrefix id_or_tag id orelse
                String.isPrefix id id_or_tag
@@ -60,24 +75,32 @@ structure GitControl :> VCS_CONTROL = struct
             else 
                 case git_command_output context libname
                                         ["show-ref",
-                                         "refs/tags/" ^ id_or_tag] of
+                                         "refs/tags/" ^ id_or_tag,
+                                         "--"] of
                     OK "" => OK false
                   | ERROR _ => OK false
                   | OK s => OK (id = hd (String.tokens (fn c => c = #" ") s))
 
     fun branch_tip context (libname, branch) =
+        (* We don't have access to the source info or the network
+           here, as this is used by status (e.g. via is_on_branch) as
+           well as review. It's possible the remote branch won't exist,
+           e.g. if the repo was checked out by something other than
+           Vext, and if that's the case, we can't add it here; we'll
+           just have to fail, since checking against local branches
+           instead could produce the wrong result. *)
         git_command_output context libname
                            ["rev-list", "-1",
-                            remote_branch_name branch]
+                            remote_branch_name branch, "--"]
                        
     fun is_newest_locally context (libname, branch) =
         case branch_tip context (libname, branch) of
-            ERROR e => ERROR e
+            ERROR e => OK false
           | OK rev => is_at context (libname, rev)
 
     fun is_on_branch context (libname, branch) =
         case branch_tip context (libname, branch) of
-            ERROR e => ERROR e
+            ERROR e => OK false
           | OK rev =>
             case is_at context (libname, rev) of
                 ERROR e => ERROR e
@@ -89,23 +112,22 @@ structure GitControl :> VCS_CONTROL = struct
                     ERROR e => OK false  (* cmd returns non-zero for no *)
                   | _ => OK true
 
-    fun fetch context (libname, source) = (*!!!*)
-        let val url = remote_for context (libname, source)
-        in
-            case git_command context libname
-                             ["remote", "set-url", our_remote, url] of
-                ERROR e => ERROR e
-              | _ => git_command context libname ["fetch", our_remote]
-        end
+    fun fetch context (libname, source) =
+        case add_our_remote context (libname, source) of
+            ERROR e => ERROR e
+          | _ => git_command context libname ["fetch", our_remote]
                             
     fun is_newest context (libname, source, branch) =
-        case is_newest_locally context (libname, branch) of
+        case add_our_remote context (libname, source) of
             ERROR e => ERROR e
-          | OK false => OK false
-          | OK true =>
-            case fetch context (libname, source) of
+          | OK () => 
+            case is_newest_locally context (libname, branch) of
                 ERROR e => ERROR e
-              | _ => is_newest_locally context (libname, branch)
+              | OK false => OK false
+              | OK true =>
+                case fetch context (libname, source) of
+                    ERROR e => ERROR e
+                  | _ => is_newest_locally context (libname, branch)
 
     fun is_modified_locally context libname =
         case git_command_output context libname ["status", "--porcelain"] of
