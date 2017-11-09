@@ -1,6 +1,10 @@
 
 structure HgControl :> VCS_CONTROL = struct
-                            
+
+    (* Pulls always use an explicit URL, never just the default
+       remote, in order to ensure we update properly if the location
+       given in the project file changes. *)
+
     type vcsstate = { id: string, modified: bool,
                       branch: string, tags: string list }
 
@@ -80,18 +84,21 @@ structure HgControl :> VCS_CONTROL = struct
             ERROR e => ERROR e
           | OK newest_in_repo => is_at context (libname, newest_in_repo)
 
-    fun pull context libname =
-        hg_command context libname
-                   (if FileBits.verbose ()
-                    then ["pull"]
-                    else ["pull", "-q"])
+    fun pull context (libname, source) =
+        let val url = remote_for context (libname, source)
+        in
+            hg_command context libname
+                       (if FileBits.verbose ()
+                        then ["pull", url]
+                        else ["pull", "-q", url])
+        end
 
-    fun is_newest context (libname, branch) =
+    fun is_newest context (libname, source, branch) =
         case is_newest_locally context (libname, branch) of
             ERROR e => ERROR e
           | OK false => OK false
           | OK true =>
-            case pull context libname of
+            case pull context (libname, source) of
                 ERROR e => ERROR e
               | _ => is_newest_locally context (libname, branch)
 
@@ -113,8 +120,8 @@ structure HgControl :> VCS_CONTROL = struct
                                  url, libname]
         end
                                                     
-    fun update context (libname, branch) =
-        let val pull_result = pull context libname
+    fun update context (libname, source, branch) =
+        let val pull_result = pull context (libname, source)
         in
             case hg_command context libname ["update", branch_name branch] of
                 ERROR e => ERROR e
@@ -124,10 +131,10 @@ structure HgControl :> VCS_CONTROL = struct
                   | _ => id_of context libname
         end
 
-    fun update_to context (libname, "") =
+    fun update_to context (libname, _, "") =
         ERROR "Non-empty id (tag or revision id) required for update_to"
-      | update_to context (libname, id) = 
-        let val pull_result = pull context libname
+      | update_to context (libname, source, id) = 
+        let val pull_result = pull context (libname, source)
         in
             case hg_command context libname ["update", "-r", id] of
                 OK _ => id_of context libname

@@ -27,13 +27,15 @@ functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
     *)
 
     fun check with_network context
-              ({ libname, branch, project_pin, lock_pin, ... } : libspec) =
+              ({ libname, source, branch,
+                 project_pin, lock_pin, ... } : libspec) =
         let fun check_unpinned () =
-                let val is_newest = if with_network
-                                    then V.is_newest
-                                    else V.is_newest_locally
+                let val newest =
+                        if with_network
+                        then V.is_newest context (libname, source, branch)
+                        else V.is_newest_locally context (libname, branch)
                 in
-                    case is_newest context (libname, branch) of
+                    case newest of
                          ERROR e => ERROR e
                        | OK true => OK CORRECT
                        | OK false =>
@@ -81,15 +83,15 @@ functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
                ({ libname, source, branch,
                   project_pin, lock_pin, ... } : libspec) =
         let fun update_unpinned () =
-                case V.is_newest context (libname, branch) of
+                case V.is_newest context (libname, source, branch) of
                     ERROR e => ERROR e
                   | OK true => V.id_of context libname
-                  | OK false => V.update context (libname, branch)
+                  | OK false => V.update context (libname, source, branch)
             fun update_pinned target =
                 case V.is_at context (libname, target) of
                     ERROR e => ERROR e
                   | OK true => OK target
-                  | OK false => V.update_to context (libname, target)
+                  | OK false => V.update_to context (libname, source, target)
             fun update' () =
                 case lock_pin of
                     PINNED target => update_pinned target

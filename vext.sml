@@ -38,7 +38,7 @@
     authorization.
 *)
 
-val vext_version = "0.9.9"
+val vext_version = "0.9.91"
 
 
 datatype vcs =
@@ -158,7 +158,7 @@ signature VCS_CONTROL = sig
         given branch. False may indicate that the branch has advanced
         or that the library is not on the branch at all. This function
         may use the network to check for new revisions *)
-    val is_newest : context -> libname * branch -> bool result
+    val is_newest : context -> libname * source * branch -> bool result
 
     (** Test whether the library is at the newest revision available
         locally for the given branch. False may indicate that the
@@ -175,10 +175,10 @@ signature VCS_CONTROL = sig
     val checkout : context -> libname * source * branch -> unit result
 
     (** Update the library to the given branch tip *)
-    val update : context -> libname * branch -> id_or_tag result
+    val update : context -> libname * source * branch -> id_or_tag result
 
     (** Update the library to the given specific id or tag *)
-    val update_to : context -> libname * id_or_tag -> id_or_tag result
+    val update_to : context -> libname * source * id_or_tag -> id_or_tag result
 end
 
 signature LIB_CONTROL = sig
@@ -458,13 +458,15 @@ functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
     *)
 
     fun check with_network context
-              ({ libname, branch, project_pin, lock_pin, ... } : libspec) =
+              ({ libname, source, branch,
+                 project_pin, lock_pin, ... } : libspec) =
         let fun check_unpinned () =
-                let val is_newest = if with_network
-                                    then V.is_newest
-                                    else V.is_newest_locally
+                let val newest =
+                        if with_network
+                        then V.is_newest context (libname, source, branch)
+                        else V.is_newest_locally context (libname, branch)
                 in
-                    case is_newest context (libname, branch) of
+                    case newest of
                          ERROR e => ERROR e
                        | OK true => OK CORRECT
                        | OK false =>
@@ -512,15 +514,15 @@ functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
                ({ libname, source, branch,
                   project_pin, lock_pin, ... } : libspec) =
         let fun update_unpinned () =
-                case V.is_newest context (libname, branch) of
+                case V.is_newest context (libname, source, branch) of
                     ERROR e => ERROR e
                   | OK true => V.id_of context libname
-                  | OK false => V.update context (libname, branch)
+                  | OK false => V.update context (libname, source, branch)
             fun update_pinned target =
                 case V.is_at context (libname, target) of
                     ERROR e => ERROR e
                   | OK true => OK target
-                  | OK false => V.update_to context (libname, target)
+                  | OK false => V.update_to context (libname, source, target)
             fun update' () =
                 case lock_pin of
                     PINNED target => update_pinned target
@@ -1165,7 +1167,11 @@ end = struct
 end
 
 structure HgControl :> VCS_CONTROL = struct
-                            
+
+    (* Pulls always use an explicit URL, never just the default
+       remote, in order to ensure we update properly if the location
+       given in the project file changes. *)
+
     type vcsstate = { id: string, modified: bool,
                       branch: string, tags: string list }
 
@@ -1245,18 +1251,21 @@ structure HgControl :> VCS_CONTROL = struct
             ERROR e => ERROR e
           | OK newest_in_repo => is_at context (libname, newest_in_repo)
 
-    fun pull context libname =
-        hg_command context libname
-                   (if FileBits.verbose ()
-                    then ["pull"]
-                    else ["pull", "-q"])
+    fun pull context (libname, source) =
+        let val url = remote_for context (libname, source)
+        in
+            hg_command context libname
+                       (if FileBits.verbose ()
+                        then ["pull", url]
+                        else ["pull", "-q", url])
+        end
 
-    fun is_newest context (libname, branch) =
+    fun is_newest context (libname, source, branch) =
         case is_newest_locally context (libname, branch) of
             ERROR e => ERROR e
           | OK false => OK false
           | OK true =>
-            case pull context libname of
+            case pull context (libname, source) of
                 ERROR e => ERROR e
               | _ => is_newest_locally context (libname, branch)
 
@@ -1278,8 +1287,8 @@ structure HgControl :> VCS_CONTROL = struct
                                  url, libname]
         end
                                                     
-    fun update context (libname, branch) =
-        let val pull_result = pull context libname
+    fun update context (libname, source, branch) =
+        let val pull_result = pull context (libname, source)
         in
             case hg_command context libname ["update", branch_name branch] of
                 ERROR e => ERROR e
@@ -1289,10 +1298,10 @@ structure HgControl :> VCS_CONTROL = struct
                   | _ => id_of context libname
         end
 
-    fun update_to context (libname, "") =
+    fun update_to context (libname, _, "") =
         ERROR "Non-empty id (tag or revision id) required for update_to"
-      | update_to context (libname, id) = 
-        let val pull_result = pull context libname
+      | update_to context (libname, source, id) = 
+        let val pull_result = pull context (libname, source)
         in
             case hg_command context libname ["update", "-r", id] of
                 OK _ => id_of context libname
@@ -1307,8 +1316,11 @@ end
 structure GitControl :> VCS_CONTROL = struct
 
     (* With Git repos we always operate in detached HEAD state. Even
-       the master branch is checked out using the remote reference,
-       origin/master. *)
+       the master branch is checked out using a remote reference
+       (vext/master). The remote we use is always named vext, and we
+       update it to the expected URL each time we fetch, in order to
+       ensure we update properly if the location given in the project
+       file changes. The origin remote is unused. *)
 
     fun git_command context libname args =
         FileBits.command context libname ("git" :: args)
@@ -1328,7 +1340,9 @@ structure GitControl :> VCS_CONTROL = struct
                                | BRANCH "" => "master"
                                | BRANCH b => b
 
-    fun remote_branch_name branch = "origin/" ^ branch_name branch
+    val our_remote = "vext"
+                                                 
+    fun remote_branch_name branch = our_remote ^ "/" ^ branch_name branch
 
     fun checkout context (libname, source, branch) =
         let val url = remote_for context (libname, source)
@@ -1338,8 +1352,8 @@ structure GitControl :> VCS_CONTROL = struct
                out into an existing empty dir anyway *)
             case FileBits.mkpath (FileBits.libpath context libname) of
                 OK () => git_command context ""
-                                     ["clone", "-b",
-                                      branch_name branch,
+                                     ["clone", "--origin", our_remote,
+                                      "--branch", branch_name branch,
                                       url, libname]
               | ERROR e => ERROR e
         end
@@ -1389,12 +1403,21 @@ structure GitControl :> VCS_CONTROL = struct
                     ERROR e => OK false  (* cmd returns non-zero for no *)
                   | _ => OK true
 
-    fun is_newest context (libname, branch) =
+    fun fetch context (libname, source) = (*!!!*)
+        let val url = remote_for context (libname, source)
+        in
+            case git_command context libname
+                             ["remote", "set-url", our_remote, url] of
+                ERROR e => ERROR e
+              | _ => git_command context libname ["fetch", our_remote]
+        end
+                            
+    fun is_newest context (libname, source, branch) =
         case is_newest_locally context (libname, branch) of
             ERROR e => ERROR e
           | OK false => OK false
           | OK true =>
-            case git_command context libname ["fetch"] of
+            case fetch context (libname, source) of
                 ERROR e => ERROR e
               | _ => is_newest_locally context (libname, branch)
 
@@ -1411,8 +1434,8 @@ structure GitControl :> VCS_CONTROL = struct
        but it's perhaps cleaner not to maintain a local branch at all,
        but instead checkout the remote branch as a detached head. *)
 
-    fun update context (libname, branch) =
-        case git_command context libname ["fetch"] of
+    fun update context (libname, source, branch) =
+        case fetch context (libname, source) of
             ERROR e => ERROR e
           | _ =>
             case git_command context libname ["checkout", "--detach",
@@ -1428,10 +1451,10 @@ structure GitControl :> VCS_CONTROL = struct
        update to a new pin (from the lock file) that hasn't been
        fetched yet. *)
 
-    fun update_to context (libname, "") = 
+    fun update_to context (libname, _, "") = 
         ERROR "Non-empty id (tag or revision id) required for update_to"
-      | update_to context (libname, id) =
-        let val fetch_result = git_command context libname ["fetch"]
+      | update_to context (libname, source, id) =
+        let val fetch_result = fetch context (libname, source)
         in
             case git_command context libname ["checkout", "--detach", id] of
                 OK _ => id_of context libname
