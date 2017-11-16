@@ -26,21 +26,26 @@ chmod +x "$target/vext"
 echo "Done"
 
 vcs=""
-vcscmd=""
-
 if [ -d "$target/.hg" ]; then
     vcs="Mercurial"
-    vcscmd="hg add"
 elif [ -d "$target/.git" ]; then
     vcs="Git"
-    vcscmd="git add"
 fi
 
 if [ -n "$vcs" ]; then
     echo -n "Add Vext scripts to local $vcs repo? [yN] "
     read answer
     case "$answer" in
-	Y|y) ( cd "$target" ; $vcscmd $vextfiles ) ; echo "Done" ;;
+	Y|y) ( cd "$target"
+               if [ -d ".hg" ]; then
+                   hg add $vextfiles
+                   echo 'glob:.vext-*.bin' >> .hgignore
+                   hg add .hgignore
+               elif [ -d ".git" ]; then
+                   git add $vextfiles
+                   echo '.vext-*.bin' >> .gitignore
+                   git add .gitignore
+               fi ) ; echo "Done" ;;
 	*) echo "Not adding to repo" ;;
     esac
 fi
