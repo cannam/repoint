@@ -25,6 +25,7 @@ fun load_libspec spec_json lock_json libname : libspec =
           vcs = case vcs of
                     "hg" => HG
                   | "git" => GIT
+                  | "svn" => SVN
                   | other => raise Fail ("Unknown version-control system \"" ^
                                          other ^ "\""),
           source = case (url, service, owner, repo) of

@@ -59,15 +59,19 @@ end = struct
             }
             val vcs_maybe = 
                 case [HgControl.exists context ".",
-                      GitControl.exists context "."] of
-                    [OK true, OK false] => OK HG
-                  | [OK false, OK true] => OK GIT
+                      GitControl.exists context ".",
+                      SvnControl.exists context "."] of
+                    [OK true, OK false, OK false] => OK HG
+                  | [OK false, OK true, OK false] => OK GIT
+                  | [OK false, OK false, OK true] => OK SVN
                   | _ => ERROR ("Unable to identify VCS for directory " ^ dir)
         in
             case vcs_maybe of
                 ERROR e => ERROR e
               | OK vcs =>
-                case (fn HG => HgControl.id_of | GIT => GitControl.id_of)
+                case (fn HG => HgControl.id_of
+                       | GIT => GitControl.id_of 
+                       | SVN => SvnControl.id_of)
                          vcs context "." of
                     ERROR e => ERROR ("Unable to obtain id of project repo: "
                                       ^ e)
@@ -195,6 +199,7 @@ end = struct
                      target_path,
                      "--exclude=.hg",
                      "--exclude=.git",
+                     "--exclude=.svn",
                      "--exclude=vext",
                      "--exclude=vext.sml",
                      "--exclude=vext.ps1",

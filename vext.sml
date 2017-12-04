@@ -43,7 +43,8 @@ val vext_version = "0.9.91"
 
 datatype vcs =
          HG |
-         GIT
+         GIT |
+         SVN
 
 datatype source =
          URL_SOURCE of string |
@@ -174,7 +175,8 @@ signature VCS_CONTROL = sig
         library on the given branch *)
     val checkout : context -> libname * source * branch -> unit result
 
-    (** Update the library to the given branch tip *)
+    (** Update the library to the given branch tip. Assumes that a
+        local copy of the library already exists *)
     val update : context -> libname * source * branch -> id_or_tag result
 
     (** Update the library to the given specific id or tag *)
@@ -1039,12 +1041,14 @@ end = struct
         ]
 
     fun vcs_name vcs =
-        case vcs of GIT => "git" |
-                    HG => "hg"
+        case vcs of HG => "hg"
+                  | GIT => "git"
+                  | SVN => "svn"
                                              
     fun vcs_from_name name =
-        case name of "git" => GIT 
-                   | "hg" => HG
+        case name of "hg" => HG
+                   | "git" => GIT 
+                   | "svn" => SVN
                    | other => raise Fail ("Unknown vcs name \"" ^ name ^ "\"")
 
     fun load_more_providers previously_loaded json =
@@ -1488,22 +1492,95 @@ structure GitControl :> VCS_CONTROL = struct
             
 end
 
+structure SvnControl :> VCS_CONTROL = struct
+
+    fun svn_command context libname args =
+        FileBits.command context libname ("svn" :: args)
+
+    fun svn_command_output context libname args =
+        FileBits.command_output context libname ("svn" :: args)
+                        
+    fun exists context libname =
+        OK (OS.FileSys.isDir (FileBits.subpath context libname ".svn"))
+        handle _ => OK false
+
+    fun remote_for context (libname, source) =
+        Provider.remote_url context SVN source libname
+
+    fun id_of context libname =
+        svn_command_output context libname ["info", "--show-item", "revision"]
+
+    fun is_at context (libname, id_or_tag) =
+        case id_of context libname of
+            ERROR e => ERROR e
+          | OK id => OK (id = id_or_tag)
+
+    fun is_on_branch context (libname, b) =
+        OK (b = DEFAULT_BRANCH)  (*!!! branch not supported with svn [yet?] *)
+                                 (*!!! same for tags *)
+               
+    fun is_newest context (libname, source, branch) =
+        case svn_command_output context libname ["status", "--show-updates"] of 
+            ERROR e => ERROR e
+          | OK output =>
+            case rev (String.tokens (fn c => c = #"\n") output) of
+                [] => ERROR "No result returned for server status"
+              | last_line::_ =>
+                case rev (String.tokens (fn c => c = #" ") last_line) of
+                    [] => ERROR "No revision field found in server status"
+                  | server_id::_ => is_at context (libname, server_id)
+
+    fun is_newest_locally context (libname, branch) =
+        OK true
+
+    fun is_modified_locally context libname =
+        case svn_command_output context libname ["status"] of
+            ERROR e => ERROR e
+          | OK "" => OK false
+          | OK _ => OK true
+
+    fun checkout context (libname, source, branch) =
+        let val url = remote_for context (libname, source)
+        in
+            (* make the lib dir rather than just the ext dir, since
+               the lib dir might be nested and svn will happily check
+               out into an existing empty dir anyway *)
+            case FileBits.mkpath (FileBits.libpath context libname) of
+                ERROR e => ERROR e
+              | _ => svn_command context "" ["checkout", url, libname]
+        end
+                                                    
+    fun update context (libname, source, branch) =
+        case svn_command context libname ["update"] of
+            ERROR e => ERROR e
+          | _ => id_of context libname
+
+    fun update_to context (libname, _, "") =
+        ERROR "Non-empty id (tag or revision id) required for update_to"
+      | update_to context (libname, source, id) = 
+        case svn_command context libname ["update", "-r", id] of
+            ERROR e => ERROR e
+          | OK _ => id_of context libname
+                  
+end
+
 structure AnyLibControl :> LIB_CONTROL = struct
 
     structure H = LibControlFn(HgControl)
     structure G = LibControlFn(GitControl)
+    structure S = LibControlFn(SvnControl)
 
     fun review context (spec as { vcs, ... } : libspec) =
-        (fn HG => H.review | GIT => G.review) vcs context spec
+        (fn HG => H.review | GIT => G.review | SVN => S.review) vcs context spec
 
     fun status context (spec as { vcs, ... } : libspec) =
-        (fn HG => H.status | GIT => G.status) vcs context spec
+        (fn HG => H.status | GIT => G.status | SVN => S.status) vcs context spec
 
     fun update context (spec as { vcs, ... } : libspec) =
-        (fn HG => H.update | GIT => G.update) vcs context spec
+        (fn HG => H.update | GIT => G.update | SVN => S.update) vcs context spec
 
     fun id_of context (spec as { vcs, ... } : libspec) =
-        (fn HG => H.id_of | GIT => G.id_of) vcs context spec
+        (fn HG => H.id_of | GIT => G.id_of | SVN => S.id_of) vcs context spec
 end
 
 
@@ -1567,15 +1644,19 @@ end = struct
             }
             val vcs_maybe = 
                 case [HgControl.exists context ".",
-                      GitControl.exists context "."] of
-                    [OK true, OK false] => OK HG
-                  | [OK false, OK true] => OK GIT
+                      GitControl.exists context ".",
+                      SvnControl.exists context "."] of
+                    [OK true, OK false, OK false] => OK HG
+                  | [OK false, OK true, OK false] => OK GIT
+                  | [OK false, OK false, OK true] => OK SVN
                   | _ => ERROR ("Unable to identify VCS for directory " ^ dir)
         in
             case vcs_maybe of
                 ERROR e => ERROR e
               | OK vcs =>
-                case (fn HG => HgControl.id_of | GIT => GitControl.id_of)
+                case (fn HG => HgControl.id_of
+                       | GIT => GitControl.id_of 
+                       | SVN => SvnControl.id_of)
                          vcs context "." of
                     ERROR e => ERROR ("Unable to obtain id of project repo: "
                                       ^ e)
@@ -1703,6 +1784,7 @@ end = struct
                      target_path,
                      "--exclude=.hg",
                      "--exclude=.git",
+                     "--exclude=.svn",
                      "--exclude=vext",
                      "--exclude=vext.sml",
                      "--exclude=vext.ps1",
@@ -1772,6 +1854,7 @@ fun load_libspec spec_json lock_json libname : libspec =
           vcs = case vcs of
                     "hg" => HG
                   | "git" => GIT
+                  | "svn" => SVN
                   | other => raise Fail ("Unknown version-control system \"" ^
                                          other ^ "\""),
           source = case (url, service, owner, repo) of

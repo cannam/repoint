@@ -10,6 +10,10 @@ libcontent=$(cat <<EOF
 "B": {
     "vcs": "git",
     "service": "testfile"
+},
+"C": {
+    "vcs": "svn",
+    "service": "testfile"
 }
 EOF
           )
@@ -19,22 +23,33 @@ archive_file="/tmp/vext-test-$$.tar.gz"
 # archive requires project is version-controlled and should support
 # the same set of VCS as supported for libraries
 
-for project_vcs in hg git ; do
+for project_vcs in hg git svn ; do
 
     author_flag="--author"
     if [ "$project_vcs" = "hg" ]; then
 	author_flag="--user"
+    elif [ "$project_vcs" = "svn" ]; then
+        author_flag="--username" # should be ignored for file URL,
+                                 # which is what we want
     fi
     
     rm -rf "$current"
+    rm -rf "$current.svn"
     
     prepare
     write_project_file "$libcontent"
 
     # doesn't actually matter whether the project is updated before
     # archiving or not
+
+    if [ "$project_vcs" = "svn" ]; then
+        svnadmin create "$current.svn"
+        ( cd ..
+          svn checkout file://"$current.svn" "$current" )
+    else
+        $project_vcs init
+    fi
     
-    $project_vcs init
     $project_vcs add vext-project.json
     $project_vcs commit -m "Commit vext-project file" "$author_flag" "Test Person <test@example.com>"
 
@@ -56,8 +71,13 @@ for project_vcs in hg git ; do
     id=""
     if [ "$project_vcs" = "hg" ]; then
 	id=$(hg id | awk '{ print $1 }')
-    else
+    elif [ "$project_vcs" = "git" ]; then
 	id=$(git rev-parse HEAD)
+    elif [ "$project_vcs" = "svn" ]; then
+	id=$(svn info --show-item revision)
+    else
+        echo "Internal error: unknown VCS" 1>&2
+        exit 2
     fi
     
     touch newfile
@@ -75,6 +95,7 @@ for project_vcs in hg git ; do
     case "$project_vcs" in
         hg) hg update -r"$id";;
         git) git checkout --detach "$id";;
+        svn) svn update -r"$id";;
     esac
     
     rm -f "$archive_file"
@@ -90,6 +111,7 @@ done
 # if we don't have a project vcs, we can't archive
 
 rm -rf "$current"
+rm -rf "$current.svn"
 rm -f "$archive_file"
     
 prepare

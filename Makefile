@@ -14,6 +14,7 @@ SOURCES	:= \
 	src/provider.sml \
 	src/hg.sml \
 	src/git.sml \
+	src/svn.sml \
 	src/anycontrol.sml \
 	src/archive.sml \
 	src/app.sml

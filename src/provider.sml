@@ -25,12 +25,14 @@ end = struct
         ]
 
     fun vcs_name vcs =
-        case vcs of GIT => "git" |
-                    HG => "hg"
+        case vcs of HG => "hg"
+                  | GIT => "git"
+                  | SVN => "svn"
                                              
     fun vcs_from_name name =
-        case name of "git" => GIT 
-                   | "hg" => HG
+        case name of "hg" => HG
+                   | "git" => GIT 
+                   | "svn" => SVN
                    | other => raise Fail ("Unknown vcs name \"" ^ name ^ "\"")
 
     fun load_more_providers previously_loaded json =
