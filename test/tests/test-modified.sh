@@ -10,6 +10,10 @@ libcontent=$(cat <<EOF
 "B": {
     "vcs": "git",
     "service": "testfile"
+},
+"C": {
+    "vcs": "svn",
+    "service": "testfile"
 }
 EOF
           )
@@ -20,15 +24,15 @@ write_project_file "$libcontent"
 "$vext" install
 
 for task in status review ; do
-    assert_local_outputs $task "Clean Clean"
+    assert_local_outputs $task "Clean Clean Clean"
 done
 
-for dir in ext/A ext/B; do
+for dir in ext/A ext/B ext/C; do
     ( cd "$dir" ; echo "more!" >> file.txt )
 done
 
 for task in status review ; do
-    assert_local_outputs $task "Modified Modified"
+    assert_local_outputs $task "Modified Modified Modified"
 done
 
 

@@ -10,6 +10,10 @@ libcontent=$(cat <<EOF
 "B": {
     "vcs": "git",
     "service": "testfile"
+},
+"C": {
+    "vcs": "svn",
+    "service": "testfile"
 }
 EOF
           )
@@ -26,10 +30,10 @@ for extpath in flarp \
     write_project_file_with_extpath "$extpath" "$libcontent"
 
     "$vext" install
-    check_expected_with_extpath "$extpath" f94ae9d7e5c9 3199655c658ff337ce24f78c6d1f410f34f4c6f2
+    check_expected_with_extpath "$extpath" f94ae9d7e5c9 3199655c658ff337ce24f78c6d1f410f34f4c6f2 2
 
     "$vext" update
-    check_expected_with_extpath "$extpath" f94ae9d7e5c9 3199655c658ff337ce24f78c6d1f410f34f4c6f2
+    check_expected_with_extpath "$extpath" f94ae9d7e5c9 3199655c658ff337ce24f78c6d1f410f34f4c6f2 2
 
 done
 

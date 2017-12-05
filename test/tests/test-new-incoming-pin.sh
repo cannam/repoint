@@ -18,9 +18,16 @@ libcontent=$(cat <<EOF
     "vcs": "git",
     "service": "testfile",
     "repository": "B2"
+},
+"C": {
+    "vcs": "svn",
+    "service": "testfile",
+    "repository": "C2"
 }
 EOF
           )
+
+##!!! todo: finish this for svn
 
 ( cd ../../testrepos
   rm -rf A2 B2
@@ -32,7 +39,7 @@ prepare
 write_project_file "$libcontent"
 
 "$vext" install
-check_expected f94ae9d7e5c9 3199655c658ff337ce24f78c6d1f410f34f4c6f2
+check_expected f94ae9d7e5c9 3199655c658ff337ce24f78c6d1f410f34f4c6f2 2
 
 ( cd ../../testrepos
   cd A2
@@ -58,6 +65,12 @@ libcontent_pinned=$(cat <<EOF
     "service": "testfile",
     "repository": "B2",
     "pin": "$newidB"
+},
+"C": {
+    "vcs": "svn",
+    "service": "testfile",
+    "repository": "C2",
+    "pin": "$newidC"
 }
 EOF
           )
@@ -65,10 +78,10 @@ EOF
 write_project_file "$libcontent_pinned"
 
 "$vext" install # always obeys lock file, so should do nothing here
-check_expected f94ae9d7e5c9 3199655c658ff337ce24f78c6d1f410f34f4c6f2
+check_expected f94ae9d7e5c9 3199655c658ff337ce24f78c6d1f410f34f4c6f2 2
 
 rm vext-lock.json
 
 "$vext" install
-check_expected $newidA $newidB
+check_expected $newidA $newidB $newidC
 

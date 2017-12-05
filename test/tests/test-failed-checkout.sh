@@ -10,11 +10,15 @@ libcontent=$(cat <<EOF
 "B": {
     "vcs": "git",
     "service": "testfile"
+},
+"C": {
+    "vcs": "svn",
+    "service": "testfile"
 }
 EOF
           )
 
-for dir in A B; do
+for dir in A B C; do
     
     prepare
     write_project_file "$libcontent"
