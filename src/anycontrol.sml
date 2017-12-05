@@ -16,5 +16,6 @@ structure AnyLibControl :> LIB_CONTROL = struct
 
     fun id_of context (spec as { vcs, ... } : libspec) =
         (fn HG => H.id_of | GIT => G.id_of | SVN => S.id_of) vcs context spec
+
 end
 

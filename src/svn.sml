@@ -68,5 +68,8 @@ structure SvnControl :> VCS_CONTROL = struct
         case svn_command context libname ["update", "-r", id] of
             ERROR e => ERROR e
           | OK _ => id_of context libname
-                  
+
+    fun copy_url_for context libname =
+        svn_command_output context libname ["info", "--show-item", "url"]
+
 end

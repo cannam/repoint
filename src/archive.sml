@@ -50,7 +50,7 @@ end = struct
        - Clean up by deleting the new copy
     *)
 
-    fun project_vcs_and_id dir =
+    fun project_vcs_id_and_url dir =
         let val context = {
                 rootpath = dir,
                 extdir = ".",
@@ -73,9 +73,15 @@ end = struct
                        | GIT => GitControl.id_of 
                        | SVN => SvnControl.id_of)
                          vcs context "." of
-                    ERROR e => ERROR ("Unable to obtain id of project repo: "
-                                      ^ e)
-                  | OK id => OK (vcs, id)
+                    ERROR e => ERROR ("Unable to find id of project repo: " ^ e)
+                  | OK id =>
+                    case (fn HG => HgControl.copy_url_for
+                           | GIT => GitControl.copy_url_for
+                           | SVN => SvnControl.copy_url_for)
+                             vcs context "." of
+                        ERROR e => ERROR ("Unable to find URL of project repo: "
+                                          ^ e)
+                      | OK url => OK (vcs, id, url)
         end
             
     fun make_archive_root (context : context) =
@@ -101,19 +107,7 @@ end = struct
             NONE => ()
           | _ => raise Fail ("Path " ^ path ^ " exists, not overwriting")
             
-    fun file_url path =
-        let val forward_path = 
-                String.translate (fn #"\\" => "/" |
-                                     c => Char.toString c) path
-        in
-            (* Path is expected to be absolute already, but if it
-                starts with a drive letter, we'll need an extra slash *)
-            case explode forward_path of
-                #"/"::rest => "file:///" ^ implode rest
-              | _ => "file:///" ^ forward_path
-        end
-            
-    fun make_archive_copy target_name (vcs, project_id)
+    fun make_archive_copy target_name (vcs, project_id, source_url)
                           ({ context, ... } : project) =
         let val archive_root = make_archive_root context
             val synthetic_context = {
@@ -125,7 +119,7 @@ end = struct
             val synthetic_library = {
                 libname = target_name,
                 vcs = vcs,
-                source = URL_SOURCE (file_url (#rootpath context)),
+                source = URL_SOURCE source_url,
                 branch = DEFAULT_BRANCH, (* overridden by pinned id below *)
                 project_pin = PINNED project_id,
                 lock_pin = PINNED project_id
@@ -220,7 +214,7 @@ end = struct
                                         ^ target_path)
                   | SOME pn => pn
             val details =
-                case project_vcs_and_id (#rootpath (#context project)) of
+                case project_vcs_id_and_url (#rootpath (#context project)) of
                     ERROR e => raise Fail e
                   | OK details => details
             val archive_root =

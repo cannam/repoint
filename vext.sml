@@ -181,6 +181,12 @@ signature VCS_CONTROL = sig
 
     (** Update the library to the given specific id or tag *)
     val update_to : context -> libname * source * id_or_tag -> id_or_tag result
+
+    (** Return a URL from which the library can be cloned, given that
+        the local copy already exists. For a DVCS this can be the
+        local copy, but for a centralised VCS it will have to be the
+        remote repository URL. Used for archiving *)
+    val copy_url_for : context -> libname -> string result
 end
 
 signature LIB_CONTROL = sig
@@ -196,6 +202,7 @@ structure FileBits :> sig
     val subpath : context -> libname -> string -> string
     val command_output : context -> libname -> string list -> string result
     val command : context -> libname -> string list -> unit result
+    val file_url : string -> string
     val file_contents : string -> string
     val mydir : unit -> string
     val homedir : unit -> string
@@ -262,6 +269,19 @@ end = struct
 
     fun trim str =
         hd (String.fields (fn x => x = #"\n" orelse x = #"\r") str)
+            
+    fun file_url path =
+        let val forward_path = 
+                String.translate (fn #"\\" => "/" |
+                                  c => Char.toString c)
+                                 (OS.Path.mkCanonical path)
+        in
+            (* Path is expected to be absolute already, but if it
+               starts with a drive letter, we'll need an extra slash *)
+            case explode forward_path of
+                #"/"::rest => "file:///" ^ implode rest
+              | _ => "file:///" ^ forward_path
+        end
         
     fun file_contents filename =
         let val stream = TextIO.openIn filename
@@ -1179,7 +1199,8 @@ structure HgControl :> VCS_CONTROL = struct
     type vcsstate = { id: string, modified: bool,
                       branch: string, tags: string list }
 
-    val hg_args = [ "--config", "ui.interactive=true", "--config", "ui.merge=:merge" ]
+    val hg_args = [ "--config", "ui.interactive=true",
+                    "--config", "ui.merge=:merge" ]
                         
     fun hg_command context libname args =
         FileBits.command context libname ("hg" :: hg_args @ args)
@@ -1314,7 +1335,10 @@ structure HgControl :> VCS_CONTROL = struct
                     ERROR e' => ERROR e' (* this was the ur-error *)
                   | _ => ERROR e
         end
-                  
+
+    fun copy_url_for context libname =
+        OK (FileBits.file_url (FileBits.libpath context libname))
+            
 end
 
 structure GitControl :> VCS_CONTROL = struct
@@ -1489,6 +1513,9 @@ structure GitControl :> VCS_CONTROL = struct
                     ERROR e' => ERROR e' (* this was the ur-error *)
                   | _ => ERROR e
         end
+
+    fun copy_url_for context libname =
+        OK (FileBits.file_url (FileBits.libpath context libname))
             
 end
 
@@ -1561,7 +1588,10 @@ structure SvnControl :> VCS_CONTROL = struct
         case svn_command context libname ["update", "-r", id] of
             ERROR e => ERROR e
           | OK _ => id_of context libname
-                  
+
+    fun copy_url_for context libname =
+        svn_command_output context libname ["info", "--show-item", "url"]
+
 end
 
 structure AnyLibControl :> LIB_CONTROL = struct
@@ -1581,6 +1611,7 @@ structure AnyLibControl :> LIB_CONTROL = struct
 
     fun id_of context (spec as { vcs, ... } : libspec) =
         (fn HG => H.id_of | GIT => G.id_of | SVN => S.id_of) vcs context spec
+
 end
 
 
@@ -1635,7 +1666,7 @@ end = struct
        - Clean up by deleting the new copy
     *)
 
-    fun project_vcs_and_id dir =
+    fun project_vcs_id_and_url dir =
         let val context = {
                 rootpath = dir,
                 extdir = ".",
@@ -1658,9 +1689,15 @@ end = struct
                        | GIT => GitControl.id_of 
                        | SVN => SvnControl.id_of)
                          vcs context "." of
-                    ERROR e => ERROR ("Unable to obtain id of project repo: "
-                                      ^ e)
-                  | OK id => OK (vcs, id)
+                    ERROR e => ERROR ("Unable to find id of project repo: " ^ e)
+                  | OK id =>
+                    case (fn HG => HgControl.copy_url_for
+                           | GIT => GitControl.copy_url_for
+                           | SVN => SvnControl.copy_url_for)
+                             vcs context "." of
+                        ERROR e => ERROR ("Unable to find URL of project repo: "
+                                          ^ e)
+                      | OK url => OK (vcs, id, url)
         end
             
     fun make_archive_root (context : context) =
@@ -1686,19 +1723,7 @@ end = struct
             NONE => ()
           | _ => raise Fail ("Path " ^ path ^ " exists, not overwriting")
             
-    fun file_url path =
-        let val forward_path = 
-                String.translate (fn #"\\" => "/" |
-                                     c => Char.toString c) path
-        in
-            (* Path is expected to be absolute already, but if it
-                starts with a drive letter, we'll need an extra slash *)
-            case explode forward_path of
-                #"/"::rest => "file:///" ^ implode rest
-              | _ => "file:///" ^ forward_path
-        end
-            
-    fun make_archive_copy target_name (vcs, project_id)
+    fun make_archive_copy target_name (vcs, project_id, source_url)
                           ({ context, ... } : project) =
         let val archive_root = make_archive_root context
             val synthetic_context = {
@@ -1710,7 +1735,7 @@ end = struct
             val synthetic_library = {
                 libname = target_name,
                 vcs = vcs,
-                source = URL_SOURCE (file_url (#rootpath context)),
+                source = URL_SOURCE source_url,
                 branch = DEFAULT_BRANCH, (* overridden by pinned id below *)
                 project_pin = PINNED project_id,
                 lock_pin = PINNED project_id
@@ -1805,7 +1830,7 @@ end = struct
                                         ^ target_path)
                   | SOME pn => pn
             val details =
-                case project_vcs_and_id (#rootpath (#context project)) of
+                case project_vcs_id_and_url (#rootpath (#context project)) of
                     ERROR e => raise Fail e
                   | OK details => details
             val archive_root =

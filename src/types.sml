@@ -139,6 +139,12 @@ signature VCS_CONTROL = sig
 
     (** Update the library to the given specific id or tag *)
     val update_to : context -> libname * source * id_or_tag -> id_or_tag result
+
+    (** Return a URL from which the library can be cloned, given that
+        the local copy already exists. For a DVCS this can be the
+        local copy, but for a centralised VCS it will have to be the
+        remote repository URL. Used for archiving *)
+    val copy_url_for : context -> libname -> string result
 end
 
 signature LIB_CONTROL = sig

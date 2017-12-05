@@ -53,6 +53,11 @@ for project_vcs in hg git svn ; do
     $project_vcs add vext-project.json
     $project_vcs commit -m "Commit vext-project file" "$author_flag" "Test Person <test@example.com>"
 
+    if [ "$project_vcs" = "svn" ]; then
+        # need to update after committing
+        $project_vcs update
+    fi
+
     rm -f "$archive_file"
     "$vext" archive "$archive_file"
 
@@ -84,6 +89,11 @@ for project_vcs in hg git svn ; do
     $project_vcs add newfile
     $project_vcs commit -m "Add new file" "$author_flag" "Other Test Person <other@example.com>"
 
+    if [ "$project_vcs" = "svn" ]; then
+        # need to update after committing
+        $project_vcs update
+    fi
+    
     rm -f "$archive_file"
     "$vext" archive "$archive_file"
 

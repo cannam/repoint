@@ -171,5 +171,8 @@ structure GitControl :> VCS_CONTROL = struct
                     ERROR e' => ERROR e' (* this was the ur-error *)
                   | _ => ERROR e
         end
+
+    fun copy_url_for context libname =
+        OK (FileBits.file_url (FileBits.libpath context libname))
             
 end

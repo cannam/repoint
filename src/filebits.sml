@@ -5,6 +5,7 @@ structure FileBits :> sig
     val subpath : context -> libname -> string -> string
     val command_output : context -> libname -> string list -> string result
     val command : context -> libname -> string list -> unit result
+    val file_url : string -> string
     val file_contents : string -> string
     val mydir : unit -> string
     val homedir : unit -> string
@@ -71,6 +72,19 @@ end = struct
 
     fun trim str =
         hd (String.fields (fn x => x = #"\n" orelse x = #"\r") str)
+            
+    fun file_url path =
+        let val forward_path = 
+                String.translate (fn #"\\" => "/" |
+                                  c => Char.toString c)
+                                 (OS.Path.mkCanonical path)
+        in
+            (* Path is expected to be absolute already, but if it
+               starts with a drive letter, we'll need an extra slash *)
+            case explode forward_path of
+                #"/"::rest => "file:///" ^ implode rest
+              | _ => "file:///" ^ forward_path
+        end
         
     fun file_contents filename =
         let val stream = TextIO.openIn filename
