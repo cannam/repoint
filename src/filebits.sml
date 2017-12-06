@@ -11,6 +11,7 @@ structure FileBits :> sig
     val homedir : unit -> string
     val mkpath : string -> unit result
     val rmpath : string -> unit result
+    val nonempty_dir_exists : string -> bool
     val project_spec_path : string -> string
     val project_lock_path : string -> string
     val verbose : unit -> bool
@@ -220,7 +221,7 @@ end = struct
     fun mkpath path =
         mkpath' (OS.Path.mkCanonical path)
 
-    fun rmpath' path =
+    fun dir_contents dir =
         let open OS
             fun files_from dirstream =
                 case FileSys.readDir dirstream of
@@ -231,19 +232,22 @@ end = struct
                     if file = Path.parentArc orelse file = Path.currentArc
                     then files_from dirstream
                     else file :: files_from dirstream
-            fun contents dir =
-                let val stream = FileSys.openDir dir
-                    val files = map (fn f => Path.joinDirFile
-                                                 { dir = dir, file = f })
-                                    (files_from stream)
-                    val _ = FileSys.closeDir stream
-                in files
-                end
+            val stream = FileSys.openDir dir
+            val files = map (fn f => Path.joinDirFile
+                                         { dir = dir, file = f })
+                            (files_from stream)
+            val _ = FileSys.closeDir stream
+        in
+            files
+        end
+
+    fun rmpath' path =
+        let open OS
             fun remove path =
                 if FileSys.isLink path (* dangling links bother isDir *)
                 then FileSys.remove path
                 else if FileSys.isDir path
-                then (app remove (contents path); FileSys.rmDir path)
+                then (app remove (dir_contents path); FileSys.rmDir path)
                 else FileSys.remove path
         in
             (remove path; OK ())
@@ -253,4 +257,13 @@ end = struct
     fun rmpath path =
         rmpath' (OS.Path.mkCanonical path)
 
+    fun nonempty_dir_exists path =
+        let open OS.FileSys
+        in
+            (not (isLink path) andalso
+             isDir path andalso
+             dir_contents path <> [])
+            handle _ => false
+        end                                        
+                
 end

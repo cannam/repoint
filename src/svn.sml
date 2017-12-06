@@ -23,8 +23,7 @@ structure SvnControl :> VCS_CONTROL = struct
           | OK id => OK (id = id_or_tag)
 
     fun is_on_branch context (libname, b) =
-        OK (b = DEFAULT_BRANCH)  (*!!! branch not supported with svn [yet?] *)
-                                 (*!!! same for tags *)
+        OK (b = DEFAULT_BRANCH)
                
     fun is_newest context (libname, source, branch) =
         case svn_command_output context libname ["status", "--show-updates"] of 
@@ -48,13 +47,21 @@ structure SvnControl :> VCS_CONTROL = struct
 
     fun checkout context (libname, source, branch) =
         let val url = remote_for context (libname, source)
+            val path = FileBits.libpath context libname
         in
-            (* make the lib dir rather than just the ext dir, since
-               the lib dir might be nested and svn will happily check
-               out into an existing empty dir anyway *)
-            case FileBits.mkpath (FileBits.libpath context libname) of
-                ERROR e => ERROR e
-              | _ => svn_command context "" ["checkout", url, libname]
+            if FileBits.nonempty_dir_exists path
+            then (* Surprisingly, SVN itself has no problem with
+                    this. But for consistency with other VCSes we 
+                    don't allow it *)
+                ERROR ("Refusing to checkout to nonempty target dir \"" ^
+                        path ^ "\"")
+            else 
+                (* make the lib dir rather than just the ext dir, since
+                   the lib dir might be nested and svn will happily check
+                   out into an existing empty dir anyway *)
+                case FileBits.mkpath (FileBits.libpath context libname) of
+                    ERROR e => ERROR e
+                  | _ => svn_command context "" ["checkout", url, libname]
         end
                                                     
     fun update context (libname, source, branch) =

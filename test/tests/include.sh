@@ -141,10 +141,6 @@ assert_all() {
     assert_outputs "$1" "$2 $2 $2"
 }
 
-assert_all_wrong() {
-    assert_all "$1" "Wrong"
-}
-
 assert_all_present() {
     assert_all "$1" "Present"
 }

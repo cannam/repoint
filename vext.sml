@@ -38,7 +38,7 @@
     authorization.
 *)
 
-val vext_version = "0.9.91"
+val vext_version = "0.9.92"
 
 
 datatype vcs =
@@ -208,6 +208,7 @@ structure FileBits :> sig
     val homedir : unit -> string
     val mkpath : string -> unit result
     val rmpath : string -> unit result
+    val nonempty_dir_exists : string -> bool
     val project_spec_path : string -> string
     val project_lock_path : string -> string
     val verbose : unit -> bool
@@ -417,7 +418,7 @@ end = struct
     fun mkpath path =
         mkpath' (OS.Path.mkCanonical path)
 
-    fun rmpath' path =
+    fun dir_contents dir =
         let open OS
             fun files_from dirstream =
                 case FileSys.readDir dirstream of
@@ -428,19 +429,22 @@ end = struct
                     if file = Path.parentArc orelse file = Path.currentArc
                     then files_from dirstream
                     else file :: files_from dirstream
-            fun contents dir =
-                let val stream = FileSys.openDir dir
-                    val files = map (fn f => Path.joinDirFile
-                                                 { dir = dir, file = f })
-                                    (files_from stream)
-                    val _ = FileSys.closeDir stream
-                in files
-                end
+            val stream = FileSys.openDir dir
+            val files = map (fn f => Path.joinDirFile
+                                         { dir = dir, file = f })
+                            (files_from stream)
+            val _ = FileSys.closeDir stream
+        in
+            files
+        end
+
+    fun rmpath' path =
+        let open OS
             fun remove path =
                 if FileSys.isLink path (* dangling links bother isDir *)
                 then FileSys.remove path
                 else if FileSys.isDir path
-                then (app remove (contents path); FileSys.rmDir path)
+                then (app remove (dir_contents path); FileSys.rmDir path)
                 else FileSys.remove path
         in
             (remove path; OK ())
@@ -450,6 +454,15 @@ end = struct
     fun rmpath path =
         rmpath' (OS.Path.mkCanonical path)
 
+    fun nonempty_dir_exists path =
+        let open OS.FileSys
+        in
+            (not (isLink path) andalso
+             isDir path andalso
+             dir_contents path <> [])
+            handle _ => false
+        end                                        
+                
 end
                                          
 functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
@@ -1543,8 +1556,7 @@ structure SvnControl :> VCS_CONTROL = struct
           | OK id => OK (id = id_or_tag)
 
     fun is_on_branch context (libname, b) =
-        OK (b = DEFAULT_BRANCH)  (*!!! branch not supported with svn [yet?] *)
-                                 (*!!! same for tags *)
+        OK (b = DEFAULT_BRANCH)
                
     fun is_newest context (libname, source, branch) =
         case svn_command_output context libname ["status", "--show-updates"] of 
@@ -1568,13 +1580,21 @@ structure SvnControl :> VCS_CONTROL = struct
 
     fun checkout context (libname, source, branch) =
         let val url = remote_for context (libname, source)
+            val path = FileBits.libpath context libname
         in
-            (* make the lib dir rather than just the ext dir, since
-               the lib dir might be nested and svn will happily check
-               out into an existing empty dir anyway *)
-            case FileBits.mkpath (FileBits.libpath context libname) of
-                ERROR e => ERROR e
-              | _ => svn_command context "" ["checkout", url, libname]
+            if FileBits.nonempty_dir_exists path
+            then (* Surprisingly, SVN itself has no problem with
+                    this. But for consistency with other VCSes we 
+                    don't allow it *)
+                ERROR ("Refusing to checkout to nonempty target dir \"" ^
+                        path ^ "\"")
+            else 
+                (* make the lib dir rather than just the ext dir, since
+                   the lib dir might be nested and svn will happily check
+                   out into an existing empty dir anyway *)
+                case FileBits.mkpath (FileBits.libpath context libname) of
+                    ERROR e => ERROR e
+                  | _ => svn_command context "" ["checkout", url, libname]
         end
                                                     
     fun update context (libname, source, branch) =
@@ -1891,8 +1911,13 @@ fun load_libspec spec_json lock_json libname : libspec =
           project_pin = project_pin,
           lock_pin = lock_pin,
           branch = case branch of
-                       SOME b => BRANCH b
-                     | NONE => DEFAULT_BRANCH
+                       NONE => DEFAULT_BRANCH
+                     | SOME b => 
+                       case vcs of
+                           "svn" => raise Fail ("Branches not supported for " ^
+                                                "svn repositories; change the" ^
+                                                "URL instead")
+                         | _ => BRANCH b
         }
     end  
 

@@ -49,14 +49,12 @@ write_project_file "$libcontent_unpinned"
 check_expected 1379d75f0b4f 7219cf6e6d4706295246d278a3821ea923e1dfe2 1
 
 # The pinned id here is actually on a non-default branch, so status
-# should be able to tell we're now in the wrong place (not just
-# present or superseded)
+# should be able to tell we're now in the wrong place, not just
+# present or superseded - at least for VCSes for which we support
+# branches (i.e. not SVN)
 
-##!!! This would require the SVN logic to support branches, which it
-##!!! doesn't yet
-
-assert_all_wrong status
-assert_all_wrong review
+assert_outputs status "Wrong Wrong Present"
+assert_outputs review "Wrong Wrong Superseded"
 
 "$vextdir"/vext update
 check_expected f94ae9d7e5c9 3199655c658ff337ce24f78c6d1f410f34f4c6f2 2

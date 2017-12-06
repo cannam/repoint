@@ -37,8 +37,13 @@ fun load_libspec spec_json lock_json libname : libspec =
           project_pin = project_pin,
           lock_pin = lock_pin,
           branch = case branch of
-                       SOME b => BRANCH b
-                     | NONE => DEFAULT_BRANCH
+                       NONE => DEFAULT_BRANCH
+                     | SOME b => 
+                       case vcs of
+                           "svn" => raise Fail ("Branches not supported for " ^
+                                                "svn repositories; change the" ^
+                                                "URL instead")
+                         | _ => BRANCH b
         }
     end  
 
