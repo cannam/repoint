@@ -176,7 +176,7 @@ signature VCS_CONTROL = sig
     val checkout : context -> libname * source * branch -> unit result
 
     (** Update the library to the given branch tip. Assumes that a
-        local copy of the library already exists *)
+        local copy of the library already exists. Return the new id *)
     val update : context -> libname * source * branch -> id_or_tag result
 
     (** Update the library to the given specific id or tag *)
@@ -373,6 +373,9 @@ end = struct
             val tmpFile = FileSys.tmpName ()
             val result = run_command context libname cmdlist (SOME tmpFile)
             val contents = file_contents tmpFile
+            val _ = if verbose ()
+                    then print ("Output was:\n\"" ^ contents ^ "\"\n")
+                    else tick libname cmdlist
         in
             FileSys.remove tmpFile handle _ => ();
             case result of

@@ -75,6 +75,17 @@ fi
 # -- SVN will always clobber locally and I think there's nothing we can do
 # about it, because it updates file-by-file and keeps no local history
 
+##!!! This fails at the moment because the hg and git libraries fail
+##!!! to update and cause Vext to bail out before rewriting the lock
+##!!! file, while the svn library updates (it shouldn't but it does,
+##!!! and I don't think we can help that) which means the lock file is
+##!!! left in an incorrect state. Ultimately the problem here is that
+##!!! we are rewriting the lock file once, but only if all updates
+##!!! have been successful -- whereas it's possible for some updates
+##!!! to succeed and others to fail, which will still mean the lock
+##!!! file needs to be written. I should write a test for that case
+##!!! before going on to fix it.
+
 check_expected f94ae9d7e5c9 3199655c658ff337ce24f78c6d1f410f34f4c6f2 1
 
 assert_contents ext/A/file.txt "modified"

@@ -176,6 +176,9 @@ end = struct
             val tmpFile = FileSys.tmpName ()
             val result = run_command context libname cmdlist (SOME tmpFile)
             val contents = file_contents tmpFile
+            val _ = if verbose ()
+                    then print ("Output was:\n\"" ^ contents ^ "\"\n")
+                    else tick libname cmdlist
         in
             FileSys.remove tmpFile handle _ => ();
             case result of
