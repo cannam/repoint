@@ -24,6 +24,10 @@ libcontent=$(cat <<EOF
     "vcs": "git",
     "service": "testfile",
     "branch": "b2"
+},
+"C": {
+    "vcs": "svn",
+    "service": "testfile"
 }
 EOF
           )
@@ -36,14 +40,15 @@ mkdir -p "$current"/ext
 ( cd "$current"/ext
   hg clone -b default ../../../testrepos/A
   git clone -b master ../../../testrepos/B
+  # skip SVN, this test isn't meaningful for it
 )
 
 "$vext" status
 
 # See test-switch-to-branch for rationale here
-assert_outputs review "Wrong Superseded"
+assert_outputs review "Wrong Superseded Absent"
 
 "$vext" update
 
-check_expected 1379d75f0b4f 7219cf6e6d4706295246d278a3821ea923e1dfe2
+check_expected 1379d75f0b4f 7219cf6e6d4706295246d278a3821ea923e1dfe2 2
 

@@ -1915,7 +1915,7 @@ fun load_libspec spec_json lock_json libname : libspec =
                      | SOME b => 
                        case vcs of
                            "svn" => raise Fail ("Branches not supported for " ^
-                                                "svn repositories; change the" ^
+                                                "svn repositories; change " ^
                                                 "URL instead")
                          | _ => BRANCH b
         }
