@@ -65,14 +65,16 @@ structure SvnControl :> VCS_CONTROL = struct
         end
                                                     
     fun update context (libname, source, branch) =
-        case svn_command context libname ["update"] of
+        case svn_command context libname
+                         ["update", "--accept", "postpone"] of
             ERROR e => ERROR e
           | _ => id_of context libname
 
     fun update_to context (libname, _, "") =
         ERROR "Non-empty id (tag or revision id) required for update_to"
       | update_to context (libname, source, id) = 
-        case svn_command context libname ["update", "-r", id] of
+        case svn_command context libname
+                         ["update", "-r", id, "--accept", "postpone"] of
             ERROR e => ERROR e
           | OK _ => id_of context libname
 

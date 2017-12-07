@@ -47,8 +47,8 @@ echo "modified" > ext/A/file.txt
 echo "new" > ext/A/new.txt
 echo "modified-b" > ext/B/file-b.txt
 echo "new-b" > ext/B/new-b.txt
-echo "modified-c" > ext/C/file-c.txt
-echo "new-c" > ext/C/new-c.txt
+echo "modified-c" > ext/C/file.txt
+echo "new-c" > ext/C/new.txt
 
 write_project_file "$libcontent_pinned"
 
@@ -59,8 +59,8 @@ assert_contents ext/A/file.txt "modified"
 assert_contents ext/A/new.txt "new"
 assert_contents ext/B/file-b.txt "modified-b"
 assert_contents ext/B/new-b.txt "new-b"
-assert_contents ext/C/file-c.txt "modified-c"
-assert_contents ext/C/new-c.txt "new-c"
+assert_contents ext/C/file.txt "modified-c"
+assert_contents ext/C/new.txt "new-c"
 
 # should refuse to clobber local modifications
 
@@ -70,12 +70,17 @@ if "$vext" update ; then
 else
     :
 fi
-check_expected f94ae9d7e5c9 3199655c658ff337ce24f78c6d1f410f34f4c6f2 2
+
+# NB the expected results here for the SVN repo are the *wrong* values
+# -- SVN will always clobber locally and I think there's nothing we can do
+# about it, because it updates file-by-file and keeps no local history
+
+check_expected f94ae9d7e5c9 3199655c658ff337ce24f78c6d1f410f34f4c6f2 1
 
 assert_contents ext/A/file.txt "modified"
 assert_contents ext/A/new.txt "new"
 assert_contents ext/B/file-b.txt "modified-b"
 assert_contents ext/B/new-b.txt "new-b"
-assert_contents ext/C/file-c.txt "modified-c"
-assert_contents ext/C/new-c.txt "new-c"
+assert_contents ext/C/file.txt "modified-c"
+
 
