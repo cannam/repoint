@@ -178,7 +178,7 @@ end = struct
             val contents = file_contents tmpFile
             val _ = if verbose ()
                     then print ("Output was:\n\"" ^ contents ^ "\"\n")
-                    else tick libname cmdlist
+                    else ()
         in
             FileSys.remove tmpFile handle _ => ();
             case result of

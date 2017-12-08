@@ -375,7 +375,7 @@ end = struct
             val contents = file_contents tmpFile
             val _ = if verbose ()
                     then print ("Output was:\n\"" ^ contents ^ "\"\n")
-                    else tick libname cmdlist
+                    else ()
         in
             FileSys.remove tmpFile handle _ => ();
             case result of
@@ -2108,27 +2108,11 @@ fun review_project ({ context, libs } : project) =
                                    print_status_header (print_status true)
                                    libs)
 
-fun update_project ({ context, libs } : project) =
-    let val outcomes = act_and_print
-                           (AnyLibControl.update context)
-                           print_outcome_header print_update_outcome libs
-        val locks =
-            List.concat
-                (map (fn (libname, result) =>
-                         case result of
-                             ERROR _ => []
-                           | OK id => [{ libname = libname, id_or_tag = id }])
-                     outcomes)
-        val return_code = return_code_for outcomes
-    in
-        if OS.Process.isSuccess return_code
-        then save_lock_file (#rootpath context) locks
-        else ();
-        return_code
-    end
-
 fun lock_project ({ context, libs } : project) =
-    let val outcomes = map (fn lib =>
+    let val _ = if FileBits.verbose ()
+                then print ("Scanning IDs for lock file...\n")
+                else ()
+        val outcomes = map (fn lib =>
                                (#libname lib, AnyLibControl.id_of context lib))
                            libs
         val locks =
@@ -2145,6 +2129,17 @@ fun lock_project ({ context, libs } : project) =
         then save_lock_file (#rootpath context) locks
         else ();
         return_code
+    end
+
+fun update_project (project as { context, libs }) =
+    let val outcomes = act_and_print
+                           (AnyLibControl.update context)
+                           print_outcome_header print_update_outcome libs
+        val _ = if List.exists (fn (_, OK _) => true | _ => false) outcomes
+                then lock_project project
+                else OS.Process.success
+    in
+        return_code_for outcomes
     end
     
 fun load_local_project pintype =

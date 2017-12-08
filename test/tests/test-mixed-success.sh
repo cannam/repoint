@@ -6,8 +6,8 @@
 # any reason, then when we ask for an update, those ones will be
 # updated, the rest will fail, and the lock file needs to be updated
 # to reflect the reality on the ground. We need to make sure the lock
-# file is not either (i) left as it was before, without reflecting the
-# successful updates, or (ii) updated as if everything had gone ok
+# file is neither (i) left as it was before, without reflecting the
+# successful updates, nor (ii) updated as if everything had gone ok
 # including the failed updates.
 
 libcontent_working=$(cat <<EOF
@@ -60,4 +60,4 @@ if "$vext" update; then
     exit 3
 fi
 
-check_expected f94ae9d7e5c9 7219cf6e6d4706295246d278a3821ea923e1dfe2 2
+check_expected f94ae9d7e5c9 7219cf6e6d4706295246d278a3821ea923e1dfe2 1
