@@ -25,6 +25,7 @@ fun load_libspec spec_json lock_json libname : libspec =
           vcs = case vcs of
                     "hg" => HG
                   | "git" => GIT
+                  | "svn" => SVN
                   | other => raise Fail ("Unknown version-control system \"" ^
                                          other ^ "\""),
           source = case (url, service, owner, repo) of
@@ -36,8 +37,13 @@ fun load_libspec spec_json lock_json libname : libspec =
           project_pin = project_pin,
           lock_pin = lock_pin,
           branch = case branch of
-                       SOME b => BRANCH b
-                     | NONE => DEFAULT_BRANCH
+                       NONE => DEFAULT_BRANCH
+                     | SOME b => 
+                       case vcs of
+                           "svn" => raise Fail ("Branches not supported for " ^
+                                                "svn repositories; change " ^
+                                                "URL instead")
+                         | _ => BRANCH b
         }
     end  
 
@@ -223,27 +229,11 @@ fun review_project ({ context, libs } : project) =
                                    print_status_header (print_status true)
                                    libs)
 
-fun update_project ({ context, libs } : project) =
-    let val outcomes = act_and_print
-                           (AnyLibControl.update context)
-                           print_outcome_header print_update_outcome libs
-        val locks =
-            List.concat
-                (map (fn (libname, result) =>
-                         case result of
-                             ERROR _ => []
-                           | OK id => [{ libname = libname, id_or_tag = id }])
-                     outcomes)
-        val return_code = return_code_for outcomes
-    in
-        if OS.Process.isSuccess return_code
-        then save_lock_file (#rootpath context) locks
-        else ();
-        return_code
-    end
-
 fun lock_project ({ context, libs } : project) =
-    let val outcomes = map (fn lib =>
+    let val _ = if FileBits.verbose ()
+                then print ("Scanning IDs for lock file...\n")
+                else ()
+        val outcomes = map (fn lib =>
                                (#libname lib, AnyLibControl.id_of context lib))
                            libs
         val locks =
@@ -260,6 +250,17 @@ fun lock_project ({ context, libs } : project) =
         then save_lock_file (#rootpath context) locks
         else ();
         return_code
+    end
+
+fun update_project (project as { context, libs }) =
+    let val outcomes = act_and_print
+                           (AnyLibControl.update context)
+                           print_outcome_header print_update_outcome libs
+        val _ = if List.exists (fn (_, OK _) => true | _ => false) outcomes
+                then lock_project project
+                else OS.Process.success
+    in
+        return_code_for outcomes
     end
     
 fun load_local_project pintype =

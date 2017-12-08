@@ -1,7 +1,8 @@
 
 datatype vcs =
          HG |
-         GIT
+         GIT |
+         SVN
 
 datatype source =
          URL_SOURCE of string |
@@ -132,11 +133,18 @@ signature VCS_CONTROL = sig
         library on the given branch *)
     val checkout : context -> libname * source * branch -> unit result
 
-    (** Update the library to the given branch tip *)
+    (** Update the library to the given branch tip. Assumes that a
+        local copy of the library already exists. Return the new id *)
     val update : context -> libname * source * branch -> id_or_tag result
 
     (** Update the library to the given specific id or tag *)
     val update_to : context -> libname * source * id_or_tag -> id_or_tag result
+
+    (** Return a URL from which the library can be cloned, given that
+        the local copy already exists. For a DVCS this can be the
+        local copy, but for a centralised VCS it will have to be the
+        remote repository URL. Used for archiving *)
+    val copy_url_for : context -> libname -> string result
 end
 
 signature LIB_CONTROL = sig

@@ -16,12 +16,13 @@ prepare() {
         exit 2
     fi
     rm -rf ext *.json
-    if [ ! -d ../../testrepos/A ]; then
-        ( cd ../../testrepos
-          tar xf A.tar.gz
-          tar xf B.tar.gz
-        )
-    fi
+    for testrepo in A B C; do
+        if [ ! -d ../../testrepos/$testrepo ]; then
+            ( cd ../../testrepos
+              tar xf $testrepo.tar.gz
+            )
+        fi
+    done
 }
 
 prepare 
@@ -31,6 +32,7 @@ vext="$vextdir"/vext
 write_project_file_with_extpath() {
     local extpath="$1"
     local libcontent=$(echo "$2" | sed 's/^/        /')
+    local testrepopath=$(cd ../../testrepos ; pwd)
     cat > vext-project.json <<EOF
 {
     "config": {
@@ -38,8 +40,8 @@ write_project_file_with_extpath() {
     },
     "services": {
 	"testfile": {
-	    "vcs": ["hg", "git"],
-	    "anonymous": "file://$(pwd)/../../testrepos/{repository}"
+	    "vcs": ["hg", "git", "svn"],
+	    "anonymous": "file://$testrepopath/{repository}"
 	}
     },
     "libraries": {
@@ -58,6 +60,7 @@ check_expected_with_extpath() {
     local extpath="$1"
     local id_A="$2"
     local id_B="$3"
+    local id_C="$4"
     local actual_id_A=$( cd "$extpath"/A ; hg id | awk '{ print $1 }' | sed 's/\+$//' )
     if [ "$actual_id_A" != "$id_A" ]; then
         echo "ERROR: id for repo A ($actual_id_A) does not match expected ($id_A)"
@@ -68,6 +71,11 @@ check_expected_with_extpath() {
         echo "ERROR: id for repo B ($actual_id_B) does not match expected ($id_B)"
         exit 3
     fi
+    local actual_id_C=$( cd "$extpath"/C ; svn info --show-item revision )
+    if [ "$actual_id_C" != "$id_C" ]; then
+        echo "ERROR: id for repo C ($actual_id_C) does not match expected ($id_C)"
+        exit 3
+    fi
     cat > expected-lock.json <<EOF
 {
   "libraries": {
@@ -76,6 +84,9 @@ check_expected_with_extpath() {
     },
     "B": {
       "pin": "$id_B"
+    },
+    "C": {
+      "pin": "$id_C"
     }
   }
 }
@@ -98,7 +109,7 @@ assert_outputs() {
     local task="$1"
     local expected="$2"
     echo "Checking $task outputs against expected values..."
-    local output=$("$vext" "$task" | grep '|' | tail -2 |
+    local output=$("$vext" "$task" | grep '|' | tail -3 |
                        awk -F'|' '{ print $2 }' |
                        sed 's/ //g' |
                        fmt -80)
@@ -114,7 +125,7 @@ assert_local_outputs() {
     local task="$1"
     local expected="$2"
     echo "Checking $task local outputs against expected values..."
-    local output=$("$vext" "$task" | grep '|' | tail -2 |
+    local output=$("$vext" "$task" | grep '|' | tail -3 |
                        awk -F'|' '{ print $3 }' |
                        sed 's/ //g' |
                        fmt -80)
@@ -127,11 +138,7 @@ assert_local_outputs() {
 }    
 
 assert_all() {
-    assert_outputs "$1" "$2 $2"
-}
-
-assert_all_wrong() {
-    assert_all "$1" "Wrong"
+    assert_outputs "$1" "$2 $2 $2"
 }
 
 assert_all_present() {

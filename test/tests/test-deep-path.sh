@@ -23,6 +23,10 @@ libcontent=$(cat <<EOF
 "path/to/B": {
     "vcs": "git",
     "service": "testfile"
+},
+"path/to/C": {
+    "vcs": "svn",
+    "service": "testfile"
 }
 EOF
           )
@@ -44,6 +48,11 @@ libcontent=$(cat <<EOF
     "vcs": "git",
     "service": "testfile",
     "repository": "source/of/B"
+},
+"path/to/C": {
+    "vcs": "svn",
+    "service": "testfile",
+    "repository": "source/of/C"
 }
 EOF
           )
@@ -55,6 +64,7 @@ rm -rf "$mydir/../testrepos/source"
 mkdir -p "$mydir/../testrepos/source/of"
 mv "$mydir/../testrepos/A" "$mydir/../testrepos/source/of/" 
 mv "$mydir/../testrepos/B" "$mydir/../testrepos/source/of/" 
+mv "$mydir/../testrepos/C" "$mydir/../testrepos/source/of/" 
 
 "$vext" install
 

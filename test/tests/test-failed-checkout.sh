@@ -10,16 +10,21 @@ libcontent=$(cat <<EOF
 "B": {
     "vcs": "git",
     "service": "testfile"
+},
+"C": {
+    "vcs": "svn",
+    "service": "testfile"
 }
 EOF
           )
 
-for dir in A B; do
+for dir in A B C; do
     
     prepare
     write_project_file "$libcontent"
 
-    # Make dir exist already, so both hg and git should refuse to clone
+    # Make dir exist already and have something in it, so our clone
+    # should fail
     ( mkdir ext ; cd ext ; mkdir $dir ; touch $dir/blah )
 
     if "$vext" install ; then

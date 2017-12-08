@@ -5,11 +5,13 @@ structure FileBits :> sig
     val subpath : context -> libname -> string -> string
     val command_output : context -> libname -> string list -> string result
     val command : context -> libname -> string list -> unit result
+    val file_url : string -> string
     val file_contents : string -> string
     val mydir : unit -> string
     val homedir : unit -> string
     val mkpath : string -> unit result
     val rmpath : string -> unit result
+    val nonempty_dir_exists : string -> bool
     val project_spec_path : string -> string
     val project_lock_path : string -> string
     val verbose : unit -> bool
@@ -71,6 +73,19 @@ end = struct
 
     fun trim str =
         hd (String.fields (fn x => x = #"\n" orelse x = #"\r") str)
+            
+    fun file_url path =
+        let val forward_path = 
+                String.translate (fn #"\\" => "/" |
+                                  c => Char.toString c)
+                                 (OS.Path.mkCanonical path)
+        in
+            (* Path is expected to be absolute already, but if it
+               starts with a drive letter, we'll need an extra slash *)
+            case explode forward_path of
+                #"/"::rest => "file:///" ^ implode rest
+              | _ => "file:///" ^ forward_path
+        end
         
     fun file_contents filename =
         let val stream = TextIO.openIn filename
@@ -161,6 +176,9 @@ end = struct
             val tmpFile = FileSys.tmpName ()
             val result = run_command context libname cmdlist (SOME tmpFile)
             val contents = file_contents tmpFile
+            val _ = if verbose ()
+                    then print ("Output was:\n\"" ^ contents ^ "\"\n")
+                    else ()
         in
             FileSys.remove tmpFile handle _ => ();
             case result of
@@ -206,7 +224,7 @@ end = struct
     fun mkpath path =
         mkpath' (OS.Path.mkCanonical path)
 
-    fun rmpath' path =
+    fun dir_contents dir =
         let open OS
             fun files_from dirstream =
                 case FileSys.readDir dirstream of
@@ -217,19 +235,22 @@ end = struct
                     if file = Path.parentArc orelse file = Path.currentArc
                     then files_from dirstream
                     else file :: files_from dirstream
-            fun contents dir =
-                let val stream = FileSys.openDir dir
-                    val files = map (fn f => Path.joinDirFile
-                                                 { dir = dir, file = f })
-                                    (files_from stream)
-                    val _ = FileSys.closeDir stream
-                in files
-                end
+            val stream = FileSys.openDir dir
+            val files = map (fn f => Path.joinDirFile
+                                         { dir = dir, file = f })
+                            (files_from stream)
+            val _ = FileSys.closeDir stream
+        in
+            files
+        end
+
+    fun rmpath' path =
+        let open OS
             fun remove path =
                 if FileSys.isLink path (* dangling links bother isDir *)
                 then FileSys.remove path
                 else if FileSys.isDir path
-                then (app remove (contents path); FileSys.rmDir path)
+                then (app remove (dir_contents path); FileSys.rmDir path)
                 else FileSys.remove path
         in
             (remove path; OK ())
@@ -239,4 +260,13 @@ end = struct
     fun rmpath path =
         rmpath' (OS.Path.mkCanonical path)
 
+    fun nonempty_dir_exists path =
+        let open OS.FileSys
+        in
+            (not (isLink path) andalso
+             isDir path andalso
+             dir_contents path <> [])
+            handle _ => false
+        end                                        
+                
 end

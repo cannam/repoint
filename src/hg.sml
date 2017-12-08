@@ -8,7 +8,8 @@ structure HgControl :> VCS_CONTROL = struct
     type vcsstate = { id: string, modified: bool,
                       branch: string, tags: string list }
 
-    val hg_args = [ "--config", "ui.interactive=true", "--config", "ui.merge=:merge" ]
+    val hg_args = [ "--config", "ui.interactive=true",
+                    "--config", "ui.merge=:merge" ]
                         
     fun hg_command context libname args =
         FileBits.command context libname ("hg" :: hg_args @ args)
@@ -143,5 +144,8 @@ structure HgControl :> VCS_CONTROL = struct
                     ERROR e' => ERROR e' (* this was the ur-error *)
                   | _ => ERROR e
         end
-                  
+
+    fun copy_url_for context libname =
+        OK (FileBits.file_url (FileBits.libpath context libname))
+            
 end

@@ -7,7 +7,11 @@ src/vext.mlb
 test/tests/current
 test/testrepos/A
 test/testrepos/B
+test/testrepos/C
 test/testrepos/A2
 test/testrepos/B2
+test/testrepos/C2
+test/testrepos/C2_checkout
+test/testrepos/source
 .vext*.bin
 *.orig

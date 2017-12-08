@@ -18,21 +18,28 @@ libcontent=$(cat <<EOF
     "vcs": "git",
     "service": "testfile",
     "repository": "B2"
+},
+"C": {
+    "vcs": "svn",
+    "service": "testfile",
+    "repository": "C2"
 }
 EOF
           )
 
 ( cd ../../testrepos
-  rm -rf A2 B2
+  rm -rf A2 B2 C2 C2_checkout
   hg clone A A2
   git clone -bmaster B B2
+  cp -a C C2
+  svn co file://$(pwd)/C2 C2_checkout
 )
 
 prepare
 write_project_file "$libcontent"
 
 "$vext" install
-check_expected f94ae9d7e5c9 3199655c658ff337ce24f78c6d1f410f34f4c6f2
+check_expected f94ae9d7e5c9 3199655c658ff337ce24f78c6d1f410f34f4c6f2 2
 
 ( cd ../../testrepos
   cd A2
@@ -41,10 +48,15 @@ check_expected f94ae9d7e5c9 3199655c658ff337ce24f78c6d1f410f34f4c6f2
   cd ../B2
   echo 5 > file-b.txt
   git commit -a -m 5
+  cd ../C2_checkout
+  echo 5 > file.txt
+  svn commit -m 5
+  svn update
 )
 
 newidA=$( cd ../../testrepos/A2 ; hg id | awk '{ print $1; }' )
 newidB=$( cd ../../testrepos/B2 ; git rev-parse HEAD )
+newidC=$( cd ../../testrepos/C2_checkout ; svn info --show-item revision )
 
 libcontent_pinned=$(cat <<EOF
 "A": {
@@ -58,6 +70,12 @@ libcontent_pinned=$(cat <<EOF
     "service": "testfile",
     "repository": "B2",
     "pin": "$newidB"
+},
+"C": {
+    "vcs": "svn",
+    "service": "testfile",
+    "repository": "C2",
+    "pin": "$newidC"
 }
 EOF
           )
@@ -65,10 +83,10 @@ EOF
 write_project_file "$libcontent_pinned"
 
 "$vext" install # always obeys lock file, so should do nothing here
-check_expected f94ae9d7e5c9 3199655c658ff337ce24f78c6d1f410f34f4c6f2
+check_expected f94ae9d7e5c9 3199655c658ff337ce24f78c6d1f410f34f4c6f2 2
 
 rm vext-lock.json
 
 "$vext" install
-check_expected $newidA $newidB
+check_expected $newidA $newidB $newidC
 

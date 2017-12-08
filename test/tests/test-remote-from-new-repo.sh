@@ -19,6 +19,10 @@ libcontent=$(cat <<EOF
 "B": {
     "vcs": "git",
     "service": "testfile"
+},
+"C": {
+    "vcs": "svn",
+    "service": "testfile"
 }
 EOF
           )
@@ -32,13 +36,14 @@ mkdir -p "$current"/ext
 ( cd "$current"/ext
   hg init A
   git init B
+  mkdir -p C # not meaningful for SVN
 )
 
 "$vext" status
 "$vext" review
 "$vext" update
 
-check_expected f94ae9d7e5c9 3199655c658ff337ce24f78c6d1f410f34f4c6f2
+check_expected f94ae9d7e5c9 3199655c658ff337ce24f78c6d1f410f34f4c6f2 2
 
 assert_all_correct review
 
