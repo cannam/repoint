@@ -6,7 +6,34 @@ structure SvnControl :> VCS_CONTROL = struct
 
     fun svn_command_output context libname args =
         FileBits.command_output context libname ("svn" :: args)
-                        
+
+    fun svn_command_lines context libname args =
+        case svn_command_output context libname args of
+            ERROR e => ERROR e
+          | OK s => OK (String.tokens (fn c => c = #"\n" orelse c = #"\r") s)
+
+    fun split_line_pair line =
+        let fun strip_leading_ws str = case explode str of
+                                           #" "::rest => implode rest
+                                         | _ => str
+        in
+            case String.tokens (fn c => c = #":") line of
+                [] => ("", "")
+              | first::rest =>
+                (first, strip_leading_ws (String.concatWith ":" rest))
+        end
+            
+    fun svn_info_item context libname key =
+        (* SVN 1.9 has info --show-item which is what we need, but at
+           this point we still have 1.8 on the CI boxes so we might as 
+           well aim to support it *)
+        case svn_command_lines context libname ["info"] of
+            ERROR e => ERROR e
+          | OK lines =>
+            case List.find (fn (k, v) => k = key) (map split_line_pair lines) of
+                NONE => ERROR ("Key \"" ^ key ^ "\" not found in output")
+              | SOME (_, v) => OK v
+            
     fun exists context libname =
         OK (OS.FileSys.isDir (FileBits.subpath context libname ".svn"))
         handle _ => OK false
@@ -15,14 +42,7 @@ structure SvnControl :> VCS_CONTROL = struct
         Provider.remote_url context SVN source libname
 
     fun id_of context libname =
-        case svn_command_output context libname
-                                ["info", "--show-item", "revision"] of
-            ERROR e => ERROR e
-          | OK output =>
-            case String.tokens (fn c => c = #" " orelse c = #"\t") output of
-                [token] => OK token
-              | _ => ERROR ("Unable to extract single revision ID from \"" ^
-                            output ^ "\"")
+        svn_info_item context libname "Revision" (*!!! check: does svn localise this? should we ensure C locale? *)
 
     fun is_at context (libname, id_or_tag) =
         case id_of context libname of
@@ -33,10 +53,10 @@ structure SvnControl :> VCS_CONTROL = struct
         OK (b = DEFAULT_BRANCH)
                
     fun is_newest context (libname, source, branch) =
-        case svn_command_output context libname ["status", "--show-updates"] of 
+        case svn_command_lines context libname ["status", "--show-updates"] of 
             ERROR e => ERROR e
-          | OK output =>
-            case rev (String.tokens (fn c => c = #"\n") output) of
+          | OK lines =>
+            case rev lines of
                 [] => ERROR "No result returned for server status"
               | last_line::_ =>
                 case rev (String.tokens (fn c => c = #" ") last_line) of
@@ -44,7 +64,7 @@ structure SvnControl :> VCS_CONTROL = struct
                   | server_id::_ => is_at context (libname, server_id)
 
     fun is_newest_locally context (libname, branch) =
-        OK true
+        OK true (* no local history *)
 
     fun is_modified_locally context libname =
         case svn_command_output context libname ["status"] of
@@ -60,8 +80,7 @@ structure SvnControl :> VCS_CONTROL = struct
             then (* Surprisingly, SVN itself has no problem with
                     this. But for consistency with other VCSes we 
                     don't allow it *)
-                ERROR ("Refusing to checkout to nonempty target dir \"" ^
-                        path ^ "\"")
+                ERROR ("Refusing checkout to nonempty dir \"" ^ path ^ "\"")
             else 
                 (* make the lib dir rather than just the ext dir, since
                    the lib dir might be nested and svn will happily check
@@ -86,6 +105,6 @@ structure SvnControl :> VCS_CONTROL = struct
           | OK _ => id_of context libname
 
     fun copy_url_for context libname =
-        svn_command_output context libname ["info", "--show-item", "url"]
+        svn_info_item context libname "URL"
 
 end
