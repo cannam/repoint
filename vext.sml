@@ -1551,7 +1551,14 @@ structure SvnControl :> VCS_CONTROL = struct
         Provider.remote_url context SVN source libname
 
     fun id_of context libname =
-        svn_command_output context libname ["info", "--show-item", "revision"]
+        case svn_command_output context libname
+                                ["info", "--show-item", "revision"] of
+            ERROR e => ERROR e
+          | OK output =>
+            case String.tokens (fn c => c = #" " orelse c = #"\t") output of
+                [token] => OK token
+              | _ => ERROR ("Unable to extract single revision ID from \"" ^
+                            output ^ "\"")
 
     fun is_at context (libname, id_or_tag) =
         case id_of context libname of
