@@ -79,7 +79,7 @@ for project_vcs in hg git svn ; do
     elif [ "$project_vcs" = "git" ]; then
 	id=$(git rev-parse HEAD)
     elif [ "$project_vcs" = "svn" ]; then
-	id=$(svn info --show-item revision)
+	id=$(svn info | grep '^Revision:' | awk '{ print $2; }')
     else
         echo "Internal error: unknown VCS" 1>&2
         exit 2

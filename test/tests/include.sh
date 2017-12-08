@@ -71,7 +71,9 @@ check_expected_with_extpath() {
         echo "ERROR: id for repo B ($actual_id_B) does not match expected ($id_B)"
         exit 3
     fi
-    local actual_id_C=$( cd "$extpath"/C ; svn info --show-item revision )
+    # NB we don't use "svn info --show-item revision" because we still
+    # want svn 1.8 compatibility (at the time of writing)a
+    local actual_id_C=$( cd "$extpath"/C ; svn info | grep '^Revision:' | awk '{ print $2; }' )
     if [ "$actual_id_C" != "$id_C" ]; then
         echo "ERROR: id for repo C ($actual_id_C) does not match expected ($id_C)"
         exit 3
