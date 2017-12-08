@@ -11,7 +11,7 @@ program.
 
 You might think of Vext as an alternative to Mercurial subrepositories
 or Git submodules, but with less magic, fewer alarming failure cases,
-and equal support for both Mercurial and Git.
+and support for libraries hosted using Mercurial, Git, or Subversion.
 
 You configure Vext with a list of libraries, their remote repository
 locations, and any branch or tag information you want their checkouts
@@ -147,7 +147,8 @@ directory or relative path) it will be checked out to within the
 external-library directory. Properties of a library may include
 
  * `vcs` - The version control system to use. Must be one of the
-   recognised set of names, currently `hg` (Mercurial) or `git`.
+   recognised set of names, currently `git`, `hg` (Mercurial), or
+   `svn` (Subversion).
 
  * `service` - The repository hosting service. Some services are
    built-in, but you can define further ones in a `services` section
