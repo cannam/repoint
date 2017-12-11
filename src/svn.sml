@@ -94,7 +94,7 @@ structure SvnControl :> VCS_CONTROL = struct
         case svn_command context libname
                          ["update", "--accept", "postpone"] of
             ERROR e => ERROR e
-          | _ => id_of context libname
+          | _ => OK ()
 
     fun update_to context (libname, _, "") =
         ERROR "Non-empty id (tag or revision id) required for update_to"
@@ -102,7 +102,7 @@ structure SvnControl :> VCS_CONTROL = struct
         case svn_command context libname
                          ["update", "-r", id, "--accept", "postpone"] of
             ERROR e => ERROR e
-          | OK _ => id_of context libname
+          | OK _ => OK ()
 
     fun copy_url_for context libname =
         svn_info_item context libname "URL"

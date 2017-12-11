@@ -129,7 +129,7 @@ structure HgControl :> VCS_CONTROL = struct
               | _ =>
                 case pull_result of
                     ERROR e => ERROR e
-                  | _ => id_of context libname
+                  | _ => OK ()
         end
 
     fun update_to context (libname, _, "") =
@@ -138,7 +138,7 @@ structure HgControl :> VCS_CONTROL = struct
         let val pull_result = pull context (libname, source)
         in
             case hg_command context libname ["update", "-r", id] of
-                OK _ => id_of context libname
+                OK _ => OK ()
               | ERROR e =>
                 case pull_result of
                     ERROR e' => ERROR e' (* this was the ur-error *)

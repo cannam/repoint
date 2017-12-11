@@ -85,12 +85,12 @@ functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
         let fun update_unpinned () =
                 case V.is_newest context (libname, source, branch) of
                     ERROR e => ERROR e
-                  | OK true => V.id_of context libname
+                  | OK true => OK ()
                   | OK false => V.update context (libname, source, branch)
             fun update_pinned target =
                 case V.is_at context (libname, target) of
                     ERROR e => ERROR e
-                  | OK true => OK target
+                  | OK true => OK ()
                   | OK false => V.update_to context (libname, source, target)
             fun update' () =
                 case lock_pin of

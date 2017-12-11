@@ -149,7 +149,7 @@ structure GitControl :> VCS_CONTROL = struct
             case git_command context libname ["checkout", "--detach",
                                               remote_branch_name branch] of
                 ERROR e => ERROR e
-              | _ => id_of context libname
+              | _ => OK ()
 
     (* This function is dealing with a specific id or tag, so if we
        can successfully check it out (detached) then that's all we
@@ -165,7 +165,7 @@ structure GitControl :> VCS_CONTROL = struct
         let val fetch_result = fetch context (libname, source)
         in
             case git_command context libname ["checkout", "--detach", id] of
-                OK _ => id_of context libname
+                OK _ => OK ()
               | ERROR e =>
                 case fetch_result of
                     ERROR e' => ERROR e' (* this was the ur-error *)
