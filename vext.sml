@@ -38,7 +38,7 @@
     authorization.
 *)
 
-val vext_version = "0.9.92"
+val vext_version = "0.9.93"
 
 
 datatype vcs =
@@ -176,11 +176,11 @@ signature VCS_CONTROL = sig
     val checkout : context -> libname * source * branch -> unit result
 
     (** Update the library to the given branch tip. Assumes that a
-        local copy of the library already exists. Return the new id *)
-    val update : context -> libname * source * branch -> id_or_tag result
+        local copy of the library already exists *)
+    val update : context -> libname * source * branch -> unit result
 
     (** Update the library to the given specific id or tag *)
-    val update_to : context -> libname * source * id_or_tag -> id_or_tag result
+    val update_to : context -> libname * source * id_or_tag -> unit result
 
     (** Return a URL from which the library can be cloned, given that
         the local copy already exists. For a DVCS this can be the
@@ -192,7 +192,7 @@ end
 signature LIB_CONTROL = sig
     val review : context -> libspec -> (libstate * localstate) result
     val status : context -> libspec -> (libstate * localstate) result
-    val update : context -> libspec -> id_or_tag result
+    val update : context -> libspec -> unit result
     val id_of : context -> libspec -> id_or_tag result
 end
 
@@ -309,11 +309,12 @@ end = struct
                 then arg
                 else "\"" ^ arg ^ "\""
             fun check arg =
-                let val valid = explode " /#:;?,._-{}@="
+                let val valid = explode " /#:;?,._-{}@=+"
                 in
                     app (fn c =>
                             if isAlphaNum c orelse
-                               List.exists (fn v => v = c) valid
+                               List.exists (fn v => v = c) valid orelse
+                               c > chr 127
                             then ()
                             else raise Fail ("Invalid character '" ^
                                              (Char.toString c) ^
@@ -554,12 +555,12 @@ functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
         let fun update_unpinned () =
                 case V.is_newest context (libname, source, branch) of
                     ERROR e => ERROR e
-                  | OK true => V.id_of context libname
+                  | OK true => OK ()
                   | OK false => V.update context (libname, source, branch)
             fun update_pinned target =
                 case V.is_at context (libname, target) of
                     ERROR e => ERROR e
-                  | OK true => OK target
+                  | OK true => OK ()
                   | OK false => V.update_to context (libname, source, target)
             fun update' () =
                 case lock_pin of
@@ -1619,7 +1620,7 @@ structure HgControl :> VCS_CONTROL = struct
               | _ =>
                 case pull_result of
                     ERROR e => ERROR e
-                  | _ => id_of context libname
+                  | _ => OK ()
         end
 
     fun update_to context (libname, _, "") =
@@ -1628,7 +1629,7 @@ structure HgControl :> VCS_CONTROL = struct
         let val pull_result = pull context (libname, source)
         in
             case hg_command context libname ["update", "-r", id] of
-                OK _ => id_of context libname
+                OK _ => OK ()
               | ERROR e =>
                 case pull_result of
                     ERROR e' => ERROR e' (* this was the ur-error *)
@@ -1790,7 +1791,7 @@ structure GitControl :> VCS_CONTROL = struct
             case git_command context libname ["checkout", "--detach",
                                               remote_branch_name branch] of
                 ERROR e => ERROR e
-              | _ => id_of context libname
+              | _ => OK ()
 
     (* This function is dealing with a specific id or tag, so if we
        can successfully check it out (detached) then that's all we
@@ -1806,7 +1807,7 @@ structure GitControl :> VCS_CONTROL = struct
         let val fetch_result = fetch context (libname, source)
         in
             case git_command context libname ["checkout", "--detach", id] of
-                OK _ => id_of context libname
+                OK _ => OK ()
               | ERROR e =>
                 case fetch_result of
                     ERROR e' => ERROR e' (* this was the ur-error *)
@@ -1825,7 +1826,34 @@ structure SvnControl :> VCS_CONTROL = struct
 
     fun svn_command_output context libname args =
         FileBits.command_output context libname ("svn" :: args)
-                        
+
+    fun svn_command_lines context libname args =
+        case svn_command_output context libname args of
+            ERROR e => ERROR e
+          | OK s => OK (String.tokens (fn c => c = #"\n" orelse c = #"\r") s)
+
+    fun split_line_pair line =
+        let fun strip_leading_ws str = case explode str of
+                                           #" "::rest => implode rest
+                                         | _ => str
+        in
+            case String.tokens (fn c => c = #":") line of
+                [] => ("", "")
+              | first::rest =>
+                (first, strip_leading_ws (String.concatWith ":" rest))
+        end
+            
+    fun svn_info_item context libname key =
+        (* SVN 1.9 has info --show-item which is what we need, but at
+           this point we still have 1.8 on the CI boxes so we might as 
+           well aim to support it *)
+        case svn_command_lines context libname ["info"] of
+            ERROR e => ERROR e
+          | OK lines =>
+            case List.find (fn (k, v) => k = key) (map split_line_pair lines) of
+                NONE => ERROR ("Key \"" ^ key ^ "\" not found in output")
+              | SOME (_, v) => OK v
+            
     fun exists context libname =
         OK (OS.FileSys.isDir (FileBits.subpath context libname ".svn"))
         handle _ => OK false
@@ -1834,7 +1862,7 @@ structure SvnControl :> VCS_CONTROL = struct
         Provider.remote_url context SVN source libname
 
     fun id_of context libname =
-        svn_command_output context libname ["info", "--show-item", "revision"]
+        svn_info_item context libname "Revision" (*!!! check: does svn localise this? should we ensure C locale? *)
 
     fun is_at context (libname, id_or_tag) =
         case id_of context libname of
@@ -1845,10 +1873,10 @@ structure SvnControl :> VCS_CONTROL = struct
         OK (b = DEFAULT_BRANCH)
                
     fun is_newest context (libname, source, branch) =
-        case svn_command_output context libname ["status", "--show-updates"] of 
+        case svn_command_lines context libname ["status", "--show-updates"] of 
             ERROR e => ERROR e
-          | OK output =>
-            case rev (String.tokens (fn c => c = #"\n") output) of
+          | OK lines =>
+            case rev lines of
                 [] => ERROR "No result returned for server status"
               | last_line::_ =>
                 case rev (String.tokens (fn c => c = #" ") last_line) of
@@ -1856,7 +1884,7 @@ structure SvnControl :> VCS_CONTROL = struct
                   | server_id::_ => is_at context (libname, server_id)
 
     fun is_newest_locally context (libname, branch) =
-        OK true
+        OK true (* no local history *)
 
     fun is_modified_locally context libname =
         case svn_command_output context libname ["status"] of
@@ -1872,8 +1900,7 @@ structure SvnControl :> VCS_CONTROL = struct
             then (* Surprisingly, SVN itself has no problem with
                     this. But for consistency with other VCSes we 
                     don't allow it *)
-                ERROR ("Refusing to checkout to nonempty target dir \"" ^
-                        path ^ "\"")
+                ERROR ("Refusing checkout to nonempty dir \"" ^ path ^ "\"")
             else 
                 (* make the lib dir rather than just the ext dir, since
                    the lib dir might be nested and svn will happily check
@@ -1887,7 +1914,7 @@ structure SvnControl :> VCS_CONTROL = struct
         case svn_command context libname
                          ["update", "--accept", "postpone"] of
             ERROR e => ERROR e
-          | _ => id_of context libname
+          | _ => OK ()
 
     fun update_to context (libname, _, "") =
         ERROR "Non-empty id (tag or revision id) required for update_to"
@@ -1895,10 +1922,10 @@ structure SvnControl :> VCS_CONTROL = struct
         case svn_command context libname
                          ["update", "-r", id, "--accept", "postpone"] of
             ERROR e => ERROR e
-          | OK _ => id_of context libname
+          | OK _ => OK ()
 
     fun copy_url_for context libname =
-        svn_command_output context libname ["info", "--show-item", "url"]
+        svn_info_item context libname "URL"
 
 end
 
@@ -2071,8 +2098,8 @@ end = struct
             foldl (fn (lib, acc) =>
                       case acc of
                           ERROR e => ERROR e
-                        | OK _ => AnyLibControl.update synthetic_context lib)
-                  (OK "")
+                        | OK () => AnyLibControl.update synthetic_context lib)
+                  (OK ())
                   (#libs project)
         end
 

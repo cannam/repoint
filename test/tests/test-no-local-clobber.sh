@@ -47,8 +47,8 @@ echo "modified" > ext/A/file.txt
 echo "new" > ext/A/new.txt
 echo "modified-b" > ext/B/file-b.txt
 echo "new-b" > ext/B/new-b.txt
-echo "modified-c" > ext/C/file.txt
-echo "new-c" > ext/C/new.txt
+echo "modified-c" > ext/C/file-c.txt
+echo "new-c" > ext/C/new-c.txt
 
 write_project_file "$libcontent_pinned"
 
@@ -59,8 +59,8 @@ assert_contents ext/A/file.txt "modified"
 assert_contents ext/A/new.txt "new"
 assert_contents ext/B/file-b.txt "modified-b"
 assert_contents ext/B/new-b.txt "new-b"
-assert_contents ext/C/file.txt "modified-c"
-assert_contents ext/C/new.txt "new-c"
+assert_contents ext/C/file-c.txt "modified-c"
+assert_contents ext/C/new-c.txt "new-c"
 
 # should refuse to clobber local modifications
 

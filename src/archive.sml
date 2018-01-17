@@ -147,8 +147,8 @@ end = struct
             foldl (fn (lib, acc) =>
                       case acc of
                           ERROR e => ERROR e
-                        | OK _ => AnyLibControl.update synthetic_context lib)
-                  (OK "")
+                        | OK () => AnyLibControl.update synthetic_context lib)
+                  (OK ())
                   (#libs project)
         end
 

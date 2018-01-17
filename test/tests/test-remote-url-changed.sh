@@ -13,6 +13,8 @@
 # expected to produce the right output until "vext review" has been
 # run. But it mustn't crash.
 
+##!!! todo: update for SVN (remote repo URL changed in vext-project.json but not yet changed in working copy)
+
 libcontent=$(cat <<EOF
 "A": {
     "vcs": "hg",

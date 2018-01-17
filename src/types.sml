@@ -134,11 +134,11 @@ signature VCS_CONTROL = sig
     val checkout : context -> libname * source * branch -> unit result
 
     (** Update the library to the given branch tip. Assumes that a
-        local copy of the library already exists. Return the new id *)
-    val update : context -> libname * source * branch -> id_or_tag result
+        local copy of the library already exists *)
+    val update : context -> libname * source * branch -> unit result
 
     (** Update the library to the given specific id or tag *)
-    val update_to : context -> libname * source * id_or_tag -> id_or_tag result
+    val update_to : context -> libname * source * id_or_tag -> unit result
 
     (** Return a URL from which the library can be cloned, given that
         the local copy already exists. For a DVCS this can be the
@@ -150,6 +150,6 @@ end
 signature LIB_CONTROL = sig
     val review : context -> libspec -> (libstate * localstate) result
     val status : context -> libspec -> (libstate * localstate) result
-    val update : context -> libspec -> id_or_tag result
+    val update : context -> libspec -> unit result
     val id_of : context -> libspec -> id_or_tag result
 end

@@ -112,11 +112,12 @@ end = struct
                 then arg
                 else "\"" ^ arg ^ "\""
             fun check arg =
-                let val valid = explode " /#:;?,._-{}@="
+                let val valid = explode " /#:;?,._-{}@=+"
                 in
                     app (fn c =>
                             if isAlphaNum c orelse
-                               List.exists (fn v => v = c) valid
+                               List.exists (fn v => v = c) valid orelse
+                               c > chr 127
                             then ()
                             else raise Fail ("Invalid character '" ^
                                              (Char.toString c) ^

@@ -32,5 +32,5 @@
     authorization.
 *)
 
-val vext_version = "0.9.92"
+val vext_version = "0.9.93"
 

@@ -56,7 +56,7 @@ check_expected f94ae9d7e5c9 3199655c658ff337ce24f78c6d1f410f34f4c6f2 2
 
 newidA=$( cd ../../testrepos/A2 ; hg id | awk '{ print $1; }' )
 newidB=$( cd ../../testrepos/B2 ; git rev-parse HEAD )
-newidC=$( cd ../../testrepos/C2_checkout ; svn info --show-item revision )
+newidC=$( cd ../../testrepos/C2_checkout ; svn info | grep '^Revision:' | awk '{ print $2; }' )
 
 "$vext" install
 check_expected f94ae9d7e5c9 3199655c658ff337ce24f78c6d1f410f34f4c6f2 2
