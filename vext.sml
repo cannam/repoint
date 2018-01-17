@@ -1842,17 +1842,33 @@ structure SvnControl :> VCS_CONTROL = struct
               | first::rest =>
                 (first, strip_leading_ws (String.concatWith ":" rest))
         end
-            
-    fun svn_info_item context libname key =
-        (* SVN 1.9 has info --show-item which is what we need, but at
-           this point we still have 1.8 on the CI boxes so we might as 
-           well aim to support it *)
-        case svn_command_lines context libname ["info"] of
-            ERROR e => ERROR e
-          | OK lines =>
-            case List.find (fn (k, v) => k = key) (map split_line_pair lines) of
-                NONE => ERROR ("Key \"" ^ key ^ "\" not found in output")
-              | SOME (_, v) => OK v
+
+    structure X = SubXml
+                      
+    fun svn_info context libname route =
+        (* SVN 1.9 has info --show-item which is just what we need,
+           but at this point we still have 1.8 on the CI boxes so we
+           might as well aim to support it. For that we really have to
+           use the XML output format, since the default info output is
+           localised. This is the only thing our mini-XML parser is
+           used for though, so it would be good to trim it at some
+           point *)
+        let fun find elt [] = OK elt
+              | find { children, ... } (first :: rest) =
+                case List.find (fn (X.ELEMENT { name, ... }) => name = first
+                               | _ => false)
+                               children of
+                    NONE => ERROR ("No element \"" ^ first ^ "\" in SVN XML")
+                  | SOME (X.ELEMENT e) => find e rest
+                  | SOME _ => ERROR "Internal error"
+        in
+            case svn_command_output context libname ["info", "--xml"] of
+                ERROR e => ERROR e
+              | OK xml =>
+                case X.parse xml of
+                    X.ERROR e => ERROR e
+                  | X.OK (X.DOCUMENT doc) => find doc route
+        end
             
     fun exists context libname =
         OK (OS.FileSys.isDir (FileBits.subpath context libname ".svn"))
@@ -1861,8 +1877,27 @@ structure SvnControl :> VCS_CONTROL = struct
     fun remote_for context (libname, source) =
         Provider.remote_url context SVN source libname
 
+    (* Remote the checkout came from, not necessarily the one we want *)
+    fun actual_remote_for context libname =
+        case svn_info context libname ["entry", "url"] of
+            ERROR e => ERROR e
+          | OK { children, ... } =>
+            case List.find (fn (X.TEXT _) => true | _ => false) children of
+                NONE => ERROR "No content for URL in SVN info XML"
+              | SOME (X.TEXT url) => OK url
+              | SOME _ => ERROR "Internal error"
+
     fun id_of context libname =
-        svn_info_item context libname "Revision" (*!!! check: does svn localise this? should we ensure C locale? *)
+        case svn_info context libname ["entry"] of
+            ERROR e => ERROR e
+          | OK { children, ... } => 
+            case List.find
+                     (fn (X.ATTRIBUTE { name = "revision", ... }) => true
+                     | _ => false)
+                     children of
+                NONE => ERROR "No revision for entry in SVN info XML"
+              | SOME (X.ATTRIBUTE { value, ... }) => OK value
+              | SOME _ => ERROR "Internal error"
 
     fun is_at context (libname, id_or_tag) =
         case id_of context libname of
@@ -1925,7 +1960,7 @@ structure SvnControl :> VCS_CONTROL = struct
           | OK _ => OK ()
 
     fun copy_url_for context libname =
-        svn_info_item context libname "URL"
+        actual_remote_for context libname
 
 end
 
