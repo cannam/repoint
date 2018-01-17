@@ -10,6 +10,7 @@ SOURCES	:= \
 	src/filebits.sml \
 	src/control.sml \
 	src/sml-simplejson/json.sml \
+	src/sml-subxml/subxml.sml \
 	src/jsonbits.sml \
 	src/provider.sml \
 	src/hg.sml \
