@@ -284,6 +284,24 @@ from the archive by adding one or more options of the form `--exclude
 Further configuration
 ---------------------
 
+### Changing the source of a library
+
+If the upstream repository URL for a library changes -- e.g. to move
+to a different provider, or if you want to pick up a different fork of
+the library -- you can change its details in `vext-project.json` to
+reflect its new location, and the new location will be used for all
+subsequent Vext operations.
+
+This should work seamlessly for all of the supported version control
+systems, so long as the new location has the same repository root as
+before (i.e. it is not an unrelated repository) and so long as it uses
+the same version control system.
+
+If you want to switch a library to check out from a repository
+unrelated to its current one, or switch it to a different version
+control system, then for the moment you will have to remove any
+existing checkout of that library by hand first.
+
 ### Adding new service providers
 
 You can cause a library to be checked out from any URL, even one that
