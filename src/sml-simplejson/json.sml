@@ -1,61 +1,8 @@
 
 (* Simple Standard ML JSON parser
-   ==============================
-
    https://bitbucket.org/cannam/sml-simplejson
-
-   An RFC-compliant JSON parser in one SML file with no dependency 
-   on anything outside the Basis library. Also includes a simple
-   serialiser.
-
-   Tested with MLton, Poly/ML, and SML/NJ compilers.
-
-   Parser notes:
-
-   * Complies with RFC 7159, The JavaScript Object Notation (JSON)
-     Data Interchange Format
-
-   * Passes all of the JSONTestSuite parser accept/reject tests that
-     exist at the time of writing, as listed in "Parsing JSON is a
-     Minefield" (http://seriot.ch/parsing_json.php)
- 
-   * Two-pass parser using naive exploded strings, therefore not
-     particularly fast and not suitable for large input files
-
-   * Only supports UTF-8 input, not UTF-16 or UTF-32. Doesn't check
-     that JSON strings are valid UTF-8 -- the caller must do that --
-     but does handle \u escapes
-
-   * Converts all numbers to type "real". If that is a 64-bit IEEE
-     float type (common but not guaranteed in SML) then we're pretty
-     standard for a JSON parser
-
-   Copyright 2017 Chris Cannam.
+   Copyright 2017 Chris Cannam. BSD licence.
    Parts based on the JSON parser in the Ponyo library by Phil Eaton.
-
-   Permission is hereby granted, free of charge, to any person
-   obtaining a copy of this software and associated documentation
-   files (the "Software"), to deal in the Software without
-   restriction, including without limitation the rights to use, copy,
-   modify, merge, publish, distribute, sublicense, and/or sell copies
-   of the Software, and to permit persons to whom the Software is
-   furnished to do so, subject to the following conditions:
-
-   The above copyright notice and this permission notice shall be
-   included in all copies or substantial portions of the Software.
-
-   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-   NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR
-   ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
-   CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
-   WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-   Except as contained in this notice, the names of Chris Cannam and
-   Particular Programs Ltd shall not be used in advertising or
-   otherwise to promote the sale, use or other dealings in this
-   Software without prior written authorization.
 *)
 
 signature JSON = sig
