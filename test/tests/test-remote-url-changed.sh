@@ -13,8 +13,6 @@
 # expected to produce the right output until "vext review" has been
 # run. But it mustn't crash.
 
-##!!! todo: update for SVN (remote repo URL changed in vext-project.json but not yet changed in working copy)
-
 libcontent=$(cat <<EOF
 "A": {
     "vcs": "hg",
@@ -23,28 +21,58 @@ libcontent=$(cat <<EOF
 "B": {
     "vcs": "git",
     "service": "testfile"
+},
+"C": {
+    "vcs": "svn",
+    "service": "testfile"
 }
 EOF
           )
 
-break_remotes() {
+break_hg_remote() {
 
     if ! grep -q "^ *default *=" "$current"/ext/A/.hg/hgrc ; then
         echo "ERROR: No default remote found in hg repo!?"
-        exit 2
-    fi
-    if ! grep -q "url =" "$current"/ext/B/.git/config ; then
-        echo "ERROR: No remote urls found in git repo!?"
         exit 2
     fi
 
     perl -i -p -e \
          's,^ *default *=.*$,default = file:///nonexistent/path,' \
          "$current/ext/A/.hg/hgrc"
+}
+
+break_git_remote() {
+
+    if ! grep -q "url =" "$current"/ext/B/.git/config ; then
+        echo "ERROR: No remote urls found in git repo!?"
+        exit 2
+    fi
 
     perl -i -p -e \
          's,^([^a-z]*)url =.*$,$1url = file:///nonexistent/path,' \
          "$current/ext/B/.git/config"
+}
+
+break_svn_remote() {
+
+    ( cd ../../testrepos
+      cp -a C C2
+    )
+
+    ( cd "$current/ext/C"
+      url=$(svn info | grep '^URL:' | awk '{ print $2; }')
+      svn switch --relocate "$url" "$url"2
+    )
+
+    ( cd ../../testrepos
+      rm -rf C2
+    )
+}
+
+break_remotes() {
+    break_hg_remote
+    break_git_remote
+    break_svn_remote
 }
 
 prepare
@@ -56,4 +84,8 @@ break_remotes
 
 "$vext" status
 "$vext" review
+"$vext" install
+
+break_remotes
+
 "$vext" update
