@@ -9,7 +9,7 @@
 
     A simple manager for third-party source code dependencies
 
-    Copyright 2017 Chris Cannam, Particular Programs Ltd,
+    Copyright 2018 Chris Cannam, Particular Programs Ltd,
     and Queen Mary, University of London
 
     Permission is hereby granted, free of charge, to any person
@@ -38,7 +38,7 @@
     authorization.
 *)
 
-val vext_version = "0.9.93"
+val vext_version = "0.9.94"
 
 
 datatype vcs =
@@ -1906,17 +1906,30 @@ structure SvnControl :> VCS_CONTROL = struct
 
     fun is_on_branch context (libname, b) =
         OK (b = DEFAULT_BRANCH)
+
+    fun check_remote context (libname, source) =
+      case (remote_for context (libname, source),
+            actual_remote_for context libname) of
+          (_, ERROR e) => ERROR e
+        | (url, OK actual) => 
+          if actual = url
+          then OK ()
+          else svn_command context libname ["relocate", url]
                
     fun is_newest context (libname, source, branch) =
-        case svn_command_lines context libname ["status", "--show-updates"] of 
+        case check_remote context (libname, source) of
             ERROR e => ERROR e
-          | OK lines =>
-            case rev lines of
-                [] => ERROR "No result returned for server status"
-              | last_line::_ =>
-                case rev (String.tokens (fn c => c = #" ") last_line) of
-                    [] => ERROR "No revision field found in server status"
-                  | server_id::_ => is_at context (libname, server_id)
+          | OK () => 
+            case svn_command_lines context libname
+                                   ["status", "--show-updates"] of
+                ERROR e => ERROR e
+              | OK lines =>
+                case rev lines of
+                    [] => ERROR "No result returned for server status"
+                  | last_line::_ =>
+                    case rev (String.tokens (fn c => c = #" ") last_line) of
+                        [] => ERROR "No revision field found in server status"
+                      | server_id::_ => is_at context (libname, server_id)
 
     fun is_newest_locally context (libname, branch) =
         OK true (* no local history *)
@@ -1946,18 +1959,24 @@ structure SvnControl :> VCS_CONTROL = struct
         end
                                                     
     fun update context (libname, source, branch) =
-        case svn_command context libname
-                         ["update", "--accept", "postpone"] of
+        case check_remote context (libname, source) of
             ERROR e => ERROR e
-          | _ => OK ()
+          | OK () => 
+            case svn_command context libname
+                             ["update", "--accept", "postpone"] of
+                ERROR e => ERROR e
+              | _ => OK ()
 
     fun update_to context (libname, _, "") =
         ERROR "Non-empty id (tag or revision id) required for update_to"
       | update_to context (libname, source, id) = 
-        case svn_command context libname
-                         ["update", "-r", id, "--accept", "postpone"] of
+        case check_remote context (libname, source) of
             ERROR e => ERROR e
-          | OK _ => OK ()
+          | OK () => 
+            case svn_command context libname
+                             ["update", "-r", id, "--accept", "postpone"] of
+                ERROR e => ERROR e
+              | OK _ => OK ()
 
     fun copy_url_for context libname =
         actual_remote_for context libname
