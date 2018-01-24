@@ -155,8 +155,7 @@ end = struct
             val dir = libpath context libname
             val cmd = expand_commandline cmdlist
             val _ = if verbose ()
-                    then print ("Running: " ^ cmd ^
-                                " (in dir " ^ dir ^ ")...\n")
+                    then print ("\n=== " ^ dir ^ "\n<<< " ^ cmd ^ "\n")
                     else tick libname cmdlist
             val _ = FileSys.chDir dir
             val status = case redirect of
@@ -178,7 +177,7 @@ end = struct
             val result = run_command context libname cmdlist (SOME tmpFile)
             val contents = file_contents tmpFile
             val _ = if verbose ()
-                    then print ("Output was:\n\"" ^ contents ^ "\"\n")
+                    then print (">>> \"" ^ contents ^ "\"\n")
                     else ()
         in
             FileSys.remove tmpFile handle _ => ();
