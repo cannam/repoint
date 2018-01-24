@@ -38,7 +38,7 @@
     authorization.
 *)
 
-val vext_version = "0.9.94"
+val vext_version = "0.9.95"
 
 
 datatype vcs =
