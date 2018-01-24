@@ -72,15 +72,29 @@ structure GitControl :> VCS_CONTROL = struct
             if String.isPrefix id_or_tag id orelse
                String.isPrefix id id_or_tag
             then OK true
-            else 
-                case git_command_output context libname
-                                        ["show-ref",
-                                         "refs/tags/" ^ id_or_tag,
-                                         "--"] of
-                    OK "" => OK false
-                  | ERROR _ => OK false
-                  | OK s => OK (id = hd (String.tokens (fn c => c = #" ") s))
+            else is_at_tag context (libname, id, id_or_tag)
 
+    and is_at_tag context (libname, id, tag) =
+        (* For annotated tags (with message) show-ref returns the tag
+           object ref rather than that of the revision being tagged;
+           we need the subsequent rev-list to chase that up. In fact
+           the rev-list on its own is enough to get us the id direct
+           from the tag name, but it fails with an error if the tag
+           doesn't exist, whereas we want to handle that quietly in
+           case the tag simply hasn't been pulled yet *)
+        case git_command_output context libname
+                                ["show-ref", "refs/tags/" ^ tag, "--"] of
+            OK "" => OK false (* Not a tag *)
+          | ERROR _ => OK false
+          | OK s =>
+            let val tag_ref = hd (String.tokens (fn c => c = #" ") s)
+            in
+                case git_command_output context libname
+                                        ["rev-list", "-1", tag_ref] of
+                    OK tagged => OK (id = tagged)
+                  | ERROR _ => OK false
+            end
+                           
     fun branch_tip context (libname, branch) =
         (* We don't have access to the source info or the network
            here, as this is used by status (e.g. via is_on_branch) as
