@@ -145,7 +145,7 @@ end = struct
         in
             print ("  " ^
                    Vector.sub(tick_chars, !tick_cycle) ^ " " ^
-                   pad_to 24 name ^
+                   pad_to 70 name ^
                    "\r");
             tick_cycle := (if !tick_cycle = n - 1 then 0 else 1 + !tick_cycle)
         end

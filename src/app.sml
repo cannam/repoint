@@ -134,7 +134,7 @@ fun pad_to n str =
 fun hline_to 0 = ""
   | hline_to n = "-" ^ hline_to (n-1)
 
-val libname_width = 25
+val libname_width = 28
 val libstate_width = 11
 val localstate_width = 17
 val notes_width = 5
