@@ -302,6 +302,17 @@ unrelated to its current one, or switch it to a different version
 control system, then for the moment you will have to remove any
 existing checkout of that library by hand first.
 
+### Limitations when checking libraries out using Subversion
+
+Libraries defined as to be checked out from a Subversion repository
+are in the most basic cases handled identically to those checked out
+from Git or Mercurial. However, Vext is not aware of the Subversion
+conventions for branching or tagging: branches and tags must be
+specified by changing the checkout URL. The lack of local history also
+has an effect on the information that can be reported by Vext. For
+example, `vext status` can never report Superseded for a Subversion
+checkout.
+
 ### Adding new service providers
 
 You can cause a library to be checked out from any URL, even one that
