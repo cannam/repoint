@@ -9,7 +9,6 @@ Run "vext help" for more documentation.
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = "Stop"
 $env:HGPLAIN = "true"
-$env:GIT_CONFIG_NOSYSTEM = "true"
 
 $sml = $env:VEXT_SML
 
