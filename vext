@@ -8,6 +8,10 @@ sml="$VEXT_SML"
 
 set -eu
 
+# avoid gussying up output
+export HGPLAIN=true
+export GIT_CONFIG_NOSYSTEM=true
+
 mydir=$(dirname "$0")
 program="$mydir/vext.sml"
 
