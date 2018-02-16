@@ -17,6 +17,9 @@ $program = "$mydir/vext.sml"
 
 # We need either Poly/ML or SML/NJ. No great preference as to which.
 
+# Typical locations
+$env:PATH = $env:PATH;"C:\Program Files (x86)\SMLNJ\bin";"C:\Program Files\Poly ML";"C:\Program Files (x86)\Poly ML"
+
 if (!$sml) {
     if (Get-Command "sml" -ErrorAction SilentlyContinue) {
        $sml = "smlnj"
