@@ -100,6 +100,9 @@ end
                    
 signature VCS_CONTROL = sig
 
+    (** Check whether the given VCS is installed and working *)
+    val is_working : context -> bool result
+    
     (** Test whether the library is present locally at all *)
     val exists : context -> libname -> bool result
                                             
@@ -152,4 +155,5 @@ signature LIB_CONTROL = sig
     val status : context -> libspec -> (libstate * localstate) result
     val update : context -> libspec -> unit result
     val id_of : context -> libspec -> id_or_tag result
+    val is_working : context -> vcs -> bool result
 end

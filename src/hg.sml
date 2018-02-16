@@ -8,15 +8,23 @@ structure HgControl :> VCS_CONTROL = struct
     type vcsstate = { id: string, modified: bool,
                       branch: string, tags: string list }
 
+    val hg_program = "hg"
+                        
     val hg_args = [ "--config", "ui.interactive=true",
                     "--config", "ui.merge=:merge" ]
                         
     fun hg_command context libname args =
-        FileBits.command context libname ("hg" :: hg_args @ args)
+        FileBits.command context libname (hg_program :: hg_args @ args)
 
     fun hg_command_output context libname args =
-        FileBits.command_output context libname ("hg" :: hg_args @ args)
-                        
+        FileBits.command_output context libname (hg_program :: hg_args @ args)
+
+    fun is_working context =
+        case hg_command_output context "" ["--version"] of
+            OK "" => OK false
+          | OK _ => OK true
+          | ERROR e => ERROR e
+
     fun exists context libname =
         OK (OS.FileSys.isDir (FileBits.subpath context libname ".hg"))
         handle _ => OK false

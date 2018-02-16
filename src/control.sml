@@ -111,5 +111,8 @@ functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
 
     fun id_of context ({ libname, ... } : libspec) =
         V.id_of context libname
+
+    fun is_working context vcs =
+        V.is_working context
                 
 end

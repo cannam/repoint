@@ -8,11 +8,19 @@ structure GitControl :> VCS_CONTROL = struct
        ensure we update properly if the location given in the project
        file changes. The origin remote is unused. *)
 
+    val git_program = "git"
+                      
     fun git_command context libname args =
-        FileBits.command context libname ("git" :: args)
+        FileBits.command context libname (git_program :: args)
 
     fun git_command_output context libname args =
-        FileBits.command_output context libname ("git" :: args)
+        FileBits.command_output context libname (git_program :: args)
+
+    fun is_working context =
+        case git_command_output context "" ["--version"] of
+            OK "" => OK false
+          | OK _ => OK true
+          | ERROR e => ERROR e
                             
     fun exists context libname =
         OK (OS.FileSys.isDir (FileBits.subpath context libname ".git"))

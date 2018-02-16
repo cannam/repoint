@@ -1,11 +1,13 @@
 
 structure SvnControl :> VCS_CONTROL = struct
 
+    val svn_program = "svn"
+
     fun svn_command context libname args =
-        FileBits.command context libname ("svn" :: args)
+        FileBits.command context libname (svn_program :: args)
 
     fun svn_command_output context libname args =
-        FileBits.command_output context libname ("svn" :: args)
+        FileBits.command_output context libname (svn_program :: args)
 
     fun svn_command_lines context libname args =
         case svn_command_output context libname args of
@@ -22,6 +24,12 @@ structure SvnControl :> VCS_CONTROL = struct
               | first::rest =>
                 (first, strip_leading_ws (String.concatWith ":" rest))
         end
+
+    fun is_working context =
+        case svn_command_output context "" ["--version"] of
+            OK "" => OK false
+          | OK _ => OK true
+          | ERROR e => ERROR e
 
     structure X = SubXml
                       
