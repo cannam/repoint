@@ -23,15 +23,21 @@ failing=""
 
 echo
 
-for sml in default poly smlnj mlton; do
+for sml in default poly smlnj mlton mlkit; do
+    if [ "$sml" = mlkit ]; then
+        if ! mlkit 1>/dev/null 2>&1 ; then
+            echo "MLKit apparently not installed, skipping that implementation"
+            continue
+        fi
+    fi
     echo "Testing with implementation: $sml"
     export VEXT_SML
     VEXT_SML=""
     if [ "$sml" != "default" ]; then
 	VEXT_SML="$sml"
     fi
-    if ./run-tests.sh $verbose; then
-        :
+    if time ./run-tests.sh $verbose; then
+        echo
     else
         failcount=$(($failcount+1))
         failing="$failing $sml"

@@ -20,7 +20,7 @@ addons:
       - polyml
 
 before_install:
-  - if [[ "$TRAVIS_OS_NAME" = "osx" ]] ; then brew update ; brew install mlton smlnj polyml ; fi
+  - if [[ "$TRAVIS_OS_NAME" = "osx" ]] ; then brew update ; brew install mlton smlnj polyml mlkit ; fi
       
 script:
   - make clean  # so we rebuild the aggregated vext.sml
