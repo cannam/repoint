@@ -1,6 +1,6 @@
 
 (* SubXml - A parser for a subset of XML
-   https://bitbucket.org/cannam/sml-simplexml
+   https://bitbucket.org/cannam/sml-subxml
    Copyright 2018 Chris Cannam. BSD licence.
 *)
 
