@@ -95,7 +95,8 @@ platforms.
 Vext requires a Standard ML compiler to be available when it is
 run. It supports [Poly/ML](http://polyml.org),
 [SML/NJ](http://smlnj.org), or, on non-Windows platforms only,
-[MLton](http://mlton.org). It is fairly easy to install at least one
+[MLton](http://mlton.org) and [MLKit](http://www.elsman.com/mlkit/).
+It is fairly easy to install at least one
 of these on every platform Vext is intended to support.
 
 Vext is a developer tool. Don't ask end-users of your software to use
@@ -232,7 +233,7 @@ A local status will also be shown:
    been committed.
 
  * __Differs from Lock__: The library is checked out at a version that
-   differs from the one listed in the `vect-lock.json` file. Either
+   differs from the one listed in the `vext-lock.json` file. Either
    the lock file needs updating (by `vext update` or `vext lock`) or
    the wrong revision is checked out and this should be fixed (by
    `vext install`).
