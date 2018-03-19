@@ -182,7 +182,7 @@ which installs exactly the versions listed in the lock file. You can
 check this file into your version control system to ensure that other
 users get the same revisions when running `vext install` themselves.
 
-See "Further configuration" below for more per-project and per-user
+See "Advanced stuff" below for more per-project and per-user
 configuration possibilities.
 
 
@@ -282,8 +282,8 @@ from the archive by adding one or more options of the form `--exclude
 <path>` after the target filename.
 
 
-Further configuration
----------------------
+Advanced stuff
+--------------
 
 ### Changing the source of a library
 
