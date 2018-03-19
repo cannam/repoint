@@ -305,14 +305,22 @@ existing checkout of that library by hand first.
 
 ### Limitations when checking libraries out using Subversion
 
-Libraries defined as to be checked out from a Subversion repository
-are in the most basic cases handled identically to those checked out
-from Git or Mercurial. However, Vext is not aware of the Subversion
-conventions for branching or tagging: branches and tags must be
-specified by changing the checkout URL. The lack of local history also
-has an effect on the information that can be reported by Vext. For
-example, `vext status` can never report Superseded for a Subversion
-checkout.
+Libraries checked out from a Subversion repository are in basic cases
+handled identically to those checked out from Git or Mercurial. But
+there are some limitations specific to Subversion:
+
+ * Vext is not aware of the Subversion conventions for branching or
+   tagging. Branches and tags must be specified by changing the
+   checkout URL.
+
+ * The lack of local history in a Subversion repo has an effect on the
+   information that can be reported by Vext. For example, `vext
+   status` can never report Superseded for a Subversion checkout.
+
+ * If you modify and commit a Subversion repository, remember that you
+   must subsequently run `svn update` in it before it has the right
+   local revision ID. You may get confusing results from `vext`
+   commands if you forget to do this.
 
 ### Adding new service providers
 
