@@ -100,10 +100,9 @@ end = struct
         end
 
     fun expand_commandline cmdlist =
-        (* We are quite [too] strict about what we accept here, except
+        (* We are quite strict about what we accept here, except
            for the first element in cmdlist which is assumed to be a
-           known command location rather than arbitrary user input. NB
-           only ASCII accepted at this point. *)
+           known command location rather than arbitrary user input. *)
         let open Char
             fun quote arg =
                 if List.all
