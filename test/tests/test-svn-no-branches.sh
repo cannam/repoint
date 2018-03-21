@@ -17,18 +17,5 @@ EOF
 prepare
 write_project_file "$libcontent"
 
-if output=$( "$vext" install 2>&1 ); then
-    echo "ERROR: vext install of SVN repo with non-empty branch was expected to fail"
-    exit 3
-else
-    case "$output" in
-        *Branches\ not\ supported*) ;;
-        *) echo "ERROR: vext install printed unexpected error message: $output";
-           exit 3;;
-    esac
-fi
-
-
-
-
+assert_failure install "Branches not supported"
 

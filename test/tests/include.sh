@@ -107,6 +107,24 @@ check_expected() {
     check_expected_with_extpath "ext" "$@"
 }
 
+assert_failure() {
+    local task="$1"
+    local error_text="$2"
+    echo "Checking expected failure mode for vext $task (expected error text: \"$error_text\")"
+    local output
+    if output=$( "$vext" "$task" 2>&1 ); then
+        echo "ERROR: vext $task was expected to fail here (expected error text: \"$error_text\")"
+        exit 3
+    else
+        if echo "$output" | fgrep -q "$error_text"; then
+            echo OK
+        else
+            echo "ERROR: vext $task printed unexpected error message \"$output\" (expected to see text \"$error_text\")"
+            exit 3
+        fi
+    fi
+}
+
 assert_outputs() {
     local task="$1"
     local expected="$2"

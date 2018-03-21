@@ -304,11 +304,15 @@ fun load_local_project pintype =
     end    
 
 fun with_local_project pintype f =
-    let val return_code = f (load_local_project pintype)
-                          handle Fail msg => (print ("Error: " ^ msg);
-                                              OS.Process.failure)
-                          handle e => (print ("Error: " ^ exnMessage e);
-                                       OS.Process.failure)
+  let open OS.Process
+      val return_code =
+          f (load_local_project pintype)
+          handle Fail msg =>
+                 failure before print ("Error: " ^ msg)
+               | JsonBits.Config msg =>
+                 failure before print ("Error in configuration: " ^ msg)
+               | e =>
+                 failure before print ("Error: " ^ exnMessage e)
         val _ = print "\n";
     in
         return_code
