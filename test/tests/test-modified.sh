@@ -21,7 +21,7 @@ EOF
 prepare
 write_project_file "$libcontent"
 
-"$vext" install
+"$repoint" install
 
 for task in status review ; do
     assert_local_outputs $task "Clean Clean Clean"

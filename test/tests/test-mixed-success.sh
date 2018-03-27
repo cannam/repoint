@@ -50,12 +50,12 @@ EOF
 prepare
 write_project_file "$libcontent_working"
 
-"$vext" install
+"$repoint" install
 check_expected 1379d75f0b4f 7219cf6e6d4706295246d278a3821ea923e1dfe2 1
 
 write_project_file "$libcontent_nonworking"
 
-if "$vext" update; then
+if "$repoint" update; then
     echo "ERROR: command that was intended to fail did not"
     exit 3
 fi

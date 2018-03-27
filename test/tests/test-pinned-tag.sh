@@ -44,7 +44,7 @@ for libcontent in "$libcontent_unannotated" "$libcontent_annotated" ; do
 
         prepare
         write_project_file "$libcontent"
-        "$vextdir"/vext $task
+        "$repointdir"/repoint $task
     
         # Our SVN support doesn't include tags, so the third value here is
         # just the head revision

@@ -22,10 +22,10 @@ for task in install update ; do
     prepare
     write_project_file "$libcontent"
 
-    "$vext" $task
+    "$repoint" $task
     check_expected f94ae9d7e5c9 3199655c658ff337ce24f78c6d1f410f34f4c6f2 2
 
-    # Now switch manually to an earlier revision and make sure vext
+    # Now switch manually to an earlier revision and make sure repoint
     # still behaves sensibly afterwards
 
     ( cd ext/A ; hg update -r8796fac39bdc )
@@ -35,7 +35,7 @@ for task in install update ; do
     assert_outputs status "Superseded Superseded Present"
     assert_all_superseded review
 
-    "$vext" $task
+    "$repoint" $task
     check_expected f94ae9d7e5c9 3199655c658ff337ce24f78c6d1f410f34f4c6f2 2
 
 done

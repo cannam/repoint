@@ -53,7 +53,7 @@ fun load_userconfig () : userconfig =
             JsonBits.load_json_from
                 (OS.Path.joinDirFile {
                       dir = home,
-                      file = VextFilenames.user_config_file })
+                      file = RepointFilenames.user_config_file })
             handle IO.Io _ => Json.OBJECT []
     in
         {
@@ -81,7 +81,7 @@ fun load_project (userconfig : userconfig) rootpath pintype : project =
                    handle OS.SysErr _ => false
                 then ()
                 else raise Fail ("Failed to open project spec file " ^
-                                 (VextFilenames.project_file) ^ " in " ^
+                                 (RepointFilenames.project_file) ^ " in " ^
                                  rootpath ^
                                  ".\nPlease ensure the spec file is in the " ^
                                  "project root and run this from there.")
@@ -325,15 +325,15 @@ fun lock () = with_local_project NO_LOCKFILE lock_project
 fun install () = with_local_project USE_LOCKFILE update_project
 
 fun version () =
-    (print ("v" ^ vext_version ^ "\n");
+    (print ("v" ^ repoint_version ^ "\n");
      OS.Process.success)
                       
 fun usage () =
-    (print "\nVext ";
+    (print "\nRepoint ";
      version ();
      print ("\nA simple manager for third-party source code dependencies.\n\n"
             ^ "Usage:\n\n"
-            ^ "  vext <command>\n\n"
+            ^ "  repoint <command>\n\n"
             ^ "where <command> is one of:\n\n"
             ^ "  status   print quick report on local status only, without using network\n"
             ^ "  review   check configured libraries against their providers, and report\n"
@@ -341,8 +341,8 @@ fun usage () =
             ^ "  update   update configured libraries and lock file according to project specs\n"
             ^ "  lock     update lock file to match local library status\n"
             ^ "  archive  pack up project and all libraries into an archive file\n"
-            ^ "           (invoke as 'vext archive target-file.tar.gz')\n"
-            ^ "  version  print the Vext version number and exit\n\n");
+            ^ "           (invoke as 'repoint archive target-file.tar.gz')\n"
+            ^ "  version  print the Repoint version number and exit\n\n");
     OS.Process.failure)
 
 fun archive target args =
@@ -353,7 +353,7 @@ fun archive target args =
         with_local_project USE_LOCKFILE (Archive.archive (target, xs))
       | _ => usage ()
 
-fun vext args =
+fun repoint args =
     let val return_code = 
             case args of
                 ["review"] => review ()
@@ -372,4 +372,4 @@ fun vext args =
     end
         
 fun main () =
-    vext (CommandLine.arguments ())
+    repoint (CommandLine.arguments ())

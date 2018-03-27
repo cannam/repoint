@@ -1,9 +1,9 @@
 syntax: glob
 *~
 ext
-vext
-src/vext
-src/vext.mlb
+repoint
+src/repoint
+src/repoint.mlb
 test/tests/current
 test/testrepos/A
 test/testrepos/B
@@ -13,6 +13,6 @@ test/testrepos/B2
 test/testrepos/C2
 test/testrepos/C2_checkout
 test/testrepos/source
-.vext*.bin
+.repoint*.bin
 *.orig
 MLB/

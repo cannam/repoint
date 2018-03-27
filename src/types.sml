@@ -91,11 +91,11 @@ type project = {
     libs : libspec list
 }
 
-structure VextFilenames = struct
-    val project_file = "vext-project.json"
-    val project_lock_file = "vext-lock.json"
-    val user_config_file = ".vext.json"
-    val archive_dir = ".vext-archive"
+structure RepointFilenames = struct
+    val project_file = "repoint-project.json"
+    val project_lock_file = "repoint-lock.json"
+    val user_config_file = ".repoint.json"
+    val archive_dir = ".repoint-archive"
 end
                    
 signature VCS_CONTROL = sig

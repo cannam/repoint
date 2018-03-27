@@ -7,8 +7,8 @@
 # remote metadata in a repo, and it is something that should work.
 
 # This is one of several tests in which the metadata necessary for
-# "vext status" to report correctly is absent when it is run; it isn't
-# expected to produce the right output until "vext review" has been
+# "repoint status" to report correctly is absent when it is run; it isn't
+# expected to produce the right output until "repoint review" has been
 # run. But it mustn't crash.
 
 libcontent=$(cat <<EOF
@@ -39,9 +39,9 @@ mkdir -p "$current"/ext
   mkdir -p C # not meaningful for SVN
 )
 
-"$vext" status
-"$vext" review
-"$vext" update
+"$repoint" status
+"$repoint" review
+"$repoint" update
 
 check_expected f94ae9d7e5c9 3199655c658ff337ce24f78c6d1f410f34f4c6f2 2
 

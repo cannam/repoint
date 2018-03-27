@@ -33,7 +33,7 @@ run_a_test() {
 }
 
 if [ -n "$verbose" ]; then
-    export VEXT_VERBOSE=1
+    export REPOINT_VERBOSE=1
 else
     echo
 fi

@@ -4,9 +4,9 @@
 
 # Here our remote repo is one that has been cloned from the original
 # test repo, rather than the actual original test repo itself. We
-# perform (all unpinned) a vext install, then commit something to the
-# remote, then check (i) that vext install does not change the local
-# copy, and (ii) that vext update does.
+# perform (all unpinned) a repoint install, then commit something to the
+# remote, then check (i) that repoint install does not change the local
+# copy, and (ii) that repoint update does.
 
 libcontent=$(cat <<EOF
 "A": {
@@ -38,7 +38,7 @@ EOF
 prepare
 write_project_file "$libcontent"
 
-"$vext" install
+"$repoint" install
 check_expected f94ae9d7e5c9 3199655c658ff337ce24f78c6d1f410f34f4c6f2 2
 
 ( cd ../../testrepos
@@ -58,9 +58,9 @@ newidA=$( cd ../../testrepos/A2 ; hg id | awk '{ print $1; }' )
 newidB=$( cd ../../testrepos/B2 ; git rev-parse HEAD )
 newidC=$( cd ../../testrepos/C2_checkout ; svn info | grep '^Revision:' | awk '{ print $2; }' )
 
-"$vext" install
+"$repoint" install
 check_expected f94ae9d7e5c9 3199655c658ff337ce24f78c6d1f410f34f4c6f2 2
 
-"$vext" update
+"$repoint" update
 check_expected $newidA $newidB $newidC
 

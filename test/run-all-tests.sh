@@ -31,10 +31,10 @@ for sml in default poly smlnj mlton mlkit; do
         fi
     fi
     echo "Testing with implementation: $sml"
-    export VEXT_SML
-    VEXT_SML=""
+    export REPOINT_SML
+    REPOINT_SML=""
     if [ "$sml" != "default" ]; then
-	VEXT_SML="$sml"
+	REPOINT_SML="$sml"
     fi
     if time ./run-tests.sh $verbose; then
         echo

@@ -13,17 +13,17 @@ echo @"
             "vcs": "hg",
             "service": "bitbucket",
             "owner": "cannam",
-            "repository": "vext"
+            "repository": "repoint"
         },
         "v2": {
             "vcs": "git",
             "service": "github",
             "owner": "cannam",
-            "repository": "vext"
+            "repository": "repoint"
         }
     }
 }
-"@ | Out-File -Encoding ASCII vext-project.json
+"@ | Out-File -Encoding ASCII repoint-project.json
 
 $smlOptions = @("default", "poly", "smlnj")
 
@@ -33,16 +33,16 @@ foreach ($sml in $smlOptions) {
     echo "Testing with implementation: $sml"
     echo ""
 
-    $env:VEXT_SML=""
+    $env:REPOINT_SML=""
     if ($sml -ne "default") {
-        $env:VEXT_SML=$sml
+        $env:REPOINT_SML=$sml
     }
 
     Remove-Item ext -Recurse -Force -ErrorAction SilentlyContinue
     
-    ..\vext review
-    ..\vext update
-    ..\vext review
+    ..\repoint review
+    ..\repoint update
+    ..\repoint review
 
     echo ""
 }

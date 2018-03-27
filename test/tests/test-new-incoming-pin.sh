@@ -4,9 +4,9 @@
 
 # Here our remote repo is one that has been cloned from the original
 # test repo, rather than the actual original test repo itself. We
-# perform a vext install, then commit something to the remote, then
+# perform a repoint install, then commit something to the remote, then
 # request a specific pin to the id that was just committed, and check
-# that vext install now updates to that id.
+# that repoint install now updates to that id.
 
 libcontent=$(cat <<EOF
 "A": {
@@ -38,7 +38,7 @@ EOF
 prepare
 write_project_file "$libcontent"
 
-"$vext" install
+"$repoint" install
 check_expected f94ae9d7e5c9 3199655c658ff337ce24f78c6d1f410f34f4c6f2 2
 
 ( cd ../../testrepos
@@ -82,11 +82,11 @@ EOF
 
 write_project_file "$libcontent_pinned"
 
-"$vext" install # always obeys lock file, so should do nothing here
+"$repoint" install # always obeys lock file, so should do nothing here
 check_expected f94ae9d7e5c9 3199655c658ff337ce24f78c6d1f410f34f4c6f2 2
 
-rm vext-lock.json
+rm repoint-lock.json
 
-"$vext" install
+"$repoint" install
 check_expected $newidA $newidB $newidC
 

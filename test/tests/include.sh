@@ -26,14 +26,14 @@ prepare() {
 }
 
 prepare 
-vextdir=../../..
-vext="$vextdir"/vext
+repointdir=../../..
+repoint="$repointdir"/repoint
 
 write_project_file_with_extpath() {
     local extpath="$1"
     local libcontent=$(echo "$2" | sed 's/^/        /')
     local testrepopath=$(cd ../../testrepos ; pwd)
-    cat > vext-project.json <<EOF
+    cat > repoint-project.json <<EOF
 {
     "config": {
         "extdir": "$extpath"
@@ -93,12 +93,12 @@ check_expected_with_extpath() {
   }
 }
 EOF
-    if cmp -s vext-lock.json expected-lock.json ; then
+    if cmp -s repoint-lock.json expected-lock.json ; then
         echo OK
     else
-        echo "ERROR: Contents of vext-lock.json does not match expected"
-        echo "Diff follows (vext-lock.json on left, expected on right):"
-        sdiff -w120 vext-lock.json expected-lock.json
+        echo "ERROR: Contents of repoint-lock.json does not match expected"
+        echo "Diff follows (repoint-lock.json on left, expected on right):"
+        sdiff -w120 repoint-lock.json expected-lock.json
         exit 3
     fi
 }
@@ -110,16 +110,16 @@ check_expected() {
 assert_failure() {
     local task="$1"
     local error_text="$2"
-    echo "Checking expected failure mode for vext $task (expected error text: \"$error_text\")"
+    echo "Checking expected failure mode for repoint $task (expected error text: \"$error_text\")"
     local output
-    if output=$( "$vext" "$task" 2>&1 ); then
-        echo "ERROR: vext $task was expected to fail here (expected error text: \"$error_text\")"
+    if output=$( "$repoint" "$task" 2>&1 ); then
+        echo "ERROR: repoint $task was expected to fail here (expected error text: \"$error_text\")"
         exit 3
     else
         if echo "$output" | fgrep -q "$error_text"; then
             echo OK
         else
-            echo "ERROR: vext $task printed unexpected error message \"$output\" (expected to see text \"$error_text\")"
+            echo "ERROR: repoint $task printed unexpected error message \"$output\" (expected to see text \"$error_text\")"
             exit 3
         fi
     fi
@@ -129,7 +129,7 @@ assert_outputs() {
     local task="$1"
     local expected="$2"
     echo "Checking $task outputs against expected values..."
-    local output=$("$vext" "$task" | grep '|' | tail -3 |
+    local output=$("$repoint" "$task" | grep '|' | tail -3 |
                        awk -F'|' '{ print $2 }' |
                        sed 's/ //g' |
                        fmt -80)
@@ -145,7 +145,7 @@ assert_local_outputs() {
     local task="$1"
     local expected="$2"
     echo "Checking $task local outputs against expected values..."
-    local output=$("$vext" "$task" | grep '|' | tail -3 |
+    local output=$("$repoint" "$task" | grep '|' | tail -3 |
                        awk -F'|' '{ print $3 }' |
                        sed 's/ //g' |
                        fmt -80)

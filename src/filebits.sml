@@ -18,7 +18,7 @@ structure FileBits :> sig
 end = struct
 
     fun verbose () =
-        case OS.Process.getEnv "VEXT_VERBOSE" of
+        case OS.Process.getEnv "REPOINT_VERBOSE" of
             SOME "0" => false
           | SOME _ => true
           | NONE => false
@@ -66,10 +66,10 @@ end = struct
         end
                 
     fun project_spec_path rootpath =
-        project_file_path rootpath (VextFilenames.project_file)
+        project_file_path rootpath (RepointFilenames.project_file)
 
     fun project_lock_path rootpath =
-        project_file_path rootpath (VextFilenames.project_lock_file)
+        project_file_path rootpath (RepointFilenames.project_lock_file)
 
     fun trim str =
         hd (String.fields (fn x => x = #"\n" orelse x = #"\r") str)

@@ -48,7 +48,7 @@ EOF
 
 prepare
 write_project_file "$libcontent"
-"$vext" install
+"$repoint" install
 
 # 4. Config file defines same library more than once
 

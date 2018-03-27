@@ -41,9 +41,9 @@ EOF
         write_project_file "$libcontent"
 
         if [ "$is_acceptable" = "yes" ]; then
-            "$vext" install
-        elif "$vext" install; then
-            echo "ERROR: vext install with unacceptable name $name was expected to fail"
+            "$repoint" install
+        elif "$repoint" install; then
+            echo "ERROR: repoint install with unacceptable name $name was expected to fail"
             exit 3
         else
             echo "(The prior command was expected to print an error, continuing)"

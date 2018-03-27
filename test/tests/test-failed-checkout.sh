@@ -27,8 +27,8 @@ for dir in A B C; do
     # should fail
     ( mkdir ext ; cd ext ; mkdir $dir ; touch $dir/blah )
 
-    if "$vext" install ; then
-        echo "ERROR: vext install to non-empty local dir was expected to fail"
+    if "$repoint" install ; then
+        echo "ERROR: repoint install to non-empty local dir was expected to fail"
         exit 3
     else
         echo "(The prior command was expected to print an error, continuing)"

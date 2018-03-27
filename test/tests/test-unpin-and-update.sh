@@ -40,12 +40,12 @@ EOF
 prepare
 write_project_file "$libcontent_pinned"
 
-"$vext" install
+"$repoint" install
 check_expected 1379d75f0b4f 7219cf6e6d4706295246d278a3821ea923e1dfe2 1
 
 write_project_file "$libcontent_unpinned"
 
-"$vextdir"/vext install # obeys lock file, so should do nothing
+"$repointdir"/repoint install # obeys lock file, so should do nothing
 check_expected 1379d75f0b4f 7219cf6e6d4706295246d278a3821ea923e1dfe2 1
 
 # The pinned id here is actually on a non-default branch, so status
@@ -56,7 +56,7 @@ check_expected 1379d75f0b4f 7219cf6e6d4706295246d278a3821ea923e1dfe2 1
 assert_outputs status "Wrong Wrong Present"
 assert_outputs review "Wrong Wrong Superseded"
 
-"$vextdir"/vext update
+"$repointdir"/repoint update
 check_expected f94ae9d7e5c9 3199655c658ff337ce24f78c6d1f410f34f4c6f2 2
 
 assert_all_present status

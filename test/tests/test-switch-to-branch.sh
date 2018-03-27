@@ -42,12 +42,12 @@ EOF
 prepare
 write_project_file "$libcontent_nobranch"
 
-"$vext" install
+"$repoint" install
 check_expected f94ae9d7e5c9 3199655c658ff337ce24f78c6d1f410f34f4c6f2 2
 
 write_project_file "$libcontent_branch"
 
-"$vext" install # obeys lock file, so should do nothing
+"$repoint" install # obeys lock file, so should do nothing
 check_expected f94ae9d7e5c9 3199655c658ff337ce24f78c6d1f410f34f4c6f2 2
 
 # As far as Hg is concerned, we are now on the wrong branch, and both
@@ -57,7 +57,7 @@ check_expected f94ae9d7e5c9 3199655c658ff337ce24f78c6d1f410f34f4c6f2 2
 assert_outputs status "Wrong Superseded Present"
 assert_outputs review "Wrong Superseded Correct"
 
-"$vext" update
+"$repoint" update
 check_expected 1379d75f0b4f 7219cf6e6d4706295246d278a3821ea923e1dfe2 2
 
 assert_all_present status

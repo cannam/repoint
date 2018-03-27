@@ -6,7 +6,7 @@
 # library should be checked out into a subdirectory rather than
 # directly within the external library root.
 #
-# In this case Vext must create the full path to check out into, and
+# In this case Repoint must create the full path to check out into, and
 # the default repository name it uses as source for the checkout
 # should be the directory name (from the last "/" onwards) rather than
 # the full path, since repo names seldom have slashes in them with
@@ -34,7 +34,7 @@ EOF
 prepare
 write_project_file "$libcontent"
 
-"$vext" install
+"$repoint" install
 
 rm -rf "$current"
 
@@ -66,7 +66,7 @@ mv "$mydir/../testrepos/A" "$mydir/../testrepos/source/of/"
 mv "$mydir/../testrepos/B" "$mydir/../testrepos/source/of/" 
 mv "$mydir/../testrepos/C" "$mydir/../testrepos/source/of/" 
 
-"$vext" install
+"$repoint" install
 
 rm -rf "$mydir/../testrepos/source"
 

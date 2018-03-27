@@ -29,10 +29,10 @@ for extpath in flarp \
     prepare
     write_project_file_with_extpath "$extpath" "$libcontent"
 
-    "$vext" install
+    "$repoint" install
     check_expected_with_extpath "$extpath" f94ae9d7e5c9 3199655c658ff337ce24f78c6d1f410f34f4c6f2 2
 
-    "$vext" update
+    "$repoint" update
     check_expected_with_extpath "$extpath" f94ae9d7e5c9 3199655c658ff337ce24f78c6d1f410f34f4c6f2 2
 
 done
@@ -45,8 +45,8 @@ for extpath in "$current"/mrop ; do
     prepare
     write_project_file_with_extpath "$extpath" "$libcontent"
 
-    if "$vext" install ; then
-        echo "ERROR: vext install with absolute extdir was expected to fail"
+    if "$repoint" install ; then
+        echo "ERROR: repoint install with absolute extdir was expected to fail"
         exit 3
     else
         echo "(The prior command was expected to print an error, continuing)"

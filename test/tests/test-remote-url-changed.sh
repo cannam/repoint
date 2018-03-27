@@ -3,14 +3,14 @@
 . $(dirname "$0")/include.sh
 
 # We should always pull from / push to the remote specified in the
-# vext-project file, even if that is not the default remote for the
+# repoint-project file, even if that is not the default remote for the
 # repo as actually checked out (or even, is not yet configured as a
-# remote at all). It might be nice as well if vext status/review
+# remote at all). It might be nice as well if repoint status/review
 # warned for this situation, but that's not essential.
 
 # This is one of several tests in which the metadata necessary for
-# "vext status" to report correctly is absent when it is run; it isn't
-# expected to produce the right output until "vext review" has been
+# "repoint status" to report correctly is absent when it is run; it isn't
+# expected to produce the right output until "repoint review" has been
 # run. But it mustn't crash.
 
 libcontent=$(cat <<EOF
@@ -78,14 +78,14 @@ break_remotes() {
 prepare
 write_project_file "$libcontent"
 
-"$vext" install
+"$repoint" install
 
 break_remotes
 
-"$vext" status
-"$vext" review
-"$vext" install
+"$repoint" status
+"$repoint" review
+"$repoint" install
 
 break_remotes
 
-"$vext" update
+"$repoint" update

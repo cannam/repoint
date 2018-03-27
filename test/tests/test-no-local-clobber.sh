@@ -40,7 +40,7 @@ EOF
 prepare
 write_project_file "$libcontent_unpinned"
 
-"$vext" install
+"$repoint" install
 check_expected f94ae9d7e5c9 3199655c658ff337ce24f78c6d1f410f34f4c6f2 2
 
 echo "modified" > ext/A/file.txt
@@ -52,7 +52,7 @@ echo "new-c" > ext/C/new-c.txt
 
 write_project_file "$libcontent_pinned"
 
-"$vext" install # obeys lock file, so should do nothing
+"$repoint" install # obeys lock file, so should do nothing
 check_expected f94ae9d7e5c9 3199655c658ff337ce24f78c6d1f410f34f4c6f2 2
 
 assert_contents ext/A/file.txt "modified"
@@ -64,8 +64,8 @@ assert_contents ext/C/new-c.txt "new-c"
 
 # should refuse to clobber local modifications
 
-if "$vext" update ; then
-    echo "ERROR: vext update to locally modified dir was expected to fail"
+if "$repoint" update ; then
+    echo "ERROR: repoint update to locally modified dir was expected to fail"
     exit 3
 else
     :

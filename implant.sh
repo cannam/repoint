@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copy the Vext program files from the directory containing this
+# Copy the Repoint program files from the directory containing this
 # script into the directory from which the script is run.
 
 set -eu
@@ -8,20 +8,20 @@ set -eu
 src=$(dirname "$0")
 target=$(pwd)
 
-if [ ! -f "$src/vext" ]; then
-    echo "Failed to find $src/vext, giving up"
+if [ ! -f "$src/repoint" ]; then
+    echo "Failed to find $src/repoint, giving up"
     exit 2
 fi
 
-vextfiles="vext vext.bat vext.ps1 vext.sml"
+repointfiles="repoint repoint.bat repoint.ps1 repoint.sml"
 
-echo -n "Copying Vext files from $src to $target... "
+echo -n "Copying Repoint files from $src to $target... "
 
-for f in $vextfiles; do
+for f in $repointfiles; do
     cp "$src/$f" "$target/"
 done
 
-chmod +x "$target/vext"
+chmod +x "$target/repoint"
 
 echo "Done"
 
@@ -33,17 +33,17 @@ elif [ -d "$target/.git" ]; then
 fi
 
 if [ -n "$vcs" ]; then
-    echo -n "Add Vext scripts to local $vcs repo? [yN] "
+    echo -n "Add Repoint scripts to local $vcs repo? [yN] "
     read answer
     case "$answer" in
 	Y|y) ( cd "$target"
                if [ -d ".hg" ]; then
-                   hg add $vextfiles
-                   echo 'glob:.vext-*.bin' >> .hgignore
+                   hg add $repointfiles
+                   echo 'glob:.repoint-*.bin' >> .hgignore
                    hg add .hgignore
                elif [ -d ".git" ]; then
-                   git add $vextfiles
-                   echo '.vext-*.bin' >> .gitignore
+                   git add $repointfiles
+                   echo '.repoint-*.bin' >> .gitignore
                    git add .gitignore
                fi ) ; echo "Done" ;;
 	*) echo "Not adding to repo" ;;

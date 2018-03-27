@@ -1,28 +1,28 @@
 
-Vext
-====
+Repoint
+=======
 
 A simple manager for third-party source code dependencies.
 
-Vext is a program that manages a single directory within your
+Repoint is a program that manages a single directory within your
 project's working tree. This directory contains checkouts of the
 external source code repositories that are needed to build your
 program.
 
-You might think of Vext as an alternative to Mercurial subrepositories
+You might think of Repoint as an alternative to Mercurial subrepositories
 or Git submodules, but with less magic, fewer alarming failure cases,
 and support for libraries hosted using Mercurial, Git, or Subversion.
 
-You configure Vext with a list of libraries, their remote repository
+You configure Repoint with a list of libraries, their remote repository
 locations, and any branch or tag information you want their checkouts
 to conform to. This list is stored in your repository, and when you
-run the Vext utility, it reviews the list and checks out the necessary
+run the Repoint utility, it reviews the list and checks out the necessary
 code.
 
-With a normal installation of Vext within a project, running
+With a normal installation of Repoint within a project, running
 
 ```
-$ ./vext install
+$ ./repoint install
 ```
 
 should be sufficient to retrieve the necessary dependencies specified
@@ -30,19 +30,19 @@ for the project.
 
 ### Rationale
 
-Vext was written as an alternative to Mercurial subrepositories for
+Repoint was written as an alternative to Mercurial subrepositories for
 cross-platform C++ projects with numerous external dependencies, so as
 to manage them in a simple way without depending on a particular
 version control system and without using a giant mono-repository.
 
-Vext has four limitations that distinguish it from "proper" package
+Repoint has four limitations that distinguish it from "proper" package
 managers like npm or Maven:
 
  1. It only knows how to check out library code in the form of
  complete version control repositories. There is no support for
  installing pre-packaged or pre-compiled dependencies. If it's not in
  a repository, or if cloning the repository would be too expensive,
- then Vext won't help.  (A corollary is that you should only use Vext
+ then Repoint won't help.  (A corollary is that you should only use Repoint
  in development trees that are themselves checked out from a hosted
  repo; don't distribute source releases or end-user packages that
  depend on it. If your code is distributed via a "proper" package
@@ -70,48 +70,48 @@ In turn it has one big advantage over "proper" package managers:
  manager ready to do the job.
 
 
-Installing Vext
+Installing Repoint
 ---------------
 
-Vext consists of four files which can be copied autotools-style into
-the project root. These are `vext`, `vext.sml`, `vext.bat` and
-`vext.ps1`. The file `vext.sml` contains the actual program, while
-`vext`, `vext.bat` and `vext.ps1` are platform-specific wrappers. In
-this configuration, you should type `./vext` to run the Vext tool
+Repoint consists of four files which can be copied autotools-style into
+the project root. These are `repoint`, `repoint.sml`, `repoint.bat` and
+`repoint.ps1`. The file `repoint.sml` contains the actual program, while
+`repoint`, `repoint.bat` and `repoint.ps1` are platform-specific wrappers. In
+this configuration, you should type `./repoint` to run the Repoint tool
 regardless of platform. Alternatively the same files can be installed
 to the PATH like any other executables.
 
-The Vext distribution also includes a Bash script called `implant.sh`
-which copies the four Vext files into whichever directory you run the
+The Repoint distribution also includes a Bash script called `implant.sh`
+which copies the four Repoint files into whichever directory you run the
 shell script from.
 
 ### Platform support
 
-Vext has been tested on Linux, macOS, and Windows. It has
+Repoint has been tested on Linux, macOS, and Windows. It has
 continuous-integration testing across all three platforms, though it
 is much less thoroughly tested on Windows than the other two
 platforms.
 
-Vext requires a Standard ML compiler to be available when it is
+Repoint requires a Standard ML compiler to be available when it is
 run. It supports [Poly/ML](http://polyml.org),
 [SML/NJ](http://smlnj.org), or, on non-Windows platforms only,
 [MLton](http://mlton.org) and [MLKit](http://www.elsman.com/mlkit/).
 It is fairly easy to install at least one
-of these on every platform Vext is intended to support.
+of these on every platform Repoint is intended to support.
 
-Vext is a developer tool. Don't ask end-users of your software to use
+Repoint is a developer tool. Don't ask end-users of your software to use
 it.
 
-* Linux and macOS CI build: [![Build Status](https://travis-ci.org/cannam/vext.svg?branch=master)](https://travis-ci.org/cannam/vext)
-* Windows CI build: [![Build status](https://ci.appveyor.com/api/projects/status/99esb700opqmyea8?svg=true)](https://ci.appveyor.com/project/cannam/vext)
+* Linux and macOS CI build: [![Build Status](https://travis-ci.org/cannam/repoint.svg?branch=master)](https://travis-ci.org/cannam/repoint)
+* Windows CI build: [![Build status](https://ci.appveyor.com/api/projects/status/99esb700opqmyea8?svg=true)](https://ci.appveyor.com/project/cannam/repoint)
 
-Setting up a Vext project
+Setting up a Repoint project
 -------------------------
 
 List the external libraries needed for your project in a JSON file
-called `vext-project.json` in your project's top-level directory.
+called `repoint-project.json` in your project's top-level directory.
 
-A complete example of `vext-project.json`:
+A complete example of `repoint-project.json`:
 
 ```
 {
@@ -136,11 +136,11 @@ A complete example of `vext-project.json`:
 All libraries will be checked out into subdirectories of a single
 external-library directory in the project root; the location of this
 directory (typically `ext`) should be configured as the first thing in
-`vext-project.json`. The directory in question should normally be
+`repoint-project.json`. The directory in question should normally be
 excluded from your project's own version control, i.e. added to your
 `.hgignore`, `.gitignore` etc file. The usual expectation is that this
 directory contains only third-party code, and that one could safely
-delete the entire directory and run Vext again to recreate it.
+delete the entire directory and run Repoint again to recreate it.
 
 Libraries are listed in the `libraries` object in the config
 file. Each library has a key, which is the local name (a single
@@ -171,32 +171,32 @@ external-library directory. Properties of a library may include
  
 A library that has a `pin` property is pinned to a specific tag or
 revision ID, and once it has been checked out at that tag or ID, it
-won't be changed by Vext again unless the specification for it
+won't be changed by Repoint again unless the specification for it
 changes. An unpinned library floats on a branch and is potentially
-updated every time `vext update` is run.
+updated every time `repoint update` is run.
 
-Vext creates a file called `vext-lock.json` each time you update a
+Repoint creates a file called `repoint-lock.json` each time you update a
 project, which stores the versions actually used in the current
-project directory. This is then used by the command `vext install`,
+project directory. This is then used by the command `repoint install`,
 which installs exactly the versions listed in the lock file. You can
 check this file into your version control system to ensure that other
-users get the same revisions when running `vext install` themselves.
+users get the same revisions when running `repoint install` themselves.
 
 See "Advanced stuff" below for more per-project and per-user
 configuration possibilities.
 
 
-Using the Vext tool
+Using the Repoint tool
 -------------------
 
 ### Reviewing library status
 
-Run `vext review` to check and print statuses of all the configured
+Run `repoint review` to check and print statuses of all the configured
 libraries. This won't change the local working copies, but it does
 fetch any pending changes from remote repositories, so network access
 is required.
 
-Run `vext status` to do the same thing but without using the
+Run `repoint status` to do the same thing but without using the
 network. That's much faster but it can only tell you whether a library
 is present locally at all, not necessarily whether it's the newest
 version.
@@ -208,7 +208,7 @@ For unpinned libraries:
  * __Absent__: No repository has been checked out for the library yet
 
  * __Correct__: Library is the newest version available on the correct
-   branch. If you run `vext status` instead `vext review`, this will
+   branch. If you run `repoint status` instead `repoint review`, this will
    appear as __Present__ instead of __Correct__, as the program can't
    be sure you have the latest version without using the network.
 
@@ -233,47 +233,47 @@ A local status will also be shown:
    been committed.
 
  * __Differs from Lock__: The library is checked out at a version that
-   differs from the one listed in the `vext-lock.json` file. Either
-   the lock file needs updating (by `vext update` or `vext lock`) or
+   differs from the one listed in the `repoint-lock.json` file. Either
+   the lock file needs updating (by `repoint update` or `repoint lock`) or
    the wrong revision is checked out and this should be fixed (by
-   `vext install`).
+   `repoint install`).
 
-Note that at present Vext cannot always report local modifications
+Note that at present Repoint cannot always report local modifications
 that have been committed but not pushed, although the presence of such
 a commit is one possible cause of the __Differs from Lock__ status.
 
 ### Installing and updating libraries
 
-Run `vext install` to install, i.e. to check out locally, all the
-configured libraries. If there is a `vext-lock.json` file present,
-`vext install` will check out all libraries listed in that file to the
+Run `repoint install` to install, i.e. to check out locally, all the
+configured libraries. If there is a `repoint-lock.json` file present,
+`repoint install` will check out all libraries listed in that file to the
 precise revisions recorded there. Otherwise it will follow any branch
-and/or pinned id specified in the project file. Note that `vext
+and/or pinned id specified in the project file. Note that `repoint
 install` always follows the lock file if present, even if it
 contradicts the project file.
 
-Run `vext update` to update all the configured libraries according to
-the `vext-project.json` specification, and then write out a new
-`vext-lock.json` containing the resulting state. Note that `vext
+Run `repoint update` to update all the configured libraries according to
+the `repoint-project.json` specification, and then write out a new
+`repoint-lock.json` containing the resulting state. Note that `repoint
 update` always ignores the existing contents of the lock file. Pinned
 libraries will be updated if they are in Absent or Wrong state;
 unpinned libraries will always be updated, which should have an effect
 only when they are in Absent, Superseded, or Wrong state.
 
-Run `vext lock` to rewrite `vext-lock.json` according to the actual
-state of the installed libraries. (As `vext update` does, but without
+Run `repoint lock` to rewrite `repoint-lock.json` according to the actual
+state of the installed libraries. (As `repoint update` does, but without
 changing any of the library code.)
 
 ### Creating an archive file
 
 To pack up a project and all its configured libraries into an archive
-file, run `vext archive` with the target filename as argument,
-e.g. `vext archive /home/user/myproject-v1.0.tar.gz`. This works by
+file, run `repoint archive` with the target filename as argument,
+e.g. `repoint archive /home/user/myproject-v1.0.tar.gz`. This works by
 checking out a temporary clean copy of the project's own repository,
 so it requires that the project itself is version-controlled using one
-of the same version-control systems as Vext supports for libraries.
+of the same version-control systems as Repoint supports for libraries.
 
-Vext expects the archive target filename to have one of a small set of
+Repoint expects the archive target filename to have one of a small set of
 recognised suffixes: .tar, .tar.gz, .tar.bz2, .tar.xz, and it requires
 that GNU tar or a compatible program be available in the current
 PATH. (This is unlikely to be straightforward on Windows.) Zip
@@ -289,9 +289,9 @@ Advanced stuff
 
 If the upstream repository URL for a library changes -- e.g. to move
 to a different provider, or if you want to pick up a different fork of
-the library -- you can change its details in `vext-project.json` to
+the library -- you can change its details in `repoint-project.json` to
 reflect its new location, and the new location will be used for all
-subsequent Vext operations.
+subsequent Repoint operations.
 
 This should work seamlessly for all of the supported version control
 systems, so long as the new location has the same repository root as
@@ -309,17 +309,17 @@ Libraries checked out from a Subversion repository are in basic cases
 handled identically to those checked out from Git or Mercurial. But
 there are some limitations specific to Subversion:
 
- * Vext is not aware of the Subversion conventions for branching or
+ * Repoint is not aware of the Subversion conventions for branching or
    tagging. Branches and tags must be specified by changing the
    checkout URL.
 
  * The lack of local history in a Subversion repo has an effect on the
-   information that can be reported by Vext. For example, `vext
+   information that can be reported by Repoint. For example, `repoint
    status` can never report Superseded for a Subversion checkout.
 
  * If you modify and commit a Subversion repository, remember that you
    must subsequently run `svn update` in it before it has the right
-   local revision ID. You may get confusing results from `vext`
+   local revision ID. You may get confusing results from `repoint`
    commands if you forget to do this.
 
 ### Adding new service providers
@@ -329,9 +329,9 @@ is not from a known hosting service, simply by specifying a `url`
 property for that library.
 
 Alternatively, if you want to refer to a service repeatedly that is
-not one of those hardcoded in the Vext program, you can add a
+not one of those hardcoded in the Repoint program, you can add a
 `services` property to the top-level object in
-`vext-project.json`. For example:
+`repoint-project.json`. For example:
 
 ```
 {
@@ -380,7 +380,7 @@ checkout URL for a specific library:
 
 ### Per-user configuration
 
-You can provide some user configuration in a file called `.vext.json`
+You can provide some user configuration in a file called `.repoint.json`
 (with leading dot) in your home directory.
 
 This file contains a JSON object which can have the following
@@ -392,10 +392,10 @@ properties:
 
  * `services` - global definitions of service providers, in the same
    format as described in "Adding new service providers"
-   above. Definitions here will override both those hardcoded in Vext
+   above. Definitions here will override both those hardcoded in Repoint
    and those listed in project files.
 
-As an example of `.vext.json` with an `accounts` property:
+As an example of `.repoint.json` with an `accounts` property:
 ```
 {
     "accounts": {
@@ -405,10 +405,10 @@ As an example of `.vext.json` with an `accounts` property:
 }
 ```
 
-Vext may use a different checkout URL with services on which you have
+Repoint may use a different checkout URL with services on which you have
 declared an account name, in order to take advantage of the
 possibility of using an authenticated protocol that can be pushed to
 using keychain authentication. For example, providing an account name
-may cause Vext to switch to an ssh URL in place of a default https
+may cause Repoint to switch to an ssh URL in place of a default https
 URL.
 

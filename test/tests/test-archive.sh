@@ -18,7 +18,7 @@ libcontent=$(cat <<EOF
 EOF
           )
 
-archive_file="/tmp/vext-test-$$.tar.gz"
+archive_file="/tmp/repoint-test-$$.tar.gz"
 
 # archive requires project is version-controlled and should support
 # the same set of VCS as supported for libraries
@@ -50,8 +50,8 @@ for project_vcs in hg git svn ; do
         $project_vcs init
     fi
     
-    $project_vcs add vext-project.json
-    $project_vcs commit -m "Commit vext-project file" "$author_flag" "Test Person <test@example.com>"
+    $project_vcs add repoint-project.json
+    $project_vcs commit -m "Commit repoint-project file" "$author_flag" "Test Person <test@example.com>"
 
     if [ "$project_vcs" = "svn" ]; then
         # need to update after committing
@@ -59,7 +59,7 @@ for project_vcs in hg git svn ; do
     fi
 
     rm -f "$archive_file"
-    "$vext" archive "$archive_file"
+    "$repoint" archive "$archive_file"
 
     for expected in A/file.txt B/file-b.txt ; do
         if ! tar tf "$archive_file" | grep -q "$expected" ; then
@@ -95,7 +95,7 @@ for project_vcs in hg git svn ; do
     fi
     
     rm -f "$archive_file"
-    "$vext" archive "$archive_file"
+    "$repoint" archive "$archive_file"
 
     if ! tar tf "$archive_file" | grep -q newfile ; then
         echo "ERROR: expected to find newly-added file newfile in archive"
@@ -109,7 +109,7 @@ for project_vcs in hg git svn ; do
     esac
     
     rm -f "$archive_file"
-    "$vext" archive "$archive_file"
+    "$repoint" archive "$archive_file"
 
     if tar tf "$archive_file" | grep -q newfile ; then
         echo "ERROR: expected *not* to find newly-added file newfile in archive when archiving from earlier revision"
@@ -127,8 +127,8 @@ rm -f "$archive_file"
 prepare
 write_project_file "$libcontent"
 
-if "$vext" archive "$archive_file" ; then
-    echo "ERROR: vext archive from non-version-controlled project was expected to fail"
+if "$repoint" archive "$archive_file" ; then
+    echo "ERROR: repoint archive from non-version-controlled project was expected to fail"
     exit 3
 else
     echo "(The prior command was expected to print an error, continuing)"

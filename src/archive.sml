@@ -8,7 +8,7 @@ structure Archive :> sig
 end = struct
 
     (* The idea of "archive" is to replace hg/git archive, which won't
-       include files, like the Vext-introduced external libraries,
+       include files, like the Repoint-introduced external libraries,
        that are not under version control with the main repo.
 
        The process goes like this:
@@ -17,21 +17,21 @@ end = struct
          its basename as our archive directory name
 
        - Make an "archive root" subdir of the project repo, named
-         typically .vext-archive
+         typically .repoint-archive
        
        - Identify the VCS used for the project repo. Note that any
          explicit references to VCS type in this structure are to
-         the VCS used for the project (something Vext doesn't 
+         the VCS used for the project (something Repoint doesn't 
          otherwise care about), not for an individual library
 
-       - Synthesise a Vext project with the archive root as its
+       - Synthesise a Repoint project with the archive root as its
          root path, "." as its extdir, with one library whose
          name is the user-supplied basename and whose explicit
          source URL is the original project root; update that
          project -- thus cloning the original project to a subdir
          of the archive root
 
-       - Synthesise a Vext project identical to the original one for
+       - Synthesise a Repoint project identical to the original one for
          this project, but with the newly-cloned copy as its root
          path; update that project -- thus checking out clean copies
          of the external library dirs
@@ -42,10 +42,10 @@ end = struct
              --exclude=.hg --exclude=.git project-release
          in the archive root dir
 
-       - (We also omit the vext-project.json file and any trace of
-         Vext. It can't properly be run in a directory where the
+       - (We also omit the repoint-project.json file and any trace of
+         Repoint. It can't properly be run in a directory where the
          external project folders already exist but their repo history
-         does not. End users shouldn't get to see Vext)
+         does not. End users shouldn't get to see Repoint)
 
        - Clean up by deleting the new copy
     *)
@@ -87,7 +87,7 @@ end = struct
     fun make_archive_root (context : context) =
         let val path = OS.Path.joinDirFile {
                     dir = #rootpath context,
-                    file = VextFilenames.archive_dir
+                    file = RepointFilenames.archive_dir
                 }
         in
             case FileBits.mkpath path of
@@ -194,12 +194,12 @@ end = struct
                      "--exclude=.hg",
                      "--exclude=.git",
                      "--exclude=.svn",
-                     "--exclude=vext",
-                     "--exclude=vext.sml",
-                     "--exclude=vext.ps1",
-                     "--exclude=vext.bat",
-                     "--exclude=vext-project.json",
-                     "--exclude=vext-lock.json"
+                     "--exclude=repoint",
+                     "--exclude=repoint.sml",
+                     "--exclude=repoint.ps1",
+                     "--exclude=repoint.bat",
+                     "--exclude=repoint-project.json",
+                     "--exclude=repoint-lock.json"
                  ] @ (map (fn e => "--exclude=" ^ e) exclusions) @
                   [ target_name ])
          of

@@ -3,7 +3,7 @@ structure GitControl :> VCS_CONTROL = struct
 
     (* With Git repos we always operate in detached HEAD state. Even
        the master branch is checked out using a remote reference
-       (vext/master). The remote we use is always named vext, and we
+       (repoint/master). The remote we use is always named repoint, and we
        update it to the expected URL each time we fetch, in order to
        ensure we update properly if the location given in the project
        file changes. The origin remote is unused. *)
@@ -34,7 +34,7 @@ structure GitControl :> VCS_CONTROL = struct
                                | BRANCH "" => "master"
                                | BRANCH b => b
 
-    val our_remote = "vext"
+    val our_remote = "repoint"
                                                  
     fun remote_branch_name branch = our_remote ^ "/" ^ branch_name branch
 
@@ -108,7 +108,7 @@ structure GitControl :> VCS_CONTROL = struct
            here, as this is used by status (e.g. via is_on_branch) as
            well as review. It's possible the remote branch won't exist,
            e.g. if the repo was checked out by something other than
-           Vext, and if that's the case, we can't add it here; we'll
+           Repoint, and if that's the case, we can't add it here; we'll
            just have to fail, since checking against local branches
            instead could produce the wrong result. *)
         git_command_output context libname

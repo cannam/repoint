@@ -1,5 +1,5 @@
 (* 
-    Vext
+    Repoint
 
     A simple manager for third-party source code dependencies
 
@@ -32,5 +32,5 @@
     authorization.
 *)
 
-val vext_version = "0.9.98"
+val repoint_version = "0.9.98"
 
