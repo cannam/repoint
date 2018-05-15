@@ -71,7 +71,7 @@ In turn it has one big advantage over "proper" package managers:
 
 
 Installing Repoint
----------------
+------------------
 
 Repoint consists of four files which can be copied autotools-style into
 the project root. These are `repoint`, `repoint.sml`, `repoint.bat` and
@@ -106,7 +106,7 @@ it.
 * Windows CI build: [![Build status](https://ci.appveyor.com/api/projects/status/99esb700opqmyea8?svg=true)](https://ci.appveyor.com/project/cannam/repoint)
 
 Setting up a Repoint project
--------------------------
+----------------------------
 
 List the external libraries needed for your project in a JSON file
 called `repoint-project.json` in your project's top-level directory.
@@ -187,7 +187,7 @@ configuration possibilities.
 
 
 Using the Repoint tool
--------------------
+----------------------
 
 ### Reviewing library status
 
@@ -244,21 +244,27 @@ a commit is one possible cause of the __Differs from Lock__ status.
 
 ### Installing and updating libraries
 
-Run `repoint install` to install, i.e. to check out locally, all the
-configured libraries. If there is a `repoint-lock.json` file present,
-`repoint install` will check out all libraries listed in that file to the
-precise revisions recorded there. Otherwise it will follow any branch
-and/or pinned id specified in the project file. Note that `repoint
-install` always follows the lock file if present, even if it
-contradicts the project file.
+Run `repoint install` to install, i.e. to check out locally, all of
+the configured libraries.
+
+If there is a `repoint-lock.json` file present, `repoint install` will
+check out all libraries listed in that file to the precise revisions
+recorded there. Otherwise it will follow any branch and/or pinned id
+specified in the project file.
+
+Note that `repoint install` always follows the lock file if present,
+even if it contradicts the project file.
 
 Run `repoint update` to update all the configured libraries according to
 the `repoint-project.json` specification, and then write out a new
-`repoint-lock.json` containing the resulting state. Note that `repoint
-update` always ignores the existing contents of the lock file. Pinned
-libraries will be updated if they are in Absent or Wrong state;
-unpinned libraries will always be updated, which should have an effect
-only when they are in Absent, Superseded, or Wrong state.
+`repoint-lock.json` containing the resulting state.
+
+Note that `repoint update` always ignores the existing contents of the
+lock file, but it does take into account the branch and pin
+specifications in the project file. Pinned libraries will be updated
+to the pinned version if they are in Absent or Wrong state; unpinned
+libraries will always be updated, which should have an effect only
+when they are in Absent, Superseded, or Wrong state.
 
 Run `repoint lock` to rewrite `repoint-lock.json` according to the actual
 state of the installed libraries. (As `repoint update` does, but without
@@ -285,16 +291,16 @@ from the archive by adding one or more options of the form `--exclude
 Advanced stuff
 --------------
 
-### Changing the source of a library
+### Changing the upstream origin of a library
 
-If the upstream repository URL for a library changes -- e.g. to move
-to a different provider, or if you want to pick up a different fork of
-the library -- you can change its details in `repoint-project.json` to
-reflect its new location, and the new location will be used for all
-subsequent Repoint operations.
+If the upstream repository URL for a library changes -- e.g. if the
+library moves to a different provider, or if you want to pick up a
+different fork of it -- you can change its details in
+`repoint-project.json` to reflect the new location, and that location
+will be used for all subsequent Repoint operations.
 
 This should work seamlessly for all of the supported version control
-systems, so long as the new location has the same repository root as
+systems, so long as the new location has the same root commit as
 before (i.e. it is not an unrelated repository) and so long as it uses
 the same version control system.
 
@@ -411,4 +417,12 @@ possibility of using an authenticated protocol that can be pushed to
 using keychain authentication. For example, providing an account name
 may cause Repoint to switch to an ssh URL in place of a default https
 URL.
+
+
+Author and licence
+------------------
+
+Repoint was written by Chris Cannam, copyright 2017-2018 Chris Cannam,
+Particular Programs Ltd, and Queen Mary University of London. It is
+provided under a BSD licence: see the file COPYING for details.
 
