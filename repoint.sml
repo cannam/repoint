@@ -38,7 +38,7 @@
     authorization.
 *)
 
-val repoint_version = "0.9.98"
+val repoint_version = "1.0"
 
 
 datatype vcs =
