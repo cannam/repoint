@@ -103,7 +103,7 @@ Repoint is a developer tool. Don't ask end-users of your software to use
 it.
 
 * Linux and macOS CI build: [![Build Status](https://travis-ci.org/cannam/repoint.svg?branch=master)](https://travis-ci.org/cannam/repoint)
-* Windows CI build: [![Build status](https://ci.appveyor.com/api/projects/status/99esb700opqmyea8?svg=true)](https://ci.appveyor.com/project/cannam/repoint)
+* Windows CI build: [![Build status](https://ci.appveyor.com/api/projects/status/y7x6sht8bmfvld1k?svg=true)](https://ci.appveyor.com/project/cannam/repoint)
 
 Setting up a Repoint project
 ----------------------------
