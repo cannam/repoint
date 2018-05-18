@@ -100,7 +100,23 @@ for project_vcs in hg git svn ; do
     if ! tar tf "$archive_file" | grep -q newfile ; then
         echo "ERROR: expected to find newly-added file newfile in archive"
         exit 3
-    fi 
+    fi
+
+    rm -f "$archive_file"
+    "$repoint" archive "$archive_file" --exclude newfile
+    
+    if tar tf "$archive_file" | grep -q newfile ; then
+        echo "ERROR: expected *not* to find newfile in archive when listed as exclusion"
+        exit 3
+    fi
+
+    rm -f "$archive_file"
+    "$repoint" archive "$archive_file" --exclude newfile file.txt file-b.txt file-c.txt
+    
+    if tar tf "$archive_file" | grep -q file ; then
+        echo "ERROR: expected not to find files in archive that were listed as exclusions"
+        exit 3
+    fi
     
     case "$project_vcs" in
         hg) hg update -r"$id";;
