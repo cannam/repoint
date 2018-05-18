@@ -23,7 +23,7 @@ failing=""
 
 echo
 
-for sml in default poly smlnj mlton mlkit; do
+for sml in default polyml smlnj mlton mlkit; do
     if [ "$sml" = mlkit ]; then
         if ! mlkit 1>/dev/null 2>&1 ; then
             echo "MLKit apparently not installed, skipping that implementation"
