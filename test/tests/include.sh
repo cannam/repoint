@@ -9,13 +9,12 @@ esac
 current="$mydir"/current
 
 prepare() {
-    mkdir -p "$current"
-    cd "$current"
+    cd "$mydir" && mkdir -p "$current" && cd "$current"
     if [ ! -f ../include.sh ]; then
-        echo "ERROR: Failed safety check: Path passed to prepare should be a subdir of test directory"
+        echo "ERROR: Failed safety check: Path used by prepare should be a subdir of test directory"
         exit 2
     fi
-    rm -rf ext *.json
+    cd "$mydir" && rm -rf "$current" && mkdir -p "$current" && cd "$current"
     for testrepo in A B C; do
         if [ ! -d ../../testrepos/$testrepo ]; then
             ( cd ../../testrepos
@@ -26,7 +25,7 @@ prepare() {
 }
 
 prepare 
-repointdir=../../..
+repointdir="$current"/../../..
 repoint="$repointdir"/repoint
 
 write_project_file_with_extpath() {

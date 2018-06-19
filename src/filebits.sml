@@ -14,6 +14,7 @@ structure FileBits :> sig
     val nonempty_dir_exists : string -> bool
     val project_spec_path : string -> string
     val project_lock_path : string -> string
+    val project_completion_path : string -> string
     val verbose : unit -> bool
 end = struct
 
@@ -70,6 +71,9 @@ end = struct
 
     fun project_lock_path rootpath =
         project_file_path rootpath (RepointFilenames.project_lock_file)
+
+    fun project_completion_path rootpath =
+        project_file_path rootpath (RepointFilenames.project_completion_file)
 
     fun trim str =
         hd (String.fields (fn x => x = #"\n" orelse x = #"\r") str)

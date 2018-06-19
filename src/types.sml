@@ -94,6 +94,7 @@ type project = {
 structure RepointFilenames = struct
     val project_file = "repoint-project.json"
     val project_lock_file = "repoint-lock.json"
+    val project_completion_file = ".repoint.point"
     val user_config_file = ".repoint.json"
     val archive_dir = ".repoint-archive"
 end

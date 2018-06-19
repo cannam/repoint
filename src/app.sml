@@ -126,7 +126,14 @@ fun save_lock_file rootpath locks =
     in
         JsonBits.save_json_to lock_file lock_json
     end
-        
+
+fun checkpoint_completion_file rootpath =
+    let val completion_file = FileBits.project_completion_path rootpath
+        val stream = TextIO.openOut completion_file
+    in
+        TextIO.closeOut stream
+    end
+                                                               
 fun pad_to n str =
     if n <= String.size str then str
     else pad_to n (str ^ " ")
@@ -292,8 +299,12 @@ fun update_project (project as { context, libs }) =
         val _ = if List.exists (fn (_, OK _) => true | _ => false) outcomes
                 then lock_project project
                 else OS.Process.success
+        val return_code = return_code_for outcomes
     in
-        return_code_for outcomes
+        if OS.Process.isSuccess return_code
+        then checkpoint_completion_file (#rootpath context)
+        else ();
+        return_code
     end
     
 fun load_local_project pintype =
@@ -334,7 +345,7 @@ fun usage () =
      print ("\n  A simple manager for third-party source code dependencies.\n"
             ^ "  http://all-day-breakfast.com/repoint/\n\n"
             ^ "Usage:\n\n"
-            ^ "  repoint <command>\n\n"
+            ^ "  repoint <command> [<options>]\n\n"
             ^ "where <command> is one of:\n\n"
             ^ "  status   print quick report on local status only, without using network\n"
             ^ "  review   check configured libraries against their providers, and report\n"
@@ -343,7 +354,11 @@ fun usage () =
             ^ "  lock     rewrite lock file to match local library status\n"
             ^ "  archive  pack up project and all libraries into an archive file:\n"
             ^ "           invoke as 'repoint archive targetfile.tar.gz --exclude unwanted.txt'\n"
-            ^ "  version  print the Repoint version number and exit\n\n");
+            ^ "  version  print the Repoint version number and exit\n\n"
+            ^ "and <options> may include:\n\n"
+            ^ "  --directory <dir>\n"
+            ^ "           change to directory <dir> before doing anything; in particular,\n"
+            ^ "           expect to find project spec file in that directory\n\n");
     OS.Process.failure)
 
 fun archive target args =
@@ -354,8 +369,26 @@ fun archive target args =
         with_local_project USE_LOCKFILE (Archive.archive (target, xs))
       | _ => usage ()
 
+fun handleSystemArgs args =
+    let fun handleSystemArgs' leftover args =
+            case args of
+                "--directory"::dir::rest =>
+                (OS.FileSys.chDir dir;
+                 handleSystemArgs' leftover rest)
+              | arg::rest =>
+                handleSystemArgs' (leftover @ [arg]) rest
+              | [] => leftover
+    in
+        OK (handleSystemArgs' [] args)
+        handle e => ERROR (exnMessage e)
+    end
+                   
 fun repoint args =
-    let val return_code = 
+    case handleSystemArgs args of
+        ERROR e => (print ("Error: " ^ e ^ "\n");
+                    OS.Process.exit OS.Process.failure)
+      | OK args => 
+        let val return_code = 
             case args of
                 ["review"] => review ()
               | ["status"] => status ()
@@ -367,10 +400,9 @@ fun repoint args =
               | arg::_ => (print ("Error: unknown argument \"" ^ arg ^ "\"\n");
                            usage ())
               | _ => usage ()
-    in
-        OS.Process.exit return_code;
-        ()
-    end
+        in
+            OS.Process.exit return_code
+        end
         
 fun main () =
     repoint (CommandLine.arguments ())
