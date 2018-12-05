@@ -39,11 +39,11 @@ if [ -n "$vcs" ]; then
 	Y|y) ( cd "$target"
                if [ -d ".hg" ]; then
                    hg add $repointfiles
-                   echo 'glob:.repoint-*.bin' >> .hgignore
+                   echo 'glob:.repoint*' >> .hgignore
                    hg add .hgignore
                elif [ -d ".git" ]; then
                    git add $repointfiles
-                   echo '.repoint-*.bin' >> .gitignore
+                   echo '.repoint*' >> .gitignore
                    git add .gitignore
                fi ) ; echo "Done" ;;
 	*) echo "Not adding to repo" ;;
