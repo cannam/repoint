@@ -309,6 +309,31 @@ unrelated to its current one, or switch it to a different version
 control system, then for the moment you will have to remove any
 existing checkout of that library by hand first.
 
+### Re-running Repoint from a build system when something changes
+
+When a Repoint update or install process completes, Repoint touches an
+(empty) checkpoint file called `.repoint.point` in the project root
+directory. You can use this to check whether Repoint should be run: if
+`.repoint.point` is missing, or is older than either
+`repoint-project.json` or `repoint-lock.json`, then `repoint install`
+should be run before the build can complete.
+
+A Makefile or other build system can include a rule to check this and
+run `repoint install` automatically, with some caveats:
+
+ * If the build system reads recursive build files or dependencies
+   from the external library directories, then the build system will
+   itself need to be re-run after Repoint has installed the libraries;
+
+ * Repoint is a developer tool, not an end-user tool: if your code is
+   intended to be built by people who are not active developers of it,
+   then it should be packaged in a way that does not require running
+   Repoint to build it (for example using `repoint archive`).
+
+Repoint supports a `--directory` option to tell it which directory is
+the project root, for use when being invoked from a build script in a
+different directory (for example in a shadow-build configuration).
+
 ### Limitations when checking libraries out using Subversion
 
 Libraries checked out from a Subversion repository are in basic cases
@@ -424,5 +449,6 @@ Author and licence
 
 Repoint was written by Chris Cannam, copyright 2017-2018 Chris Cannam,
 Particular Programs Ltd, and Queen Mary University of London. It is
-provided under a BSD licence: see the file COPYING for details.
+free software provided under an MIT-style licence. See the file
+COPYING for details.
 
