@@ -332,7 +332,7 @@ run `repoint install` automatically, with some caveats:
 
 Repoint supports a `--directory` option to tell it which directory is
 the project root, for use when being invoked from a build script in a
-different directory (for example in a shadow-build configuration).
+different directory, such as in a shadow-build configuration.
 
 ### Limitations when checking libraries out using Subversion
 
