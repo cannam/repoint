@@ -11,7 +11,8 @@ program.
 
 You might think of Repoint as an alternative to Mercurial subrepositories
 or Git submodules, but with less magic, fewer alarming failure cases,
-and support for libraries hosted using Mercurial, Git, or Subversion.
+and support for libraries hosted using Mercurial, Git, or Subversion,
+regardless of what version control system is used for your main project.
 
 You configure Repoint with a list of libraries, their remote repository
 locations, and any branch or tag information you want their checkouts
