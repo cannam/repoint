@@ -15,7 +15,7 @@ echo @"
             "owner": "cannam",
             "repository": "repoint"
         },
-        "v2": {
+        "v2/subdir": {
             "vcs": "git",
             "service": "github",
             "owner": "cannam",
