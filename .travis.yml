@@ -20,7 +20,7 @@ addons:
       - polyml
 
 before_install:
-  - if [[ "$TRAVIS_OS_NAME" = "osx" ]] ; then brew update ; brew install mlton smlnj polyml mlkit ; fi
+  - if [[ "$TRAVIS_OS_NAME" = "osx" ]] ; then brew update ; brew install mlton polyml mlkit ; brew cask install smlnj ; fi
       
 script:
   - make clean  # so we rebuild the aggregated repoint.sml
