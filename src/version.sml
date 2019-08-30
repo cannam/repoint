@@ -32,5 +32,5 @@
     authorization.
 *)
 
-val repoint_version = "1.1.1"
+val repoint_version = "1.2"
 

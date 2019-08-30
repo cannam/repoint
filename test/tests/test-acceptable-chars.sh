@@ -8,7 +8,7 @@
 # shell quoting
 
 unacceptable_names="re'po|re\"po|re\\\npo|re\\\\po|re>po|!repo"
-acceptable_names="repo|re_po|re-po|re+po|re,po|re po|re?po|repø|مستودع"
+acceptable_names="repo|re_po|re-po|re+po|re,po|re po|re?po|repø|مستودع|re%po"
 
 # We also allow through # and @ for use in URLs, but they are often
 # parsed by the VCS so we can't just use a matching filename and
