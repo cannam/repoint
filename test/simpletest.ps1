@@ -11,7 +11,7 @@ echo @"
     "libraries": {
         "v1": {
             "vcs": "hg",
-            "service": "bitbucket",
+            "service": "sourcehut",
             "owner": "cannam",
             "repository": "repoint"
         },
