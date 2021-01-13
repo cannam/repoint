@@ -32,7 +32,7 @@ structure HgControl :> VCS_CONTROL = struct
     fun remote_for context (libname, source) =
         Provider.remote_url context HG source libname
 
-    fun current_state context libname : vcsstate result =
+    fun current_state (context : context) libname : vcsstate result =
         let fun is_branch text = text <> "" andalso #"(" = hd (explode text)
             and extract_branch b =
                 if is_branch b     (* need to remove enclosing parens *)
@@ -112,7 +112,7 @@ structure HgControl :> VCS_CONTROL = struct
     (* Actions below this line may in theory modify the repo, and
        so must invalidate the status cache *)
 
-    fun invalidate context libname : unit =
+    fun invalidate (context : context) libname : unit =
         StatusCache.drop libname (#cache context)        
             
     fun pull context (libname, source) =
