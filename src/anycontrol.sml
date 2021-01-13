@@ -11,10 +11,10 @@ structure AnyLibControl :> LIB_CONTROL = struct
     fun status context (spec as { vcs, ... } : libspec) =
         (fn HG => H.status | GIT => G.status | SVN => S.status) vcs context spec
 
-    fun update context (spec as { vcs, ... } : libspec) =
+    fun update context (spec as { libname, vcs, ... } : libspec) =
         (fn HG => H.update | GIT => G.update | SVN => S.update) vcs context spec
-
-    fun id_of context (spec as { vcs, ... } : libspec) =
+            
+    fun id_of context (spec as { libname, vcs, ... } : libspec) =
         (fn HG => H.id_of | GIT => G.id_of | SVN => S.id_of) vcs context spec
 
     fun is_working context vcs =

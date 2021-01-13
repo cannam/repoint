@@ -448,7 +448,7 @@ URL.
 Author and licence
 ------------------
 
-Repoint was written by Chris Cannam, copyright 2017-2018 Chris Cannam,
+Repoint was written by Chris Cannam, copyright 2017-2021 Chris Cannam,
 Particular Programs Ltd, and Queen Mary University of London. It is
 free software provided under an MIT-style licence. See the file
 COPYING for details.

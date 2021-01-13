@@ -55,7 +55,8 @@ end = struct
                 rootpath = dir,
                 extdir = ".",
                 providers = [],
-                accounts = []
+                accounts = [],
+                cache = StatusCache.empty
             }
             val vcs_maybe = 
                 case [HgControl.exists context ".",
@@ -114,7 +115,8 @@ end = struct
                 rootpath = archive_root,
                 extdir = ".",
                 providers = [],
-                accounts = []
+                accounts = [],
+                cache = StatusCache.empty
             }
             val synthetic_library = {
                 libname = target_name,
@@ -141,7 +143,8 @@ end = struct
                 rootpath = archive_path archive_root target_name,
                 extdir = #extdir context,
                 providers = #providers context,
-                accounts = #accounts context
+                accounts = #accounts context,
+                cache = StatusCache.empty
             }
         in
             foldl (fn (lib, acc) =>
@@ -182,7 +185,8 @@ end = struct
                 rootpath = archive_root,
                 extdir = ".",
                 providers = [],
-                accounts = []
+                accounts = [],
+                cache = StatusCache.empty
             } "" ([
                      "tar",
                      case packer of

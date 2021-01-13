@@ -106,7 +106,8 @@ fun load_project (userconfig : userconfig) rootpath pintype : project =
             rootpath = rootpath,
             extdir = extdir,
             providers = providers,
-            accounts = #accounts userconfig
+            accounts = #accounts userconfig,
+            cache = StatusCache.empty
           },
           libs = map (load_libspec spec_json lock_json) libnames
         }

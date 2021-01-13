@@ -115,12 +115,20 @@ type account = {
     service : string,
     login : string
 }
-                    
+
+type status_rec = {
+    libname : libname,
+    status : string
+}
+
+type status_cache = status_rec list ref
+                  
 type context = {
     rootpath : string,
     extdir : string,
     providers : provider list,
-    accounts : account list
+    accounts : account list,
+    cache : status_cache
 }
 
 type userconfig = {
@@ -199,6 +207,37 @@ signature LIB_CONTROL = sig
     val update : context -> libspec -> unit result
     val id_of : context -> libspec -> id_or_tag result
     val is_working : context -> vcs -> bool result
+end
+
+structure StatusCache = struct
+
+    val empty : status_cache = ref []
+
+    fun lookup (lib : libname) (cache : status_cache) : string option =
+        let fun lookup' [] = NONE
+              | lookup' ({ libname, status } :: rs) =
+                if libname = lib
+                then SOME status
+                else lookup' rs
+        in
+            lookup' (! cache)
+        end
+
+    fun drop (lib : libname) (cache : status_cache) : unit =
+        let fun drop' [] = []
+              | drop' ((r as { libname, status }) :: rs) =
+                if libname = lib
+                then rs
+                else r :: drop' rs
+        in
+            cache := drop' (! cache)
+        end
+            
+    fun add (status_rec : status_rec) (cache : status_cache) : unit =
+        let val () = drop (#libname status_rec) cache
+        in
+            cache := status_rec :: (! cache)
+        end
 end
 
 structure FileBits :> sig
@@ -1237,8 +1276,19 @@ structure HgControl :> VCS_CONTROL = struct
                      modified = is_modified id,
                      branch = extract_branch branch,
                      tags = split_tags tags }
+                   
+            val status =
+                case StatusCache.lookup libname (#cache context) of
+                    SOME status => OK status
+                  | NONE =>
+                    case hg_command_output context libname ["id"] of
+                        ERROR e => ERROR e
+                      | OK status =>
+                        (StatusCache.add { libname = libname, status = status }
+                                         (#cache context);
+                         OK status)
         in        
-            case hg_command_output context libname ["id"] of
+            case status of
                 ERROR e => ERROR e
               | OK out =>
                 case String.tokens (fn x => x = #" ") out of
@@ -1281,8 +1331,20 @@ structure HgControl :> VCS_CONTROL = struct
             ERROR e => OK false (* desired branch does not exist *)
           | OK newest_in_repo => is_at context (libname, newest_in_repo)
 
+    fun is_modified_locally context libname =
+        case current_state context libname of
+            ERROR e => ERROR e
+          | OK { modified, ... } => OK modified
+
+    (* Actions below this line may in theory modify the repo, and
+       so must invalidate the status cache *)
+
+    fun invalidate context libname : unit =
+        StatusCache.drop libname (#cache context)        
+            
     fun pull context (libname, source) =
-        let val url = remote_for context (libname, source)
+        let val () = invalidate context libname
+            val url = remote_for context (libname, source)
         in
             hg_command context libname
                        (if FileBits.verbose ()
@@ -1295,17 +1357,15 @@ structure HgControl :> VCS_CONTROL = struct
             ERROR e => ERROR e
           | OK false => OK false
           | OK true =>
+            (* only this branch needs to invalidate the status cache,
+               and pull does that *)
             case pull context (libname, source) of
                 ERROR e => ERROR e
               | _ => is_newest_locally context (libname, branch)
-
-    fun is_modified_locally context libname =
-        case current_state context libname of
-            ERROR e => ERROR e
-          | OK { modified, ... } => OK modified
                 
     fun checkout context (libname, source, branch) =
-        let val url = remote_for context (libname, source)
+        let val () = invalidate context libname
+            val url = remote_for context (libname, source)
         in
             (* make the lib dir rather than just the ext dir, since
                the lib dir might be nested and hg will happily check
@@ -1318,20 +1378,26 @@ structure HgControl :> VCS_CONTROL = struct
         end
                                                     
     fun update context (libname, source, branch) =
-        let val pull_result = pull context (libname, source)
+        let (* pull invalidates the cache, as we must here *)
+            val pull_result = pull context (libname, source)
         in
             case hg_command context libname ["update", branch_name branch] of
                 ERROR e => ERROR e
               | _ =>
                 case pull_result of
                     ERROR e => ERROR e
-                  | _ => OK ()
+                  | _ =>
+                    let val () = StatusCache.drop libname (#cache context)
+                    in
+                        OK ()
+                    end
         end
 
     fun update_to context (libname, _, "") =
         ERROR "Non-empty id (tag or revision id) required for update_to"
       | update_to context (libname, source, id) = 
-        let val pull_result = pull context (libname, source)
+        let (* pull invalidates the cache, as we must here *)
+            val pull_result = pull context (libname, source)
         in
             case hg_command context libname ["update", "-r", id] of
                 OK _ => OK ()
@@ -2066,10 +2132,10 @@ structure AnyLibControl :> LIB_CONTROL = struct
     fun status context (spec as { vcs, ... } : libspec) =
         (fn HG => H.status | GIT => G.status | SVN => S.status) vcs context spec
 
-    fun update context (spec as { vcs, ... } : libspec) =
+    fun update context (spec as { libname, vcs, ... } : libspec) =
         (fn HG => H.update | GIT => G.update | SVN => S.update) vcs context spec
-
-    fun id_of context (spec as { vcs, ... } : libspec) =
+            
+    fun id_of context (spec as { libname, vcs, ... } : libspec) =
         (fn HG => H.id_of | GIT => G.id_of | SVN => S.id_of) vcs context spec
 
     fun is_working context vcs =
@@ -2135,7 +2201,8 @@ end = struct
                 rootpath = dir,
                 extdir = ".",
                 providers = [],
-                accounts = []
+                accounts = [],
+                cache = StatusCache.empty
             }
             val vcs_maybe = 
                 case [HgControl.exists context ".",
@@ -2194,7 +2261,8 @@ end = struct
                 rootpath = archive_root,
                 extdir = ".",
                 providers = [],
-                accounts = []
+                accounts = [],
+                cache = StatusCache.empty
             }
             val synthetic_library = {
                 libname = target_name,
@@ -2221,7 +2289,8 @@ end = struct
                 rootpath = archive_path archive_root target_name,
                 extdir = #extdir context,
                 providers = #providers context,
-                accounts = #accounts context
+                accounts = #accounts context,
+                cache = StatusCache.empty
             }
         in
             foldl (fn (lib, acc) =>
@@ -2262,7 +2331,8 @@ end = struct
                 rootpath = archive_root,
                 extdir = ".",
                 providers = [],
-                accounts = []
+                accounts = [],
+                cache = StatusCache.empty
             } "" ([
                      "tar",
                      case packer of
@@ -2424,7 +2494,8 @@ fun load_project (userconfig : userconfig) rootpath pintype : project =
             rootpath = rootpath,
             extdir = extdir,
             providers = providers,
-            accounts = #accounts userconfig
+            accounts = #accounts userconfig,
+            cache = StatusCache.empty
           },
           libs = map (load_libspec spec_json lock_json) libnames
         }

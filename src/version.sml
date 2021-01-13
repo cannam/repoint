@@ -3,7 +3,7 @@
 
     A simple manager for third-party source code dependencies
 
-    Copyright 2018 Chris Cannam, Particular Programs Ltd,
+    Copyright 2017-2021 Chris Cannam, Particular Programs Ltd,
     and Queen Mary, University of London
 
     Permission is hereby granted, free of charge, to any person

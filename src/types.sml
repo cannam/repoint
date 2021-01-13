@@ -73,12 +73,20 @@ type account = {
     service : string,
     login : string
 }
-                    
+
+type status_rec = {
+    libname : libname,
+    status : string
+}
+
+type status_cache = status_rec list ref
+                  
 type context = {
     rootpath : string,
     extdir : string,
     providers : provider list,
-    accounts : account list
+    accounts : account list,
+    cache : status_cache
 }
 
 type userconfig = {

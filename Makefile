@@ -7,6 +7,7 @@
 SOURCES	:= \
 	src/version.sml \
 	src/types.sml \
+	src/cache.sml \
 	src/filebits.sml \
 	src/control.sml \
 	src/sml-simplejson/json.sml \

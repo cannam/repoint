@@ -49,8 +49,19 @@ structure HgControl :> VCS_CONTROL = struct
                      modified = is_modified id,
                      branch = extract_branch branch,
                      tags = split_tags tags }
+                   
+            val status =
+                case StatusCache.lookup libname (#cache context) of
+                    SOME status => OK status
+                  | NONE =>
+                    case hg_command_output context libname ["id"] of
+                        ERROR e => ERROR e
+                      | OK status =>
+                        (StatusCache.add { libname = libname, status = status }
+                                         (#cache context);
+                         OK status)
         in        
-            case hg_command_output context libname ["id"] of
+            case status of
                 ERROR e => ERROR e
               | OK out =>
                 case String.tokens (fn x => x = #" ") out of
@@ -93,8 +104,20 @@ structure HgControl :> VCS_CONTROL = struct
             ERROR e => OK false (* desired branch does not exist *)
           | OK newest_in_repo => is_at context (libname, newest_in_repo)
 
+    fun is_modified_locally context libname =
+        case current_state context libname of
+            ERROR e => ERROR e
+          | OK { modified, ... } => OK modified
+
+    (* Actions below this line may in theory modify the repo, and
+       so must invalidate the status cache *)
+
+    fun invalidate context libname : unit =
+        StatusCache.drop libname (#cache context)        
+            
     fun pull context (libname, source) =
-        let val url = remote_for context (libname, source)
+        let val () = invalidate context libname
+            val url = remote_for context (libname, source)
         in
             hg_command context libname
                        (if FileBits.verbose ()
@@ -107,17 +130,15 @@ structure HgControl :> VCS_CONTROL = struct
             ERROR e => ERROR e
           | OK false => OK false
           | OK true =>
+            (* only this branch needs to invalidate the status cache,
+               and pull does that *)
             case pull context (libname, source) of
                 ERROR e => ERROR e
               | _ => is_newest_locally context (libname, branch)
-
-    fun is_modified_locally context libname =
-        case current_state context libname of
-            ERROR e => ERROR e
-          | OK { modified, ... } => OK modified
                 
     fun checkout context (libname, source, branch) =
-        let val url = remote_for context (libname, source)
+        let val () = invalidate context libname
+            val url = remote_for context (libname, source)
         in
             (* make the lib dir rather than just the ext dir, since
                the lib dir might be nested and hg will happily check
@@ -130,20 +151,26 @@ structure HgControl :> VCS_CONTROL = struct
         end
                                                     
     fun update context (libname, source, branch) =
-        let val pull_result = pull context (libname, source)
+        let (* pull invalidates the cache, as we must here *)
+            val pull_result = pull context (libname, source)
         in
             case hg_command context libname ["update", branch_name branch] of
                 ERROR e => ERROR e
               | _ =>
                 case pull_result of
                     ERROR e => ERROR e
-                  | _ => OK ()
+                  | _ =>
+                    let val () = StatusCache.drop libname (#cache context)
+                    in
+                        OK ()
+                    end
         end
 
     fun update_to context (libname, _, "") =
         ERROR "Non-empty id (tag or revision id) required for update_to"
       | update_to context (libname, source, id) = 
-        let val pull_result = pull context (libname, source)
+        let (* pull invalidates the cache, as we must here *)
+            val pull_result = pull context (libname, source)
         in
             case hg_command context libname ["update", "-r", id] of
                 OK _ => OK ()
