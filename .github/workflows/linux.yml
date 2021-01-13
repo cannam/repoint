@@ -1,0 +1,19 @@
+name: Linux CI
+
+on: [push, pull_request]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-16.04
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: deps
+      run: sudo apt-get install mlton smlnj libsmlnj-smlnj polyml
+    - name: prepare
+      run: make clean   # so we rebuild the aggregated repoint.sml
+    - name: make
+      run: make
+    - name: test
+      run: make test-all

@@ -1,0 +1,21 @@
+name: macOS CI
+
+on: [push, pull_request]
+
+jobs:
+  build:
+
+    runs-on: macos-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: deps
+      run: |
+        brew install mlton polyml mlkit
+        brew cask install smlnj
+    - name: prepare
+      run: make clean   # so we rebuild the aggregated repoint.sml
+    - name: make
+      run: make
+    - name: test
+      run: PATH=$(brew --prefix)/smlnj/bin:"$PATH" make test-all
