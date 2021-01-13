@@ -10,9 +10,12 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: deps
-      run: sudo apt-get install mlton smlnj libsmlnj-smlnj polyml
+      run: sudo apt-get install mlton smlnj libsmlnj-smlnj polyml libpolyml-dev
     - name: prepare
-      run: make clean   # so we rebuild the aggregated repoint.sml
+      run: |
+        git config --global user.email "nobody@example.com"
+        git config --global user.name "Nobody"
+        make clean   # so we rebuild the aggregated repoint.sml
     - name: make
       run: make
     - name: test
