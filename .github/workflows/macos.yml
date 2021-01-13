@@ -13,7 +13,7 @@ jobs:
       run: |
         # Used to have mlkit here as well, but Homebrew is refusing to
         # install it at the moment for some reason
-        brew install mlton polyml
+        brew install mercurial mlton polyml
         brew cask install smlnj
     - name: prepare
       run: |
