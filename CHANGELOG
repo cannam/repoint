@@ -1,0 +1,16 @@
+
+Changes in Repoint v1.2 (13 Jan 2021) since the previous release v1.1:
+
+ - Add status cache to speed up Mercurial usage
+ - Add SourceHut to the known remote repo providers
+ - Fix failure to create library in deep/directory/path with SML/NJ on Windows
+
+Changes in Repoint v1.1 (5 Dec 2018) since the previous release v1.0:
+
+ - Add the .repoint.point checkpoint file and --directory option,
+   enabling Repoint to be run automatically from some build systems
+
+Changes in Repoint v1.0 (18 May 2018):
+
+ - First tagged release of Repoint
+
