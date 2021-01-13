@@ -229,10 +229,11 @@ For pinned libraries:
 
 A local status will also be shown:
 
- * __Clean__: The library has no un-committed local modifications.
+ * __Clean__: The library has no un-committed local modifications of
+   tracked files.
 
- * __Modified__: The library has local modifications that have not
-   been committed.
+ * __Modified__: The library has local modifications of tracked
+   files that have not been committed.
 
  * __Differs from Lock__: The library is checked out at a version that
    differs from the one listed in the `repoint-lock.json` file. Either

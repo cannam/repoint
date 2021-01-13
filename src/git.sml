@@ -152,7 +152,9 @@ structure GitControl :> VCS_CONTROL = struct
                   | _ => is_newest_locally context (libname, branch)
 
     fun is_modified_locally context libname =
-        case git_command_output context libname ["status", "--porcelain"] of
+        case git_command_output context libname
+                                ["status", "--porcelain",
+                                 "--untracked-files=no" ] of
             ERROR e => ERROR e
           | OK "" => OK false
           | OK _ => OK true

@@ -1,6 +1,9 @@
 
 Changes in Repoint v1.2 (13 Jan 2021) since the previous release v1.1:
 
+ - Explicitly ignore untracked files when generating Clean/Modified
+   status labels: this was already the case for Mercurial, but not
+   previously for Git or Subversion
  - Add status cache to speed up Mercurial usage
  - Add SourceHut to the known remote repo providers
  - Fix failure to create library in deep/directory/path with SML/NJ on Windows

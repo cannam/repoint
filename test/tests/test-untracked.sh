@@ -27,9 +27,17 @@ for task in status review ; do
     assert_local_outputs $task "Clean Clean Clean"
 done
 
-echo "modified" > ext/A/file.txt
-echo "modified-b" > ext/B/file-b.txt
-echo "modified-c" > ext/C/file-c.txt
+echo "new" > ext/A/new.txt
+echo "new-b" > ext/B/new-b.txt
+echo "new-c" > ext/C/new-c.txt
+
+for task in status review ; do
+    assert_local_outputs $task "Clean Clean Clean"
+done
+
+( cd ext/A ; hg add new.txt )
+( cd ext/B ; git add new-b.txt )
+( cd ext/C ; svn add new-c.txt )
 
 for task in status review ; do
     assert_local_outputs $task "Modified Modified Modified"
