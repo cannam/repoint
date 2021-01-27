@@ -344,7 +344,7 @@ fun usage () =
     (print "\nRepoint ";
      version ();
      print ("\n  A simple manager for third-party source code dependencies.\n"
-            ^ "  http://all-day-breakfast.com/repoint/\n\n"
+            ^ "  https://all-day-breakfast.com/repoint/\n\n"
             ^ "Usage:\n\n"
             ^ "  repoint <command> [<options>]\n\n"
             ^ "where <command> is one of:\n\n"
