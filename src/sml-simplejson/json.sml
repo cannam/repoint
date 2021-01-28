@@ -1,6 +1,6 @@
 
 (* Simple Standard ML JSON parser
-   https://bitbucket.org/cannam/sml-simplejson
+   https://hg.sr.ht/~cannam/sml-simplejson
    Copyright 2017 Chris Cannam. BSD licence.
    Parts based on the JSON parser in the Ponyo library by Phil Eaton.
 *)

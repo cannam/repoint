@@ -14,5 +14,6 @@ test/testrepos/C2
 test/testrepos/C2_checkout
 test/testrepos/source
 .repoint*.bin
+.repoint.pid
 *.orig
 MLB/

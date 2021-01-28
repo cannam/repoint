@@ -1,23 +1,37 @@
 
 (* SubXml - A parser for a subset of XML
-   https://bitbucket.org/cannam/sml-subxml
-   Copyright 2018 Chris Cannam. BSD licence.
+   https://hg.sr.ht/~cannam/sml-subxml
+   Copyright 2018-2021 Chris Cannam. BSD licence.
 *)
 
+(** Parser and serialiser for a format resembling XML. This can be
+    used as a minimal parser for small XML configuration or
+    interchange files. The format supported consists of the element,
+    attribute, text, CDATA, and comment syntax from XML, and is always
+    UTF-8 encoded.
+*)
 signature SUBXML = sig
 
+    (** Node type, akin to XML DOM node. *)
     datatype node = ELEMENT of { name : string, children : node list }
                   | ATTRIBUTE of { name : string, value : string }
                   | TEXT of string
                   | CDATA of string
                   | COMMENT of string
 
+    (** Document type, akin to XML DOM. *)
     datatype document = DOCUMENT of { name : string, children : node list }
 
     datatype 'a result = OK of 'a
                        | ERROR of string
 
+    (** Parse a UTF-8 encoded XML-like document and return a document
+        structure, or an error message if the document could not be
+        parsed. *)
     val parse : string -> document result
+
+    (** Serialise a document structure into a UTF-8 encoded XML-like
+        document. *)
     val serialise : document -> string
                                   
 end
@@ -67,7 +81,66 @@ structure SubXml :> SUBXML = struct
         fun tokenError pos token =
             error pos ("Unexpected token '" ^ Char.toString token ^ "'")
 
-        val nameEnd = explode " \t\n\r\"'</>!=?"
+        val nameEnd = explode " \t\n\r\"'</>!=?&"
+
+        fun numChar n =
+            let open Word
+                infix 6 orb andb >>
+                fun chars ww = SOME (map (Char.chr o toInt) ww)
+                val c = fromInt n
+            in
+                if c < 0wx80 then
+                    chars [c]
+                else if c < 0wx800 then
+                    chars [0wxc0 orb (c >> 0w6),
+                           0wx80 orb (c andb 0wx3f)]
+                else if c < 0wx10000 then
+                    chars [0wxe0 orb (c >> 0w12),
+                           0wx80 orb ((c >> 0w6) andb 0wx3f),
+                           0wx80 orb (c andb 0wx3f)]
+                else if c < 0wx10ffff then
+	            chars [0wxf0 orb (c >> 0w18),
+	                   0wx80 orb ((c >> 0w12) andb 0wx3f),
+                           0wx80 orb ((c >> 0w6) andb 0wx3f),
+                           0wx80 orb (c andb 0wx3f)]
+                else NONE
+            end
+
+        fun hexChar h =
+            Option.mapPartial numChar
+                              (StringCvt.scanString (Int.scan StringCvt.HEX) h)
+
+        fun decChar d =
+            Option.mapPartial numChar
+                              (Int.fromString d)
+                
+        fun entity pos cc =
+            let fun entity' decoder pos text [] =
+                    error pos "Document ends during hex character entity"
+                  | entity' decoder pos text (c :: rest) =
+                    if c <> #";"
+                    then entity' decoder (pos+1) (c :: text) rest
+                    else case decoder (implode (rev text)) of
+                             NONE => error pos "Invalid character entity"
+                           | SOME chars => OK (chars, rest, pos+1)
+            in
+                case cc of
+                    #"q" :: #"u" :: #"o" :: #"t" :: #";" :: rest =>
+                    OK ([#"\""], rest, pos+5)
+                  | #"a" :: #"m" :: #"p" :: #";" :: rest =>
+                    OK ([#"&"], rest, pos+4)
+                  | #"a" :: #"p" :: #"o" :: #"s" :: #";" :: rest =>
+                    OK ([#"'"], rest, pos+5)
+                  | #"l" :: #"t" :: #";" :: rest =>
+                    OK ([#"<"], rest, pos+3)
+                  | #"g" :: #"t" :: #";" :: rest => 
+                    OK ([#">"], rest, pos+3)
+                  | #"#" :: #"x" :: rest =>
+                    entity' hexChar (pos+2) [] rest
+                  | #"#" :: rest =>
+                    entity' decChar (pos+1) [] rest
+                  | _ => error pos "Invalid entity"
+            end
                               
         fun quoted quote pos acc cc =
             let fun quoted' pos text [] =
@@ -75,6 +148,11 @@ structure SubXml :> SUBXML = struct
                   | quoted' pos text (x::xs) =
                     if x = quote
                     then OK (rev text, xs, pos+1)
+                    else if x = #"&"
+                    then case entity (pos+1) xs of
+                             ERROR e => ERROR e
+                           | OK (chars, rest, newpos) =>
+                             quoted' newpos (rev chars @ text) rest
                     else quoted' (pos+1) (x::text) xs
             in
                 case quoted' pos [] cc of
@@ -176,6 +254,10 @@ structure SubXml :> SUBXML = struct
                         #"<" => if text = []
                                 then left (pos+1) acc xs
                                 else left (pos+1) (textOf text :: acc) xs
+                      | #"&" => (case entity (pos+1) xs of
+                                     ERROR e => ERROR e
+                                   | OK (chars, rest, newpos) =>
+                                     outside' newpos (rev chars @ text) acc rest)
                       | x => outside' (pos+1) (x::text) acc xs
             in
                 outside' pos [] acc cc
@@ -304,17 +386,25 @@ structure SubXml :> SUBXML = struct
                 (map node (List.filter
                                (fn ATTRIBUTE _ => false | _ => true)
                                nodes))
+
+        and encode text =
+            String.translate (fn #"\"" => "&quot;"
+                             | #"&" => "&amp;"
+                             | #"'" => "&apos;"
+                             | #"<" => "&lt;"
+                             | #">" => "&gt;"
+                             | c => str c) text
                 
         and node n =
             case n of
                 TEXT string =>
-                string
+                encode string
               | CDATA string =>
                 "<![CDATA[" ^ string ^ "]]>"
               | COMMENT string =>
-                "<!-- " ^ string ^ "-->"
+                "<!--" ^ string ^ "-->"
               | ATTRIBUTE { name, value } =>
-                name ^ "=" ^ "\"" ^ value ^ "\"" (*!!!*)
+                name ^ "=" ^ "\"" ^ encode value ^ "\""
               | ELEMENT { name, children } =>
                 "<" ^ name ^
                 (case (attributes children) of
