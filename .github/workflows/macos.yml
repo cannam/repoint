@@ -14,7 +14,7 @@ jobs:
         # Used to have mlkit here as well, but Homebrew is refusing to
         # install it at the moment for some reason
         brew install mercurial mlton polyml
-        brew cask install smlnj
+        brew install --cask smlnj
     - name: prepare
       run: |
         git config --global user.email "nobody@example.com"
