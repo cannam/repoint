@@ -16,13 +16,27 @@ structure FileBits :> sig
     val project_lock_path : string -> string
     val project_completion_path : string -> string
     val verbose : unit -> bool
+    val insecure : unit -> bool
 end = struct
 
     fun verbose () =
         case OS.Process.getEnv "REPOINT_VERBOSE" of
             SOME "0" => false
-          | SOME _ => true
           | NONE => false
+          | _ => true
+
+    val insecure_warned = ref false
+			
+    fun insecure () =
+        case OS.Process.getEnv "REPOINT_INSECURE" of
+            SOME "0" => false
+          | NONE => false
+          | _ =>
+	    (if ! insecure_warned (* deref not negate, so "if we have warned" *)
+	     then ()
+	     else (print "Warning: Insecure mode active in environment, skipping security checks\n";
+		   insecure_warned := true);
+	     true)
 
     fun split_relative path desc =
         case OS.Path.fromString path of

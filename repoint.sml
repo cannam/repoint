@@ -257,13 +257,27 @@ structure FileBits :> sig
     val project_lock_path : string -> string
     val project_completion_path : string -> string
     val verbose : unit -> bool
+    val insecure : unit -> bool
 end = struct
 
     fun verbose () =
         case OS.Process.getEnv "REPOINT_VERBOSE" of
             SOME "0" => false
-          | SOME _ => true
           | NONE => false
+          | _ => true
+
+    val insecure_warned = ref false
+			
+    fun insecure () =
+        case OS.Process.getEnv "REPOINT_INSECURE" of
+            SOME "0" => false
+          | NONE => false
+          | _ =>
+	    (if ! insecure_warned (* deref not negate, so "if we have warned" *)
+	     then ()
+	     else (print "Warning: Insecure mode active in environment, skipping security checks\n";
+		   insecure_warned := true);
+	     true)
 
     fun split_relative path desc =
         case OS.Path.fromString path of
@@ -1239,6 +1253,10 @@ structure HgControl :> VCS_CONTROL = struct
                         
     val hg_args = [ "--config", "ui.interactive=true",
                     "--config", "ui.merge=:merge" ]
+
+    val hg_extra_clone_pull_args = if FileBits.insecure ()
+				   then [ "--insecure" ]
+				   else []
                         
     fun hg_command context libname args =
         FileBits.command context libname (hg_program :: hg_args @ args)
@@ -1347,9 +1365,10 @@ structure HgControl :> VCS_CONTROL = struct
             val url = remote_for context (libname, source)
         in
             hg_command context libname
-                       (if FileBits.verbose ()
-                        then ["pull", url]
-                        else ["pull", "-q", url])
+                       ((if FileBits.verbose ()
+                         then ["pull", url]
+                         else ["pull", "-q", url])
+			@ hg_extra_clone_pull_args)
         end
 
     fun is_newest context (libname, source, branch) =
@@ -1373,8 +1392,8 @@ structure HgControl :> VCS_CONTROL = struct
             case FileBits.mkpath (FileBits.libpath context libname) of
                 ERROR e => ERROR e
               | _ => hg_command context ""
-                                ["clone", "-u", branch_name branch,
-                                 url, libname]
+                                (["clone", "-u", branch_name branch,
+                                  url, libname] @ hg_extra_clone_pull_args)
         end
                                                     
     fun update context (libname, source, branch) =
