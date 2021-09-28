@@ -38,7 +38,7 @@
     authorization.
 *)
 
-val repoint_version = "1.2"
+val repoint_version = "1.3"
 
 
 datatype vcs =
@@ -2618,17 +2618,39 @@ fun load_project (userconfig : userconfig) rootpath pintype : project =
         }
     end
 
-fun save_lock_file rootpath locks =
+fun make_lock_properties locks = 
+    map (fn { libname, id_or_tag } =>
+            (libname, Json.OBJECT [ ("pin", Json.STRING id_or_tag) ]))
+        locks
+
+fun make_lock_json_from_properties properties =
+    Json.OBJECT [ (libobjname, Json.OBJECT properties) ]
+
+fun make_lock_json locks =
+    make_lock_json_from_properties (make_lock_properties locks)
+        
+fun save_lock_file_afresh rootpath locks =
     let val lock_file = FileBits.project_lock_path rootpath
-        open Json
-        val lock_json =
-            OBJECT [
-                (libobjname,
-                 OBJECT (map (fn { libname, id_or_tag } =>
-                                 (libname,
-                                  OBJECT [ ("pin", STRING id_or_tag) ]))
-                             locks))
-            ]
+        val lock_json = make_lock_json locks
+    in
+        JsonBits.save_json_to lock_file lock_json
+    end
+
+fun save_lock_file_updating rootpath locks =
+    let val lock_file = FileBits.project_lock_path rootpath
+        val prior_lock_json = JsonBits.load_json_from lock_file
+                              handle IO.Io _ => Json.OBJECT []
+        val new_lock_properties = make_lock_properties locks
+        val filtered_prior_properties =
+            case prior_lock_json of
+                Json.OBJECT [ (_, Json.OBJECT properties) ] =>
+                List.filter (fn (e, _) =>
+                                not (List.exists (fn (e', _) => e = e')
+                                                 new_lock_properties))
+                            properties
+              | _ => []
+        val lock_json = make_lock_json_from_properties
+                            (filtered_prior_properties @ new_lock_properties)
     in
         JsonBits.save_json_to lock_file lock_json
     end
@@ -2774,12 +2796,14 @@ fun review_project ({ context, libs } : project) =
                                    print_status_header (print_status true)
                                    context libs)
 
-fun lock_project ({ context, libs } : project) =
+fun lock_project (update_only : libspec list option)
+                 ({ context, libs } : project) =
     let val _ = if FileBits.verbose ()
                 then print ("Scanning IDs for lock file...\n")
                 else ()
+        val to_update = Option.getOpt (update_only, libs)
         val outcomes = map (fn lib => (lib, AnyLibControl.id_of context lib))
-                           libs
+                           to_update
         val locks =
             List.concat
                 (map (fn (lib : libspec, result) =>
@@ -2792,7 +2816,9 @@ fun lock_project ({ context, libs } : project) =
         val _ = print clear_line
     in
         if OS.Process.isSuccess return_code
-        then save_lock_file (#rootpath context) locks
+        then (if Option.isSome update_only
+              then save_lock_file_updating
+              else save_lock_file_afresh) (#rootpath context) locks
         else ();
         return_code
     end
@@ -2802,9 +2828,11 @@ fun update_project (project as { context, libs }) =
                            (AnyLibControl.update context)
                            print_outcome_header print_update_outcome
                            context libs
-        val _ = if List.exists (fn (_, OK _) => true | _ => false) outcomes
-                then lock_project project
-                else OS.Process.success
+        val successes = List.filter (fn (_, OK _) => true | _ => false)
+                                    outcomes
+        val _ = if null successes
+                then OS.Process.success (* ignored *)
+                else lock_project (SOME (map #1 successes)) project
         val return_code = return_code_for outcomes
     in
         if OS.Process.isSuccess return_code
@@ -2838,7 +2866,7 @@ fun with_local_project pintype f =
 fun review () = with_local_project USE_LOCKFILE review_project
 fun status () = with_local_project USE_LOCKFILE status_of_project
 fun update () = with_local_project NO_LOCKFILE update_project
-fun lock () = with_local_project NO_LOCKFILE lock_project
+fun lock () = with_local_project NO_LOCKFILE (lock_project NONE)
 fun install () = with_local_project USE_LOCKFILE update_project
 
 fun version () =
