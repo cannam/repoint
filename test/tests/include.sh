@@ -41,6 +41,10 @@ write_project_file_with_extpath() {
 	"testfile": {
 	    "vcs": ["hg", "git", "svn"],
 	    "anonymous": "file://$testrepopath/{repository}"
+	},
+        "failing-localhost": {
+            "vcs": ["hg", "git", "svn"],
+	    "anonymous": "http://127.0.0.1:22/{repository}"
 	}
     },
     "libraries": {
@@ -53,6 +57,36 @@ EOF
 write_project_file() {
     write_project_file_with_extpath "ext" "$@"
 }
+
+check_expected_lockfile() {
+    echo "Checking lockfile pin IDs against expected values..."
+    local id_A="$1"
+    local id_B="$2"
+    local id_C="$3"
+    cat > expected-lock.json <<EOF
+{
+  "libraries": {
+    "A": {
+      "pin": "$id_A"
+    },
+    "B": {
+      "pin": "$id_B"
+    },
+    "C": {
+      "pin": "$id_C"
+    }
+  }
+}
+EOF
+    if cmp -s repoint-lock.json expected-lock.json ; then
+        echo OK
+    else
+        echo "ERROR: Contents of repoint-lock.json does not match expected"
+        echo "Diff follows (repoint-lock.json on left, expected on right):"
+        sdiff -w120 repoint-lock.json expected-lock.json
+        exit 3
+    fi
+}    
 
 check_expected_with_extpath() {
     echo "Checking external repo IDs against expected values..."
@@ -77,29 +111,7 @@ check_expected_with_extpath() {
         echo "ERROR: id for repo C ($actual_id_C) does not match expected ($id_C)"
         exit 3
     fi
-    cat > expected-lock.json <<EOF
-{
-  "libraries": {
-    "A": {
-      "pin": "$id_A"
-    },
-    "B": {
-      "pin": "$id_B"
-    },
-    "C": {
-      "pin": "$id_C"
-    }
-  }
-}
-EOF
-    if cmp -s repoint-lock.json expected-lock.json ; then
-        echo OK
-    else
-        echo "ERROR: Contents of repoint-lock.json does not match expected"
-        echo "Diff follows (repoint-lock.json on left, expected on right):"
-        sdiff -w120 repoint-lock.json expected-lock.json
-        exit 3
-    fi
+    check_expected_lockfile "$id_A" "$id_B" "$id_C"
 }
 
 check_expected() {
