@@ -136,16 +136,24 @@ fun save_lock_file_updating rootpath locks =
         val prior_lock_json = JsonBits.load_json_from lock_file
                               handle IO.Io _ => Json.OBJECT []
         val new_lock_properties = make_lock_properties locks
-        val filtered_prior_properties =
+        val updated_prior_properties =
             case prior_lock_json of
                 Json.OBJECT [ (_, Json.OBJECT properties) ] =>
-                List.filter (fn (e, _) =>
-                                not (List.exists (fn (e', _) => e = e')
-                                                 new_lock_properties))
-                            properties
+                map (fn (entry as (lib, _)) =>
+                        case List.find (fn (lib', _) => lib = lib')
+                                       new_lock_properties of
+                            NONE => entry
+                          | SOME updated => updated)
+                    properties
               | _ => []
-        val lock_json = make_lock_json_from_properties
-                            (filtered_prior_properties @ new_lock_properties)
+        val filtered_new_properties =
+            List.filter (fn (lib, _) =>
+                            not (List.exists (fn (lib', _) => lib = lib')
+                                             updated_prior_properties))
+                        new_lock_properties
+        val lock_json =
+            make_lock_json_from_properties
+                (updated_prior_properties @ filtered_new_properties)
     in
         JsonBits.save_json_to lock_file lock_json
     end
@@ -326,7 +334,7 @@ fun update_project (project as { context, libs }) =
         val successes = List.filter (fn (_, OK _) => true | _ => false)
                                     outcomes
         val _ = if null successes
-                then OS.Process.success (* ignored *)
+                then OS.Process.success (* ignored, not the return value *)
                 else lock_project (SOME (map #1 successes)) project
         val return_code = return_code_for outcomes
     in
