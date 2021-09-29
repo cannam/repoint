@@ -308,7 +308,16 @@ structure Json :> JSON = struct
         in
             implode (escape' [] (explode s))
         end
-        
+
+    fun serialiseNumber n =
+        implode (map (fn #"~" => #"-" | c => c)
+                     (explode
+                          (if Real.isFinite n andalso
+                              Real.== (n, Real.realRound n) andalso
+                              Real.<= (Real.abs n, 1e6)
+                           then Int.toString (Real.round n)
+                           else Real.toString n)))
+            
     fun serialise json =
         case json of
             OBJECT pp => "{" ^ String.concatWith
@@ -317,8 +326,7 @@ structure Json :> JSON = struct
                                                 serialise value) pp) ^
                          "}"
           | ARRAY arr => "[" ^ String.concatWith "," (map serialise arr) ^ "]"
-          | NUMBER n => implode (map (fn #"~" => #"-" | c => c) 
-                                     (explode (Real.toString n)))
+          | NUMBER n => serialiseNumber n
           | STRING s => "\"" ^ stringEscape s ^ "\""
           | BOOL b => Bool.toString b
           | NULL => "null"

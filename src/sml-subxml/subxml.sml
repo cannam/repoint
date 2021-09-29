@@ -116,7 +116,7 @@ structure SubXml :> SUBXML = struct
                 
         fun entity pos cc =
             let fun entity' decoder pos text [] =
-                    error pos "Document ends during hex character entity"
+                    error pos "Document ends during character entity"
                   | entity' decoder pos text (c :: rest) =
                     if c <> #";"
                     then entity' decoder (pos+1) (c :: text) rest

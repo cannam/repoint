@@ -968,7 +968,16 @@ structure Json :> JSON = struct
         in
             implode (escape' [] (explode s))
         end
-        
+
+    fun serialiseNumber n =
+        implode (map (fn #"~" => #"-" | c => c)
+                     (explode
+                          (if Real.isFinite n andalso
+                              Real.== (n, Real.realRound n) andalso
+                              Real.<= (Real.abs n, 1e6)
+                           then Int.toString (Real.round n)
+                           else Real.toString n)))
+            
     fun serialise json =
         case json of
             OBJECT pp => "{" ^ String.concatWith
@@ -977,8 +986,7 @@ structure Json :> JSON = struct
                                                 serialise value) pp) ^
                          "}"
           | ARRAY arr => "[" ^ String.concatWith "," (map serialise arr) ^ "]"
-          | NUMBER n => implode (map (fn #"~" => #"-" | c => c) 
-                                     (explode (Real.toString n)))
+          | NUMBER n => serialiseNumber n
           | STRING s => "\"" ^ stringEscape s ^ "\""
           | BOOL b => Bool.toString b
           | NULL => "null"
@@ -1756,7 +1764,7 @@ structure SubXml :> SUBXML = struct
                 
         fun entity pos cc =
             let fun entity' decoder pos text [] =
-                    error pos "Document ends during hex character entity"
+                    error pos "Document ends during character entity"
                   | entity' decoder pos text (c :: rest) =
                     if c <> #";"
                     then entity' decoder (pos+1) (c :: text) rest
