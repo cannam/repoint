@@ -38,7 +38,7 @@
     authorization.
 *)
 
-val repoint_version = "1.3"
+val repoint_version = "1.4"
 
 
 datatype vcs =
@@ -72,7 +72,7 @@ datatype localstate =
          CLEAN
 
 datatype branch =
-         BRANCH of string |
+         BRANCH of string |  (* Non-empty *)
          DEFAULT_BRANCH
              
 (* If we can recover from an error, for example by reporting failure
@@ -1469,14 +1469,48 @@ structure GitControl :> VCS_CONTROL = struct
     fun remote_for context (libname, source) =
         Provider.remote_url context GIT source libname
 
-    fun branch_name branch = case branch of
-                                 DEFAULT_BRANCH => "master"
-                               | BRANCH "" => "master"
-                               | BRANCH b => b
-
     val our_remote = "repoint"
-                                                 
-    fun remote_branch_name branch = our_remote ^ "/" ^ branch_name branch
+    val fallback_default_branch = "master" (* only if it can't be determined *)
+                                        
+    fun remote_branch_name context (libname, branch) =
+        case branch of
+            BRANCH b => our_remote ^ "/" ^ b
+          | DEFAULT_BRANCH =>
+            let val headfile = FileBits.subpath
+                                   context libname
+                                   (".git/refs/remotes/" ^ our_remote ^ "/HEAD")
+                val headspec = FileBits.file_contents headfile
+            in
+                case String.tokens (fn c => c = #" ") headspec of
+                    ["ref:", refpath] =>
+                    (case String.fields (fn c => c = #"/") refpath of
+                         "refs" :: "remotes" :: _ :: rest =>
+                         let val branch = String.concatWith "/" rest
+                         in
+                             if FileBits.verbose ()
+                             then print ("\nRetrieved default branch from file "
+                                         ^ headfile ^ ": \"" ^ branch ^ "\"\n")
+                             else ();
+                             branch
+                         end
+                       | _ =>
+                         (if FileBits.verbose ()
+                          then print ("\nUnable to extract default branch from "
+                                      ^ "HEAD ref \"" ^ refpath ^ "\"\n")
+                          else ();
+                          fallback_default_branch))
+                  | _ =>
+                    (if FileBits.verbose ()
+                     then print ("\nUnable to extract HEAD ref from \""
+                                 ^ headspec ^ "\"\n")
+                     else ();
+                     fallback_default_branch)
+            end
+            handle IO.Io _ =>
+                    (if FileBits.verbose ()
+                     then print ("\nUnable to read HEAD ref file\n")
+                     else ();
+                     fallback_default_branch)
 
     fun checkout context (libname, source, branch) =
         let val url = remote_for context (libname, source)
@@ -1491,9 +1525,9 @@ structure GitControl :> VCS_CONTROL = struct
                                  DEFAULT_BRANCH =>
                                  ["clone", "--origin", our_remote,
                                   url, libname]
-                               | _ => 
+                               | BRANCH b => 
                                  ["clone", "--origin", our_remote,
-                                  "--branch", branch_name branch,
+                                  "--branch", b,
                                   url, libname])
               | ERROR e => ERROR e
         end
@@ -1559,7 +1593,8 @@ structure GitControl :> VCS_CONTROL = struct
            instead could produce the wrong result. *)
         git_command_output context libname
                            ["rev-list", "-1",
-                            remote_branch_name branch, "--"]
+                            remote_branch_name context (libname, branch),
+                            "--"]
                        
     fun is_newest_locally context (libname, branch) =
         case branch_tip context (libname, branch) of
@@ -1576,7 +1611,9 @@ structure GitControl :> VCS_CONTROL = struct
               | OK false =>
                 case git_command context libname
                                  ["merge-base", "--is-ancestor",
-                                  "HEAD", remote_branch_name branch] of
+                                  "HEAD",
+                                  remote_branch_name context (libname, branch)
+                                 ] of
                     ERROR e => OK false  (* cmd returns non-zero for no *)
                   | _ => OK true
 
@@ -1616,8 +1653,9 @@ structure GitControl :> VCS_CONTROL = struct
         case fetch context (libname, source) of
             ERROR e => ERROR e
           | _ =>
-            case git_command context libname ["checkout", "--detach",
-                                              remote_branch_name branch] of
+            case git_command context libname
+                             ["checkout", "--detach",
+                              remote_branch_name context (libname, branch)] of
                 ERROR e => ERROR e
               | _ => OK ()
 
@@ -2551,6 +2589,7 @@ fun load_libspec spec_json lock_json libname : libspec =
           lock_pin = lock_pin,
           branch = case branch of
                        NONE => DEFAULT_BRANCH
+                     | SOME "" => DEFAULT_BRANCH
                      | SOME b => 
                        case vcs of
                            "svn" => raise Fail ("Branches not supported for " ^

@@ -30,7 +30,7 @@ datatype localstate =
          CLEAN
 
 datatype branch =
-         BRANCH of string |
+         BRANCH of string |  (* Non-empty *)
          DEFAULT_BRANCH
              
 (* If we can recover from an error, for example by reporting failure
