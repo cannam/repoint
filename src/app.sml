@@ -250,11 +250,15 @@ fun print_problem_summary context lines =
             foldl (fn (({ vcs, ... } : libspec, ERROR _), acc) => vcs::acc
                   | (_, acc) => acc) [] lines
         fun report_nonworking vcs error =
-            print ((if error = "" then "" else error ^ "\n\n") ^
-                   "Error: The project uses the " ^ (#1 (vcs_name vcs)) ^
-                   " version control system, but its\n" ^
-                   "executable program (" ^ (#2 (vcs_name vcs)) ^
-                   ") does not appear to be installed in the program path\n\n")
+            (print ((if error = "" then "" else error ^ "\n\n") ^
+                    "Error: The project uses the " ^ (#1 (vcs_name vcs)) ^
+                    " version control system, but its\n" ^
+                    "executable program (" ^ (#2 (vcs_name vcs)) ^
+                    ") does not appear to be installed or cannot be run.\n\n");
+             case (FileBits.verbose (), OS.Process.getEnv "PATH") of
+                 (true, SOME path) =>
+                 print ("The PATH variable is: " ^ path ^ "\n\n")
+               | _ => ())
         fun check_working [] checked = ()
           | check_working (vcs::rest) checked =
             if List.exists (fn v => vcs = v) checked
