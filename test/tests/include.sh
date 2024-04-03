@@ -15,7 +15,7 @@ prepare() {
         exit 2
     fi
     cd "$mydir" && rm -rf "$current" && mkdir -p "$current" && cd "$current"
-    for testrepo in A B C; do
+    for testrepo in A B Bmain C; do
         if [ ! -d ../../testrepos/$testrepo ]; then
             ( cd ../../testrepos
               tar xf $testrepo.tar.gz
