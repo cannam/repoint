@@ -32,10 +32,13 @@ structure GitControl :> VCS_CONTROL = struct
     val our_remote = "repoint"
     val fallback_default_branch = "master" (* only if it can't be determined *)
                                         
-    fun remote_branch_name context (libname, branch) =
-        case branch of
-            BRANCH b => our_remote ^ "/" ^ b
-          | DEFAULT_BRANCH =>
+    fun default_branch_name context libname =
+        let fun return_fallback msg =
+                (if FileBits.verbose ()
+                 then print ("\n" ^ msg ^ "\n")
+                 else ();
+                 fallback_default_branch)
+        in
             let val headfile = FileBits.subpath
                                    context libname
                                    (".git/refs/remotes/" ^ our_remote ^ "/HEAD")
@@ -45,52 +48,24 @@ structure GitControl :> VCS_CONTROL = struct
                     ["ref:", refpath] =>
                     (case String.fields (fn c => c = #"/") refpath of
                          "refs" :: "remotes" :: _ :: rest =>
-                         let val branch = String.concatWith "/" rest
-                         in
-                             if FileBits.verbose ()
-                             then print ("\nRetrieved default branch from file "
-                                         ^ headfile ^ ": \"" ^ branch ^ "\"\n")
-                             else ();
-                             branch
-                         end
+                         String.concatWith "/" rest
                        | _ =>
-                         (if FileBits.verbose ()
-                          then print ("\nUnable to extract default branch from "
-                                      ^ "HEAD ref \"" ^ refpath ^ "\"\n")
-                          else ();
-                          fallback_default_branch))
+                         return_fallback
+                             ("Unable to extract default branch from "
+                              ^ "HEAD ref \"" ^ refpath ^ "\""))
                   | _ =>
-                    (if FileBits.verbose ()
-                     then print ("\nUnable to extract HEAD ref from \""
-                                 ^ headspec ^ "\"\n")
-                     else ();
-                     fallback_default_branch)
+                    return_fallback ("Unable to extract HEAD ref from \""
+                                     ^ headspec ^ "\"")
             end
             handle IO.Io _ =>
-                    (if FileBits.verbose ()
-                     then print ("\nUnable to read HEAD ref file\n")
-                     else ();
-                     fallback_default_branch)
-
-    fun checkout context (libname, source, branch) =
-        let val url = remote_for context (libname, source)
-        in
-            (* make the lib dir rather than just the ext dir, since
-               the lib dir might be nested and git will happily check
-               out into an existing empty dir anyway *)
-            case FileBits.mkpath (FileBits.libpath context libname) of
-                OK () =>
-                git_command context ""
-                            (case branch of
-                                 DEFAULT_BRANCH =>
-                                 ["clone", "--origin", our_remote,
-                                  url, libname]
-                               | BRANCH b => 
-                                 ["clone", "--origin", our_remote,
-                                  "--branch", b,
-                                  url, libname])
-              | ERROR e => ERROR e
+                   return_fallback "Unable to read HEAD ref file"
         end
+            
+    fun remote_branch_name context (libname, branch) =
+        our_remote ^ "/" ^
+        (case branch of
+            BRANCH b => b
+          | DEFAULT_BRANCH => default_branch_name context libname)
 
     fun add_our_remote context (libname, source) =
         (* When we do the checkout ourselves (above), we add the
@@ -238,6 +213,22 @@ structure GitControl :> VCS_CONTROL = struct
                 case fetch_result of
                     ERROR e' => ERROR e' (* this was the ur-error *)
                   | _ => ERROR e
+        end
+
+    fun checkout context (libname, source, branch) =
+        let val url = remote_for context (libname, source)
+        in
+            (* make the lib dir rather than just the ext dir, since
+               the lib dir might be nested and git will happily check
+               out into an existing empty dir anyway *)
+            case FileBits.mkpath (FileBits.libpath context libname) of
+                ERROR e => ERROR e
+              | OK () =>
+                case git_command context "" ["clone", "--origin", our_remote,
+                                             url, libname] of
+                    ERROR e => ERROR e
+                  | OK () =>
+                    update context (libname, source, branch)
         end
 
     fun copy_url_for context libname =
