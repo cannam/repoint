@@ -149,8 +149,9 @@ signature VCS_CONTROL = sig
         local copy of the library already exists *)
     val update : context -> libname * source * branch -> unit result
 
-    (** Update the library to the given specific id or tag *)
-    val update_to : context -> libname * source * id_or_tag -> unit result
+    (** Update the library to the given specific id or tag,
+        understanding that we are expected to be on the given branch *)
+    val update_to : context -> libname * source * branch * id_or_tag -> unit result
 
     (** Return a URL from which the library can be cloned, given that
         the local copy already exists. For a DVCS this can be the

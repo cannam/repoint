@@ -91,7 +91,7 @@ functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
                 case V.is_at context (libname, target) of
                     ERROR e => ERROR e
                   | OK true => OK ()
-                  | OK false => V.update_to context (libname, source, target)
+                  | OK false => V.update_to context (libname, source, branch, target)
             fun update' () =
                 case lock_pin of
                     PINNED target => update_pinned target

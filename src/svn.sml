@@ -155,9 +155,9 @@ structure SvnControl :> VCS_CONTROL = struct
                 ERROR e => ERROR e
               | _ => OK ()
 
-    fun update_to context (libname, _, "") =
+    fun update_to context (libname, _, _, "") =
         ERROR "Non-empty id (tag or revision id) required for update_to"
-      | update_to context (libname, source, id) = 
+      | update_to context (libname, source, _, id) = 
         case check_remote context (libname, source) of
             ERROR e => ERROR e
           | OK () => 

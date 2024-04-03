@@ -191,8 +191,9 @@ signature VCS_CONTROL = sig
         local copy of the library already exists *)
     val update : context -> libname * source * branch -> unit result
 
-    (** Update the library to the given specific id or tag *)
-    val update_to : context -> libname * source * id_or_tag -> unit result
+    (** Update the library to the given specific id or tag,
+        understanding that we are expected to be on the given branch *)
+    val update_to : context -> libname * source * branch * id_or_tag -> unit result
 
     (** Return a URL from which the library can be cloned, given that
         the local copy already exists. For a DVCS this can be the
@@ -633,7 +634,7 @@ functor LibControlFn (V: VCS_CONTROL) :> LIB_CONTROL = struct
                 case V.is_at context (libname, target) of
                     ERROR e => ERROR e
                   | OK true => OK ()
-                  | OK false => V.update_to context (libname, source, target)
+                  | OK false => V.update_to context (libname, source, branch, target)
             fun update' () =
                 case lock_pin of
                     PINNED target => update_pinned target
@@ -1421,9 +1422,9 @@ structure HgControl :> VCS_CONTROL = struct
                     end
         end
 
-    fun update_to context (libname, _, "") =
+    fun update_to context (libname, _, _, "") =
         ERROR "Non-empty id (tag or revision id) required for update_to"
-      | update_to context (libname, source, id) = 
+      | update_to context (libname, source, _, id) = 
         let (* pull invalidates the cache, as we must here *)
             val pull_result = pull context (libname, source)
         in
@@ -1442,12 +1443,13 @@ end
 
 structure GitControl :> VCS_CONTROL = struct
 
-    (* With Git repos we always operate in detached HEAD state. Even
-       the master branch is checked out using a remote reference
-       (repoint/master). The remote we use is always named repoint, and we
-       update it to the expected URL each time we fetch, in order to
-       ensure we update properly if the location given in the project
-       file changes. The origin remote is unused. *)
+    (* With Git repos we are intentionally careless about the state of
+       the local branch whose name we are given - we work by checking
+       out either a specific commit (perhaps in detached HEAD state)
+       or resetting our local branch based on the remote. The remote
+       we use is always named repoint, and we update it to the
+       expected URL each time we fetch, in order to ensure we update
+       properly if the location given in the project file changes. *)
 
     val git_program = "git"
                       
@@ -1501,12 +1503,14 @@ structure GitControl :> VCS_CONTROL = struct
             handle IO.Io _ =>
                    return_fallback "Unable to read HEAD ref file"
         end
+
+    fun local_branch_name context (libname, branch) =
+        case branch of
+            BRANCH b => b
+          | DEFAULT_BRANCH => default_branch_name context libname
             
     fun remote_branch_name context (libname, branch) =
-        our_remote ^ "/" ^
-        (case branch of
-            BRANCH b => b
-          | DEFAULT_BRANCH => default_branch_name context libname)
+        our_remote ^ "/" ^ local_branch_name context (libname, branch)
 
     fun add_our_remote context (libname, source) =
         (* When we do the checkout ourselves (above), we add the
@@ -1640,17 +1644,19 @@ structure GitControl :> VCS_CONTROL = struct
 
     (* This function updates to the latest revision on a branch rather
        than to a specific id or tag. We can't just checkout the given
-       branch, as that will succeed even if the branch isn't up to
-       date. We could checkout the branch and then fetch and merge,
-       but it's perhaps cleaner not to maintain a local branch at all,
-       but instead checkout the remote branch as a detached head. *)
+       local branch, as that will succeed even if it isn't up to
+       date. Instead fetch and reset the branch based on the
+       remote. *)
 
     fun update context (libname, source, branch) =
         case fetch context (libname, source) of
             ERROR e => ERROR e
           | _ =>
             case git_command context libname
-                             ["checkout", "--detach",
+                             ["checkout",
+                              "-B",
+                              local_branch_name context (libname, branch),
+                              "--track",
                               remote_branch_name context (libname, branch)] of
                 ERROR e => ERROR e
               | _ => OK ()
@@ -1661,15 +1667,26 @@ structure GitControl :> VCS_CONTROL = struct
        attempt the fetch first, though, purely in order to avoid ugly
        error messages in the common case where we're being asked to
        update to a new pin (from the lock file) that hasn't been
-       fetched yet. *)
+       fetched yet. And after checking out detached, test whether we
+       are actually somewhere on the branch we are supposed to be
+       using and if so, reset it to this commit locally. *)
 
-    fun update_to context (libname, _, "") = 
+    fun update_to context (libname, _, _, "") = 
         ERROR "Non-empty id (tag or revision id) required for update_to"
-      | update_to context (libname, source, id) =
+      | update_to context (libname, source, branch, id) =
         let val fetch_result = fetch context (libname, source)
         in
-            case git_command context libname ["checkout", "--detach", id] of
-                OK _ => OK ()
+            case git_command context libname
+                             ["checkout", "--detach", id] of
+                OK () =>
+                (case is_on_branch context (libname, branch) of
+                     OK true => 
+                     git_command context libname
+                                 ["checkout", "-B",
+                                  local_branch_name context (libname, branch),
+                                  id]
+                   | OK false => OK ()
+                   | ERROR e' => ERROR e')
               | ERROR e =>
                 case fetch_result of
                     ERROR e' => ERROR e' (* this was the ur-error *)
@@ -2263,9 +2280,9 @@ structure SvnControl :> VCS_CONTROL = struct
                 ERROR e => ERROR e
               | _ => OK ()
 
-    fun update_to context (libname, _, "") =
+    fun update_to context (libname, _, _, "") =
         ERROR "Non-empty id (tag or revision id) required for update_to"
-      | update_to context (libname, source, id) = 
+      | update_to context (libname, source, _, id) = 
         case check_remote context (libname, source) of
             ERROR e => ERROR e
           | OK () => 
