@@ -88,6 +88,16 @@ EOF
     fi
 }    
 
+check_id() {
+    local actual="$1"
+    local expected="$2"
+    local repo="$3"
+    if [ "$actual" != "$expected" ]; then
+        echo "ERROR: id for repo $repo ($actual) does not match expected ($expected)"
+        exit 3
+    fi
+}
+
 check_expected_with_extpath() {
     echo "Checking external repo IDs against expected values..."
     local extpath="$1"
@@ -95,22 +105,13 @@ check_expected_with_extpath() {
     local id_B="$3"
     local id_C="$4"
     local actual_id_A=$( cd "$extpath"/A ; hg id | awk '{ print $1 }' | sed 's/\+$//' )
-    if [ "$actual_id_A" != "$id_A" ]; then
-        echo "ERROR: id for repo A ($actual_id_A) does not match expected ($id_A)"
-        exit 3
-    fi
+    check_id "$actual_id_A" "$id_A" "A"
     local actual_id_B=$( cd "$extpath"/B ; git rev-parse HEAD )
-    if [ "$actual_id_B" != "$id_B" ]; then
-        echo "ERROR: id for repo B ($actual_id_B) does not match expected ($id_B)"
-        exit 3
-    fi
+    check_id "$actual_id_B" "$id_B" "B"
     # NB we don't use "svn info --show-item revision" because we still
-    # want svn 1.8 compatibility (at the time of writing)a
+    # want svn 1.8 compatibility (at the time of writing)
     local actual_id_C=$( cd "$extpath"/C ; svn info | grep '^Revision:' | awk '{ print $2; }' )
-    if [ "$actual_id_C" != "$id_C" ]; then
-        echo "ERROR: id for repo C ($actual_id_C) does not match expected ($id_C)"
-        exit 3
-    fi
+    check_id "$actual_id_C" "$id_C" "C"
     check_expected_lockfile "$id_A" "$id_B" "$id_C"
 }
 
