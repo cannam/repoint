@@ -1285,12 +1285,14 @@ structure HgControl :> VCS_CONTROL = struct
     fun remote_for context (libname, source) =
         Provider.remote_url context HG source libname
 
+    val default_branch_name = "default"
+                            
     fun current_state (context : context) libname : vcsstate result =
         let fun is_branch text = text <> "" andalso #"(" = hd (explode text)
             and extract_branch b =
                 if is_branch b     (* need to remove enclosing parens *)
                 then (implode o rev o tl o rev o tl o explode) b
-                else "default"
+                else default_branch_name
             and is_modified id = id <> "" andalso #"+" = hd (rev (explode id))
             and extract_id id =
                 if is_modified id  (* need to remove trailing "+" *)
@@ -1327,8 +1329,7 @@ structure HgControl :> VCS_CONTROL = struct
         end
 
     fun branch_name branch = case branch of
-                                 DEFAULT_BRANCH => "default"
-                               | BRANCH "" => "default"
+                                 DEFAULT_BRANCH => default_branch_name
                                | BRANCH b => b
 
     fun id_of context libname =
@@ -1617,6 +1618,26 @@ structure GitControl :> VCS_CONTROL = struct
           | OK "" => OK false
           | OK _ => OK true
 
+    fun checkout context (libname, source, branch) =
+        let val url = remote_for context (libname, source)
+        in
+            (* make the lib dir rather than just the ext dir, since
+               the lib dir might be nested and git will happily check
+               out into an existing empty dir anyway *)
+            case FileBits.mkpath (FileBits.libpath context libname) of
+                ERROR e => ERROR e
+              | OK () =>
+                git_command context ""
+                            (case branch of
+                                 DEFAULT_BRANCH =>
+                                 ["clone", "--origin", our_remote,
+                                  url, libname]
+                               | BRANCH b => 
+                                 ["clone", "--origin", our_remote,
+                                  "--branch", b,
+                                  url, libname])
+        end
+
     (* This function updates to the latest revision on a branch rather
        than to a specific id or tag. We can't just checkout the given
        branch, as that will succeed even if the branch isn't up to
@@ -1653,22 +1674,6 @@ structure GitControl :> VCS_CONTROL = struct
                 case fetch_result of
                     ERROR e' => ERROR e' (* this was the ur-error *)
                   | _ => ERROR e
-        end
-
-    fun checkout context (libname, source, branch) =
-        let val url = remote_for context (libname, source)
-        in
-            (* make the lib dir rather than just the ext dir, since
-               the lib dir might be nested and git will happily check
-               out into an existing empty dir anyway *)
-            case FileBits.mkpath (FileBits.libpath context libname) of
-                ERROR e => ERROR e
-              | OK () =>
-                case git_command context "" ["clone", "--origin", our_remote,
-                                             url, libname] of
-                    ERROR e => ERROR e
-                  | OK () =>
-                    update context (libname, source, branch)
         end
 
     fun copy_url_for context libname =
