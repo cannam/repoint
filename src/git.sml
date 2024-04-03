@@ -29,34 +29,43 @@ structure GitControl :> VCS_CONTROL = struct
     fun remote_for context (libname, source) =
         Provider.remote_url context GIT source libname
 
-    fun branch_name branch = case branch of
-                                 DEFAULT_BRANCH => "master"
-                               | BRANCH "" => "master"
-                               | BRANCH b => b
-
     val our_remote = "repoint"
-                                                 
-    fun remote_branch_name branch = our_remote ^ "/" ^ branch_name branch
-
-    fun checkout context (libname, source, branch) =
-        let val url = remote_for context (libname, source)
+    val fallback_default_branch = "master" (* only if it can't be determined *)
+                                        
+    fun default_branch_name context libname =
+        let fun return_fallback msg =
+                (if FileBits.verbose ()
+                 then print ("\n" ^ msg ^ "\n")
+                 else ();
+                 fallback_default_branch)
         in
-            (* make the lib dir rather than just the ext dir, since
-               the lib dir might be nested and git will happily check
-               out into an existing empty dir anyway *)
-            case FileBits.mkpath (FileBits.libpath context libname) of
-                OK () =>
-                git_command context ""
-                            (case branch of
-                                 DEFAULT_BRANCH =>
-                                 ["clone", "--origin", our_remote,
-                                  url, libname]
-                               | _ => 
-                                 ["clone", "--origin", our_remote,
-                                  "--branch", branch_name branch,
-                                  url, libname])
-              | ERROR e => ERROR e
+            let val headfile = FileBits.subpath
+                                   context libname
+                                   (".git/refs/remotes/" ^ our_remote ^ "/HEAD")
+                val headspec = FileBits.file_contents headfile
+            in
+                case String.tokens (fn c => c = #" ") headspec of
+                    ["ref:", refpath] =>
+                    (case String.fields (fn c => c = #"/") refpath of
+                         "refs" :: "remotes" :: _ :: rest =>
+                         String.concatWith "/" rest
+                       | _ =>
+                         return_fallback
+                             ("Unable to extract default branch from "
+                              ^ "HEAD ref \"" ^ refpath ^ "\""))
+                  | _ =>
+                    return_fallback ("Unable to extract HEAD ref from \""
+                                     ^ headspec ^ "\"")
+            end
+            handle IO.Io _ =>
+                   return_fallback "Unable to read HEAD ref file"
         end
+            
+    fun remote_branch_name context (libname, branch) =
+        our_remote ^ "/" ^
+        (case branch of
+            BRANCH b => b
+          | DEFAULT_BRANCH => default_branch_name context libname)
 
     fun add_our_remote context (libname, source) =
         (* When we do the checkout ourselves (above), we add the
@@ -119,7 +128,8 @@ structure GitControl :> VCS_CONTROL = struct
            instead could produce the wrong result. *)
         git_command_output context libname
                            ["rev-list", "-1",
-                            remote_branch_name branch, "--"]
+                            remote_branch_name context (libname, branch),
+                            "--"]
                        
     fun is_newest_locally context (libname, branch) =
         case branch_tip context (libname, branch) of
@@ -136,7 +146,9 @@ structure GitControl :> VCS_CONTROL = struct
               | OK false =>
                 case git_command context libname
                                  ["merge-base", "--is-ancestor",
-                                  "HEAD", remote_branch_name branch] of
+                                  "HEAD",
+                                  remote_branch_name context (libname, branch)
+                                 ] of
                     ERROR e => OK false  (* cmd returns non-zero for no *)
                   | _ => OK true
 
@@ -165,6 +177,26 @@ structure GitControl :> VCS_CONTROL = struct
           | OK "" => OK false
           | OK _ => OK true
 
+    fun checkout context (libname, source, branch) =
+        let val url = remote_for context (libname, source)
+        in
+            (* make the lib dir rather than just the ext dir, since
+               the lib dir might be nested and git will happily check
+               out into an existing empty dir anyway *)
+            case FileBits.mkpath (FileBits.libpath context libname) of
+                ERROR e => ERROR e
+              | OK () =>
+                git_command context ""
+                            (case branch of
+                                 DEFAULT_BRANCH =>
+                                 ["clone", "--origin", our_remote,
+                                  url, libname]
+                               | BRANCH b => 
+                                 ["clone", "--origin", our_remote,
+                                  "--branch", b,
+                                  url, libname])
+        end
+
     (* This function updates to the latest revision on a branch rather
        than to a specific id or tag. We can't just checkout the given
        branch, as that will succeed even if the branch isn't up to
@@ -176,8 +208,9 @@ structure GitControl :> VCS_CONTROL = struct
         case fetch context (libname, source) of
             ERROR e => ERROR e
           | _ =>
-            case git_command context libname ["checkout", "--detach",
-                                              remote_branch_name branch] of
+            case git_command context libname
+                             ["checkout", "--detach",
+                              remote_branch_name context (libname, branch)] of
                 ERROR e => ERROR e
               | _ => OK ()
 

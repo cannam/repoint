@@ -36,12 +36,14 @@ structure HgControl :> VCS_CONTROL = struct
     fun remote_for context (libname, source) =
         Provider.remote_url context HG source libname
 
+    val default_branch_name = "default"
+                            
     fun current_state (context : context) libname : vcsstate result =
         let fun is_branch text = text <> "" andalso #"(" = hd (explode text)
             and extract_branch b =
                 if is_branch b     (* need to remove enclosing parens *)
                 then (implode o rev o tl o rev o tl o explode) b
-                else "default"
+                else default_branch_name
             and is_modified id = id <> "" andalso #"+" = hd (rev (explode id))
             and extract_id id =
                 if is_modified id  (* need to remove trailing "+" *)
@@ -78,8 +80,7 @@ structure HgControl :> VCS_CONTROL = struct
         end
 
     fun branch_name branch = case branch of
-                                 DEFAULT_BRANCH => "default"
-                               | BRANCH "" => "default"
+                                 DEFAULT_BRANCH => default_branch_name
                                | BRANCH b => b
 
     fun id_of context libname =
