@@ -91,6 +91,9 @@ structure GitControl :> VCS_CONTROL = struct
     fun id_of context libname =
         git_command_output context libname ["rev-parse", "HEAD"]
 
+    fun symbolic_id_of context libname =
+        git_command_output context libname ["rev-parse", "--abbrev-ref", "HEAD"]
+
     fun is_at_tag context (libname, id, tag) =
         (* For annotated tags (with message) show-ref returns the tag
            object ref rather than that of the revision being tagged;
@@ -111,13 +114,16 @@ structure GitControl :> VCS_CONTROL = struct
                     OK tagged => OK (id = tagged)
                   | ERROR _ => OK false
             end
-            
+
+    fun ids_match id1 id2 =
+        String.isPrefix id1 id2 orelse
+        String.isPrefix id2 id1
+                
     fun is_at context (libname, id_or_tag) =
         case id_of context libname of
             ERROR e => OK false (* HEAD nonexistent, expected in empty repo *)
           | OK id =>
-            if String.isPrefix id_or_tag id orelse
-               String.isPrefix id id_or_tag
+            if ids_match id_or_tag id
             then OK true
             else is_at_tag context (libname, id, id_or_tag)
                            
@@ -143,7 +149,7 @@ structure GitControl :> VCS_CONTROL = struct
             ERROR e => OK false  (* cmd returns non-zero for no *)
           | _ => OK true
                             
-    fun is_on_branch_by_name context (libname, branch_name) =
+    fun is_tip_or_ancestor_by_name context (libname, branch_name) =
         case branch_tip context (libname, branch_name) of
             ERROR e => OK false
           | OK rev =>
@@ -156,7 +162,7 @@ structure GitControl :> VCS_CONTROL = struct
     fun is_on_branch context (libname, branch) =
         let val branch_name = local_branch_name context (libname, branch)
         in
-            is_on_branch_by_name context (libname, branch_name)
+            is_tip_or_ancestor_by_name context (libname, branch_name)
         end
                        
     fun is_newest_locally_by_name context (libname, branch_name) =
@@ -222,25 +228,48 @@ structure GitControl :> VCS_CONTROL = struct
                                   url, libname])
         end
 
+    (* Generally speaking, when updating to a new commit from a remote
+       branch, we can reset the local branch to that commit if (a) it
+       was previously pointing at an ancestor of it or (b) the current
+       HEAD is on a different branch entirely. Otherwise it's possible
+       the user has made some unpushed commits locally that we would
+       lose, and we should avoid moving the local branch. *)
+
+    fun can_reset_for context (libname, branch_name) =
+        case is_tip_or_ancestor_by_name context (libname, branch_name) of
+            ERROR _ => true
+          | OK true => true
+          | OK false => 
+            case symbolic_id_of context libname of
+                ERROR e => true
+              | OK id => id <> "HEAD" andalso id <> branch_name
+            
     (* This function updates to the latest revision on a branch rather
        than to a specific id or tag. We can't just checkout the given
        local branch, as that will succeed even if it isn't up to
        date. Instead fetch and check out the commit identified by the
-       remote branch. *)
+       remote branch, resetting the local branch if can_reset_for says
+       we can. *)
 
     fun update context (libname, source, branch) =
         let val branch_name = local_branch_name context (libname, branch)
             val remote_branch_name = remote_branch_for branch_name
+            val fetch_result = fetch context (libname, source)
+            (* NB it matters that we do the fetch before can_reset_for *)
+            val should_reset = can_reset_for context (libname, branch_name)
         in
-            case fetch context (libname, source) of
+            case fetch_result of
                 ERROR e => ERROR e
               | _ =>
                 case git_command context libname
-                                 ["checkout",
-                                  "-B",
-                                  branch_name,
-                                  "--track",
-                                  remote_branch_name] of
+                                 (if should_reset
+                                  then ["checkout",
+                                        "-B", branch_name, "--track",
+                                        remote_branch_name]
+                                  else ["checkout",
+                                        "--detach",
+                                        remote_branch_name]
+                                 ) of
                     ERROR e => ERROR e
                   | _ => OK ()
         end
@@ -251,27 +280,39 @@ structure GitControl :> VCS_CONTROL = struct
        attempt the fetch first, though, purely in order to avoid ugly
        error messages in the common case where we're being asked to
        update to a new pin (from the lock file) that hasn't been
-       fetched yet. And after checking out detached, test whether we
-       are actually somewhere on the branch we are supposed to be
-       using and if so, reset it to this commit locally. *)
+       fetched yet. As with update, we reset the local branch if
+       can_reset_for says we can, but with the extra condition that
+       the commit we're resetting to is also on the given branch. *)
 
     fun update_to context (libname, _, _, "") = 
         ERROR "Non-empty id (tag or revision id) required for update_to"
       | update_to context (libname, source, branch, id) =
         let val branch_name = local_branch_name context (libname, branch)
             val fetch_result = fetch context (libname, source)
+            (* NB it matters that we do the fetch before can_reset_for *)
+            val should_reset =
+                if can_reset_for context (libname, branch_name)
+                then case branch_tip context (libname, branch_name) of
+                         ERROR _ => true
+                       | OK tip_id =>
+                         if ids_match tip_id id
+                         then true
+                         else case is_branch_ancestor
+                                       context (libname, branch_name) id of
+                                  ERROR _ => true
+                                | OK result => result 
+                else false
         in
             case git_command context libname
-                             ["checkout", "--detach", id] of
-                OK () =>
-                (case is_on_branch_by_name context (libname, branch_name) of
-                     OK true => 
-                     git_command context libname
-                                 ["checkout", "-B",
-                                  branch_name,
-                                  id]
-                   | OK false => OK ()
-                   | ERROR e' => ERROR e')
+                             (if should_reset
+                              then ["checkout",
+                                    "-B", branch_name,
+                                    id]
+                              else ["checkout",
+                                    "--detach",
+                                    id]
+                             ) of
+                OK _ => OK()
               | ERROR e =>
                 case fetch_result of
                     ERROR e' => ERROR e' (* this was the ur-error *)
