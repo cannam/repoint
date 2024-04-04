@@ -118,14 +118,16 @@ structure GitControl :> VCS_CONTROL = struct
     fun ids_match id1 id2 =
         String.isPrefix id1 id2 orelse
         String.isPrefix id2 id1
-                
+
+    fun is_commit_at context (libname, id_or_tag) id =
+        if ids_match id_or_tag id
+        then OK true
+        else is_at_tag context (libname, id, id_or_tag)
+                        
     fun is_at context (libname, id_or_tag) =
         case id_of context libname of
             ERROR e => OK false (* HEAD nonexistent, expected in empty repo *)
-          | OK id =>
-            if ids_match id_or_tag id
-            then OK true
-            else is_at_tag context (libname, id, id_or_tag)
+          | OK id => is_commit_at context (libname, id_or_tag) id
                            
     fun branch_tip context (libname, branch_name) =
         (* We don't have access to the source info or the network
@@ -158,6 +160,16 @@ structure GitControl :> VCS_CONTROL = struct
               | OK true => OK true
               | OK false =>
                 is_branch_ancestor context (libname, branch_name) "HEAD"
+                            
+    fun is_commit_tip_or_ancestor_by_name context (libname, branch_name) id =
+        case branch_tip context (libname, branch_name) of
+            ERROR e => OK false
+          | OK rev =>
+            case is_commit_at context (libname, rev) id of
+                ERROR e => ERROR e
+              | OK true => OK true
+              | OK false =>
+                is_branch_ancestor context (libname, branch_name) id
                             
     fun is_on_branch context (libname, branch) =
         let val branch_name = local_branch_name context (libname, branch)
@@ -229,20 +241,19 @@ structure GitControl :> VCS_CONTROL = struct
         end
 
     (* Generally speaking, when updating to a new commit from a remote
-       branch, we can reset the local branch to that commit if (a) it
-       was previously pointing at an ancestor of it or (b) the current
-       HEAD is on a different branch entirely. Otherwise it's possible
-       the user has made some unpushed commits locally that we would
-       lose, and we should avoid moving the local branch. *)
+       branch, we can reset the local branch to that commit only if it
+       was previously pointing at an ancestor of it. Otherwise it's
+       possible the user has made some unpushed commits locally that
+       we would lose, and we should avoid moving the local branch. *)
 
     fun can_reset_for context (libname, branch_name) =
-        case is_tip_or_ancestor_by_name context (libname, branch_name) of
+        case git_command_output context libname ["rev-parse", branch_name] of
             ERROR _ => true
-          | OK true => true
-          | OK false => 
-            case symbolic_id_of context libname of
-                ERROR e => true
-              | OK id => id <> "HEAD" andalso id <> branch_name
+          | OK id => 
+            case is_commit_tip_or_ancestor_by_name
+                     context (libname, branch_name) id of
+                ERROR _ => true
+              | OK result => result
             
     (* This function updates to the latest revision on a branch rather
        than to a specific id or tag. We can't just checkout the given
@@ -275,12 +286,8 @@ structure GitControl :> VCS_CONTROL = struct
         end
 
     (* This function is dealing with a specific id or tag, so if we
-       can successfully check it out (detached) then that's all we
-       need to do, regardless of whether fetch succeeded or not. We do
-       attempt the fetch first, though, purely in order to avoid ugly
-       error messages in the common case where we're being asked to
-       update to a new pin (from the lock file) that hasn't been
-       fetched yet. As with update, we reset the local branch if
+       can successfully check it out then that's all we strictly need
+       to do. As with update, we reset the local branch if
        can_reset_for says we can, but with the extra condition that
        the commit we're resetting to is also on the given branch. *)
 
