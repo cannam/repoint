@@ -172,9 +172,9 @@ structure HgControl :> VCS_CONTROL = struct
                     end
         end
 
-    fun update_to context (libname, _, "") =
+    fun update_to context (libname, _, _, "") =
         ERROR "Non-empty id (tag or revision id) required for update_to"
-      | update_to context (libname, source, id) = 
+      | update_to context (libname, source, _, id) = 
         let (* pull invalidates the cache, as we must here *)
             val pull_result = pull context (libname, source)
         in

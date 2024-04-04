@@ -98,6 +98,16 @@ check_id() {
     fi
 }
 
+check_string() {
+    local actual="$1"
+    local expected="$2"
+    local context="$3"
+    if [ "$actual" != "$expected" ]; then
+        echo "ERROR: incorrect $context: actual value ($actual) does not match expected ($expected)"
+        exit 3
+    fi
+}
+
 check_expected_with_extpath() {
     echo "Checking external repo IDs against expected values..."
     local extpath="$1"
