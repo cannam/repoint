@@ -3064,7 +3064,7 @@ fun handleSystemArgs args =
         handle e => ERROR (exnMessage e)
     end
                    
-fun repoint args =
+fun repoint args : unit =
     case handleSystemArgs args of
         ERROR e => (print ("Error: " ^ e ^ "\n");
                     OS.Process.exit OS.Process.failure)
