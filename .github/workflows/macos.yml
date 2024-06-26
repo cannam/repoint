@@ -11,7 +11,9 @@ jobs:
     - uses: actions/checkout@v2
     - name: deps
       run: |
-        brew install mercurial mlton polyml mlkit subversion
+        # Used to have mlkit here as well, but Homebrew is refusing to
+        # install it at the moment for some reason
+        brew install mercurial mlton polyml subversion
         brew install --cask smlnj
     - name: prepare
       run: |
