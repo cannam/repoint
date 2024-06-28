@@ -22,5 +22,9 @@ jobs:
         make clean   # so we rebuild the aggregated repoint.sml
     - name: make
       run: make
-    - name: test
-      run: PATH=$(brew --prefix)/smlnj/bin:"$PATH" make test-all
+    - name: find-sml
+      run: |
+        echo "Prefix is $(brew --prefix)"
+        find "$(brew --prefix)" -name sml -print
+#    - name: test
+#      run: PATH=$(brew --prefix)/smlnj/bin:"$PATH" make test-all
