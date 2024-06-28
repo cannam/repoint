@@ -26,5 +26,7 @@ jobs:
       run: |
         echo "Prefix is $(brew --prefix)"
         find "$(brew --prefix)" -name sml\* -print | while read x; do echo "found $x" ; ls -lR "$x" ; done
+        echo "Now /usr/local"
+        find "/usr/local" -name sml\* -print | while read x; do echo "found $x" ; ls -lR "$x" ; done
 #    - name: test
 #      run: PATH=$(brew --prefix)/smlnj/bin:"$PATH" make test-all
